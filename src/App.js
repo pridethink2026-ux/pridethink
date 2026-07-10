@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import AuthProfile from "./AuthProfile";
 import Chat from "./Chat";
+import Feed from "./Feed";
 
 const THEME = {
   bg: "#14102b",
@@ -32,7 +33,7 @@ const navStyles = {
 };
 
 function App() {
-  const [view, setView] = useState("perfil"); // "perfil" | "chat"
+  const [view, setView] = useState("perfil"); // "perfil" | "chat" | "feed"
 
   return (
     <div>
@@ -40,12 +41,16 @@ function App() {
         <button style={navStyles.button(view === "perfil")} onClick={() => setView("perfil")}>
           Perfil
         </button>
+        <button style={navStyles.button(view === "feed")} onClick={() => setView("feed")}>
+          Muro
+        </button>
         <button style={navStyles.button(view === "chat")} onClick={() => setView("chat")}>
           Chat
         </button>
       </div>
 
       {view === "perfil" && <AuthProfile />}
+      {view === "feed" && <Feed />}
       {view === "chat" && <Chat />}
     </div>
   );
