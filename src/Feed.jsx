@@ -5,6 +5,7 @@ import {
   collection,
   doc,
   addDoc,
+  deleteDoc,
   onSnapshot,
   query,
   orderBy,
@@ -17,20 +18,19 @@ import {
 /*
   Feed
   ----
-  Muro social en tiempo real: publicaciones + reacciones (like) + comentarios.
+  Muro social en tiempo real: publicaciones + reacciones (like) + comentarios
+  + edición/borrado de tus propios posts + notificaciones a otros usuarios.
 
   Estructura en Firestore:
   - "posts/{postId}"
-      -> { authorId, authorName, authorIdentity, text, createdAt, likes: [uid, uid, ...] }
+      -> { authorId, authorName, authorIdentity, text, createdAt, likes: [uid...], commentsCount }
   - "posts/{postId}/comments/{commentId}"
       -> { authorId, authorName, authorIdentity, text, createdAt }
+  - "notifications/{uid}/items/{itemId}"
+      -> { type: 'like' | 'comment' | 'message', fromUid, fromName, fromIdentity, createdAt, read }
 
-  "likes" se guarda como array de UID dentro del post (arrayUnion/arrayRemove),
-  así el conteo y el estado "¿ya di like?" salen del mismo documento sin
-  necesitar una subcolección aparte.
-
-  Los comentarios sí son subcolección, porque pueden crecer mucho y
-  solo se cargan cuando alguien abre esa publicación.
+  "commentsCount" se guarda directo en el post (incrementCounter simple)
+  para poder mostrar el número sin tener que abrir los comentarios.
 */
 
 const THEME = {
@@ -121,6 +121,50 @@ const styles = {
   authorName: { fontSize: "14px", fontWeight: 600, margin: 0 },
   authorIdentity: { fontSize: "12px", color: THEME.textMuted, margin: 0 },
   postText: { fontSize: "14px", lineHeight: 1.5, margin: "0 0 12px", whiteSpace: "pre-wrap" },
+  headerRight: { marginLeft: "auto", display: "flex", gap: "10px" },
+  smallLink: {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "12px",
+    color: THEME.textMuted,
+    padding: 0,
+  },
+  editTextarea: {
+    width: "100%",
+    boxSizing: "border-box",
+    background: THEME.surfaceAlt,
+    border: `1px solid ${THEME.border}`,
+    borderRadius: "10px",
+    padding: "10px 12px",
+    fontSize: "14px",
+    color: THEME.text,
+    outline: "none",
+    resize: "none",
+    fontFamily: "inherit",
+    marginBottom: "8px",
+  },
+  editRow: { display: "flex", gap: "8px", marginBottom: "12px" },
+  smallBtn: {
+    padding: "6px 14px",
+    borderRadius: "8px",
+    border: "none",
+    background: `linear-gradient(135deg, ${THEME.accent}, ${THEME.accent2})`,
+    color: "#14102b",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  smallBtnGhost: {
+    padding: "6px 14px",
+    borderRadius: "8px",
+    border: `1px solid ${THEME.border}`,
+    background: "transparent",
+    color: THEME.textMuted,
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
   actionsRow: {
     display: "flex",
     gap: "16px",
@@ -208,13 +252,29 @@ const styles = {
   },
 };
 
+// Crea una notificación para otra persona (nunca para ti mismo)
+async function notify(targetUid, { type, fromUid, fromName, fromIdentity }) {
+  if (!targetUid || targetUid === fromUid) return;
+  await addDoc(collection(db, "notifications", targetUid, "items"), {
+    type,
+    fromUid,
+    fromName,
+    fromIdentity,
+    createdAt: serverTimestamp(),
+    read: false,
+  });
+}
+
 function PostCard({ post, currentUid, myProfile }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(post.text);
 
   const likes = post.likes || [];
   const iLiked = likes.includes(currentUid);
+  const isMine = post.authorId === currentUid;
 
   // Escucha los comentarios solo mientras el bloque está abierto (ahorra lecturas)
   useEffect(() => {
@@ -234,6 +294,14 @@ function PostCard({ post, currentUid, myProfile }) {
     await updateDoc(postRef, {
       likes: iLiked ? arrayRemove(currentUid) : arrayUnion(currentUid),
     });
+    if (!iLiked) {
+      await notify(post.authorId, {
+        type: "like",
+        fromUid: currentUid,
+        fromName: myProfile?.displayName || "Alguien",
+        fromIdentity: myProfile?.identity || "",
+      });
+    }
   };
 
   const handleComment = async (e) => {
@@ -246,7 +314,27 @@ function PostCard({ post, currentUid, myProfile }) {
       text: commentText.trim(),
       createdAt: serverTimestamp(),
     });
+    await updateDoc(doc(db, "posts", post.id), {
+      commentsCount: (post.commentsCount || 0) + 1,
+    });
+    await notify(post.authorId, {
+      type: "comment",
+      fromUid: currentUid,
+      fromName: myProfile?.displayName || "Alguien",
+      fromIdentity: myProfile?.identity || "",
+    });
     setCommentText("");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editText.trim()) return;
+    await updateDoc(doc(db, "posts", post.id), { text: editText.trim() });
+    setEditing(false);
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("¿Borrar esta publicación? No se puede deshacer.")) return;
+    await deleteDoc(doc(db, "posts", post.id));
   };
 
   const initial = (post.authorIdentity || post.authorName || "?").charAt(0).toUpperCase();
@@ -259,8 +347,43 @@ function PostCard({ post, currentUid, myProfile }) {
           <p style={styles.authorName}>{post.authorName}</p>
           <p style={styles.authorIdentity}>{post.authorIdentity}</p>
         </div>
+        {isMine && !editing && (
+          <div style={styles.headerRight}>
+            <button style={styles.smallLink} onClick={() => setEditing(true)}>
+              Editar
+            </button>
+            <button style={styles.smallLink} onClick={handleDelete}>
+              Borrar
+            </button>
+          </div>
+        )}
       </div>
-      <p style={styles.postText}>{post.text}</p>
+
+      {editing ? (
+        <>
+          <textarea
+            style={styles.editTextarea}
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+          />
+          <div style={styles.editRow}>
+            <button style={styles.smallBtn} onClick={handleSaveEdit}>
+              Guardar
+            </button>
+            <button
+              style={styles.smallBtnGhost}
+              onClick={() => {
+                setEditText(post.text);
+                setEditing(false);
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </>
+      ) : (
+        <p style={styles.postText}>{post.text}</p>
+      )}
 
       <div style={styles.actionsRow}>
         <button style={styles.actionBtn(iLiked)} onClick={toggleLike}>
@@ -270,7 +393,7 @@ function PostCard({ post, currentUid, myProfile }) {
           style={styles.actionBtn(commentsOpen)}
           onClick={() => setCommentsOpen((v) => !v)}
         >
-          💬 Comentar
+          💬 {post.commentsCount > 0 ? post.commentsCount : "Comentar"}
         </button>
       </div>
 
@@ -364,6 +487,7 @@ export default function Feed() {
         text: text.trim(),
         createdAt: serverTimestamp(),
         likes: [],
+        commentsCount: 0,
       });
       setText("");
     } finally {

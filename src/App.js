@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import AuthProfile from "./AuthProfile";
 import Chat from "./Chat";
 import Feed from "./Feed";
+import Notifications from "./Notifications";
 
 const THEME = {
   bg: "#14102b",
@@ -16,9 +17,11 @@ const navStyles = {
   bar: {
     display: "flex",
     justifyContent: "center",
+    alignItems: "center",
     gap: "8px",
     padding: "16px",
     background: THEME.bg,
+    position: "relative",
   },
   button: (active) => ({
     padding: "8px 20px",
@@ -30,6 +33,12 @@ const navStyles = {
     fontWeight: 600,
     cursor: "pointer",
   }),
+  bellSlot: {
+    position: "absolute",
+    right: "16px",
+    top: "50%",
+    transform: "translateY(-50%)",
+  },
 };
 
 function App() {
@@ -47,6 +56,9 @@ function App() {
         <button style={navStyles.button(view === "chat")} onClick={() => setView("chat")}>
           Chat
         </button>
+        <div style={navStyles.bellSlot}>
+          <Notifications />
+        </div>
       </div>
 
       {view === "perfil" && <AuthProfile />}

@@ -83,6 +83,21 @@ const styles = {
     fontWeight: 600,
     borderBottom: `1px solid ${THEME.border}`,
   },
+  searchBox: {
+    padding: "10px 12px",
+    borderBottom: `1px solid ${THEME.border}`,
+  },
+  searchInput: {
+    width: "100%",
+    boxSizing: "border-box",
+    background: THEME.surfaceAlt,
+    border: `1px solid ${THEME.border}`,
+    borderRadius: "999px",
+    padding: "7px 12px",
+    fontSize: "12px",
+    color: THEME.text,
+    outline: "none",
+  },
   contactsList: {
     flex: 1,
     overflowY: "auto",
@@ -187,6 +202,7 @@ export default function Chat() {
   const [activeContact, setActiveContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [search, setSearch] = useState("");
   const messagesEndRef = useRef(null);
 
   // Escucha si hay sesión activa (viene del mismo login de AuthProfile)
@@ -223,12 +239,21 @@ export default function Chat() {
 
   // Contactos visibles: sin perfiles privados, sin bloqueos en ninguna dirección
   const myBlocked = myProfile?.blockedUsers || [];
-  const contacts = allUsers.filter((c) => {
+  const visibleContacts = allUsers.filter((c) => {
     if (c.isPrivate) return false;
     if (myBlocked.includes(c.uid)) return false;
     if ((c.blockedUsers || []).includes(currentUid)) return false;
     return true;
   });
+
+  const searchLower = search.trim().toLowerCase();
+  const contacts = searchLower
+    ? visibleContacts.filter(
+        (c) =>
+          (c.displayName || "").toLowerCase().includes(searchLower) ||
+          (c.identity || "").toLowerCase().includes(searchLower)
+      )
+    : visibleContacts;
 
   const isBlocked = activeContact ? myBlocked.includes(activeContact.uid) : false;
 
@@ -284,6 +309,16 @@ export default function Chat() {
       createdAt: serverTimestamp(),
     });
 
+    // Notifica al destinatario que le llegó un mensaje nuevo
+    await addDoc(collection(db, "notifications", activeContact.uid, "items"), {
+      type: "message",
+      fromUid: currentUid,
+      fromName: myProfile?.displayName || "Alguien",
+      fromIdentity: myProfile?.identity || "",
+      createdAt: serverTimestamp(),
+      read: false,
+    });
+
     setText("");
   };
 
@@ -304,10 +339,19 @@ export default function Chat() {
       <div style={styles.shell}>
         <div style={styles.contactsCol}>
           <p style={styles.contactsHeader}>Personas</p>
+          <div style={styles.searchBox}>
+            <input
+              style={styles.searchInput}
+              type="text"
+              placeholder="Buscar por nombre o identidad..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <div style={styles.contactsList}>
             {contacts.length === 0 && (
               <p style={{ padding: "16px", fontSize: "13px", color: THEME.textMuted }}>
-                Todavía no hay más personas registradas.
+                {search ? "Nadie coincide con tu búsqueda." : "Todavía no hay más personas registradas."}
               </p>
             )}
             {contacts.map((c) => (
