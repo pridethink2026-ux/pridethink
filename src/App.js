@@ -16,12 +16,20 @@ const THEME = {
 const navStyles = {
   bar: {
     display: "flex",
-    justifyContent: "center",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: "8px",
-    padding: "16px",
+    gap: "10px",
+    padding: "12px 16px",
     background: THEME.bg,
-    position: "relative",
+  },
+  buttonsGroup: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "8px",
+    flex: "1 1 auto",
+    order: 2,
   },
   button: (active) => ({
     padding: "8px 20px",
@@ -34,19 +42,15 @@ const navStyles = {
     cursor: "pointer",
   }),
   bellSlot: {
-    position: "absolute",
-    right: "16px",
-    top: "50%",
-    transform: "translateY(-50%)",
+    flexShrink: 0,
+    order: 3,
   },
   logoSlot: {
-    position: "absolute",
-    left: "16px",
-    top: "50%",
-    transform: "translateY(-50%)",
     display: "flex",
     alignItems: "center",
     gap: "8px",
+    flexShrink: 0,
+    order: 1,
   },
   logoImg: {
     width: "30px",
@@ -58,6 +62,7 @@ const navStyles = {
     fontSize: "15px",
     fontWeight: 600,
     color: THEME.text,
+    whiteSpace: "nowrap",
   },
 };
 
@@ -71,15 +76,17 @@ function App() {
           <img src="/logo-icon.png" alt="Pridethink" style={navStyles.logoImg} />
           <span style={navStyles.logoText}>Pridethink</span>
         </div>
-        <button style={navStyles.button(view === "perfil")} onClick={() => setView("perfil")}>
-          Perfil
-        </button>
-        <button style={navStyles.button(view === "feed")} onClick={() => setView("feed")}>
-          Muro
-        </button>
-        <button style={navStyles.button(view === "chat")} onClick={() => setView("chat")}>
-          Chat
-        </button>
+        <div style={navStyles.buttonsGroup}>
+          <button style={navStyles.button(view === "perfil")} onClick={() => setView("perfil")}>
+            Perfil
+          </button>
+          <button style={navStyles.button(view === "feed")} onClick={() => setView("feed")}>
+            Muro
+          </button>
+          <button style={navStyles.button(view === "chat")} onClick={() => setView("chat")}>
+            Chat
+          </button>
+        </div>
         <div style={navStyles.bellSlot}>
           <Notifications />
         </div>
