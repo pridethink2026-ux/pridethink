@@ -65,6 +65,13 @@ const styles = {
     padding: "32px 28px",
     boxSizing: "border-box",
   },
+  logo: {
+    display: "block",
+    width: "72px",
+    height: "72px",
+    borderRadius: "18px",
+    margin: "0 auto 20px",
+  },
   eyebrow: {
     fontSize: "12px",
     letterSpacing: "0.14em",
@@ -558,13 +565,16 @@ export default function AuthProfile() {
     <div style={styles.page}>
       <div style={styles.card}>
         {(step === "login" || step === "signup") && (
-          <LoginForm
-            mode={step}
-            setMode={setStep}
-            onSubmit={handleAuthSubmit}
-            error={error}
-            loading={loading}
-          />
+          <>
+            <img src="/logo-icon.png" alt="Pridethink" style={styles.logo} />
+            <LoginForm
+              mode={step}
+              setMode={setStep}
+              onSubmit={handleAuthSubmit}
+              error={error}
+              loading={loading}
+            />
+          </>
         )}
         {step === "identity" && (
           <IdentityForm
