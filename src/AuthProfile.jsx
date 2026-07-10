@@ -194,6 +194,36 @@ const styles = {
   },
   fieldLabel: { color: THEME.textMuted },
   fieldValue: { fontWeight: 500 },
+  privacyRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "14px 0",
+    borderBottom: `1px solid ${THEME.border}`,
+  },
+  privacyText: { fontSize: "13px" },
+  privacyHint: { fontSize: "11px", color: THEME.textMuted, margin: "2px 0 0" },
+  toggle: (on) => ({
+    width: "44px",
+    height: "24px",
+    borderRadius: "999px",
+    background: on ? THEME.accent2 : THEME.surfaceAlt,
+    border: `1px solid ${on ? THEME.accent2 : THEME.border}`,
+    position: "relative",
+    cursor: "pointer",
+    flexShrink: 0,
+    transition: "background 0.15s",
+  }),
+  toggleDot: (on) => ({
+    width: "18px",
+    height: "18px",
+    borderRadius: "50%",
+    background: "#fff",
+    position: "absolute",
+    top: "2px",
+    left: on ? "23px" : "2px",
+    transition: "left 0.15s",
+  }),
 };
 
 function LoginForm({ onSubmit, mode, setMode, error, loading }) {
@@ -338,7 +368,7 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
   );
 }
 
-function ProfileView({ user, onLogout, onEdit }) {
+function ProfileView({ user, onLogout, onEdit, onTogglePrivacy }) {
   const initial = (user.identity || "?").charAt(0).toUpperCase();
   return (
     <div>
@@ -370,6 +400,25 @@ function ProfileView({ user, onLogout, onEdit }) {
         <div style={styles.fieldRow}>
           <span style={styles.fieldLabel}>Miembro desde</span>
           <span style={styles.fieldValue}>{user.joinedAt}</span>
+        </div>
+
+        <div style={styles.privacyRow}>
+          <div>
+            <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
+              Perfil privado
+            </p>
+            <p style={styles.privacyHint}>
+              {user.isPrivate
+                ? "No apareces en el chat ni tus publicaciones son visibles para otros."
+                : "Apareces en el chat y tus publicaciones son públicas."}
+            </p>
+          </div>
+          <div
+            style={styles.toggle(!!user.isPrivate)}
+            onClick={() => onTogglePrivacy(!user.isPrivate)}
+          >
+            <div style={styles.toggleDot(!!user.isPrivate)} />
+          </div>
         </div>
       </div>
 
@@ -473,6 +522,19 @@ export default function AuthProfile() {
     }
   };
 
+  const handleTogglePrivacy = async (newValue) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const updated = { ...user, isPrivate: newValue };
+    setUser(updated);
+    try {
+      // FIREBASE: firestore write (real) - guarda la preferencia de privacidad
+      await setDoc(doc(db, "users", uid), updated, { merge: true });
+    } catch (err) {
+      setUser(user); // revierte si falla
+    }
+  };
+
   const handleLogout = async () => {
     // FIREBASE: auth (real) - cierra la sesión
     await signOut(auth);
@@ -517,6 +579,7 @@ export default function AuthProfile() {
             user={user}
             onLogout={handleLogout}
             onEdit={() => setStep("identity")}
+            onTogglePrivacy={handleTogglePrivacy}
           />
         )}
       </div>

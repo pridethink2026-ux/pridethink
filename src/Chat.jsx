@@ -10,6 +10,9 @@ import {
   orderBy,
   serverTimestamp,
   setDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 
 /*
@@ -103,6 +106,19 @@ const styles = {
     borderBottom: `1px solid ${THEME.border}`,
     fontSize: "15px",
     fontWeight: 600,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  blockBtn: {
+    background: "none",
+    border: `1px solid ${THEME.border}`,
+    borderRadius: "999px",
+    padding: "5px 12px",
+    fontSize: "12px",
+    fontWeight: 600,
+    color: THEME.textMuted,
+    cursor: "pointer",
   },
   messagesArea: {
     flex: 1,
@@ -166,7 +182,8 @@ const styles = {
 
 export default function Chat() {
   const [currentUid, setCurrentUid] = useState(null);
-  const [contacts, setContacts] = useState([]);
+  const [myProfile, setMyProfile] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -180,7 +197,16 @@ export default function Chat() {
     return unsub;
   }, []);
 
-  // Lista de contactos en tiempo real: todos los usuarios registrados menos tú
+  // Escucha tu propio perfil en tiempo real (necesario para saber a quién bloqueaste)
+  useEffect(() => {
+    if (!currentUid) return;
+    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
+      if (snap.exists()) setMyProfile(snap.data());
+    });
+    return unsub;
+  }, [currentUid]);
+
+  // Lista de todos los usuarios registrados en tiempo real (se filtra abajo)
   useEffect(() => {
     if (!currentUid) return;
     const unsub = onSnapshot(collection(db, "users"), (snap) => {
@@ -190,10 +216,31 @@ export default function Chat() {
           list.push({ uid: d.id, ...d.data() });
         }
       });
-      setContacts(list);
+      setAllUsers(list);
     });
     return unsub;
   }, [currentUid]);
+
+  // Contactos visibles: sin perfiles privados, sin bloqueos en ninguna dirección
+  const myBlocked = myProfile?.blockedUsers || [];
+  const contacts = allUsers.filter((c) => {
+    if (c.isPrivate) return false;
+    if (myBlocked.includes(c.uid)) return false;
+    if ((c.blockedUsers || []).includes(currentUid)) return false;
+    return true;
+  });
+
+  const isBlocked = activeContact ? myBlocked.includes(activeContact.uid) : false;
+
+  const handleToggleBlock = async () => {
+    if (!activeContact || !currentUid) return;
+    await updateDoc(doc(db, "users", currentUid), {
+      blockedUsers: isBlocked
+        ? arrayRemove(activeContact.uid)
+        : arrayUnion(activeContact.uid),
+    });
+    if (!isBlocked) setActiveContact(null); // al bloquear, sale de la conversación
+  };
 
   // Mensajes en tiempo real de la conversación activa
   useEffect(() => {
@@ -280,7 +327,12 @@ export default function Chat() {
           {activeContact ? (
             <>
               <div style={styles.chatHeader}>
-                {activeContact.displayName} · {activeContact.identity}
+                <span>
+                  {activeContact.displayName} · {activeContact.identity}
+                </span>
+                <button style={styles.blockBtn} onClick={handleToggleBlock}>
+                  {isBlocked ? "Desbloquear" : "Bloquear"}
+                </button>
               </div>
               <div style={styles.messagesArea}>
                 {messages.map((m) => (

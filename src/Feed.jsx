@@ -4,7 +4,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   doc,
-  getDoc,
   addDoc,
   onSnapshot,
   query,
@@ -310,20 +309,36 @@ function PostCard({ post, currentUid, myProfile }) {
 export default function Feed() {
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
+  const [usersMap, setUsersMap] = useState({});
   const [posts, setPosts] = useState([]);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
 
   // Detecta sesión activa y trae tu propio perfil (nombre/identidad para firmar tus posts)
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
       setCurrentUid(user ? user.uid : null);
-      if (user) {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists()) setMyProfile(snap.data());
-      } else {
-        setMyProfile(null);
-      }
+    });
+    return unsub;
+  }, []);
+
+  // Escucha tu propio perfil en tiempo real (para saber a quién bloqueaste)
+  useEffect(() => {
+    if (!currentUid) return;
+    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
+      if (snap.exists()) setMyProfile(snap.data());
+    });
+    return unsub;
+  }, [currentUid]);
+
+  // Escucha todos los perfiles (solo isPrivate/blockedUsers) para filtrar el feed en vivo
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "users"), (snap) => {
+      const map = {};
+      snap.forEach((d) => {
+        map[d.id] = d.data();
+      });
+      setUsersMap(map);
     });
     return unsub;
   }, []);
@@ -356,6 +371,16 @@ export default function Feed() {
     }
   };
 
+  const myBlocked = myProfile?.blockedUsers || [];
+  const visiblePosts = posts.filter((p) => {
+    if (p.authorId === currentUid) return true; // siempre ves tus propios posts
+    const author = usersMap[p.authorId];
+    if (author?.isPrivate) return false;
+    if (myBlocked.includes(p.authorId)) return false;
+    if ((author?.blockedUsers || []).includes(currentUid)) return false;
+    return true;
+  });
+
   if (!currentUid) {
     return (
       <div style={styles.wrapper}>
@@ -382,11 +407,11 @@ export default function Feed() {
           <div style={{ clear: "both" }} />
         </form>
 
-        {posts.length === 0 && (
+        {visiblePosts.length === 0 && (
           <p style={styles.empty}>Todavía no hay publicaciones. ¡Sé el primero!</p>
         )}
 
-        {posts.map((p) => (
+        {visiblePosts.map((p) => (
           <PostCard key={p.id} post={p} currentUid={currentUid} myProfile={myProfile} />
         ))}
       </div>
