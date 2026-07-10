@@ -39,6 +39,26 @@ const navStyles = {
     top: "50%",
     transform: "translateY(-50%)",
   },
+  logoSlot: {
+    position: "absolute",
+    left: "16px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+  },
+  logoImg: {
+    width: "30px",
+    height: "30px",
+    borderRadius: "8px",
+  },
+  logoText: {
+    fontFamily: "'Space Grotesk', 'Inter', sans-serif",
+    fontSize: "15px",
+    fontWeight: 600,
+    color: THEME.text,
+  },
 };
 
 function App() {
@@ -47,6 +67,10 @@ function App() {
   return (
     <div>
       <div style={navStyles.bar}>
+        <div style={navStyles.logoSlot}>
+          <img src="/logo-icon.png" alt="Pridethink" style={navStyles.logoImg} />
+          <span style={navStyles.logoText}>Pridethink</span>
+        </div>
         <button style={navStyles.button(view === "perfil")} onClick={() => setView("perfil")}>
           Perfil
         </button>
