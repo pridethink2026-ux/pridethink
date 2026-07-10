@@ -28,6 +28,14 @@ import {
 
   Todo es en tiempo real: usa onSnapshot, no hace falta recargar la página
   para ver mensajes nuevos ni contactos nuevos.
+
+  DISEÑO RESPONSIVO:
+  En pantallas angostas (celular) se muestra una sola columna a la vez
+  (lista de contactos O conversación activa, con botón "← Volver").
+  En pantallas anchas (escritorio) se muestran lado a lado, como antes.
+  Esto evita que el ancho fijo de la lista de contactos aplaste la
+  conversación en celulares, que era lo que causaba el texto partido
+  en una palabra por línea.
 */
 
 const THEME = {
@@ -41,8 +49,22 @@ const THEME = {
   border: "rgba(167, 139, 250, 0.25)",
 };
 
+const MOBILE_BREAKPOINT = 700;
+
 function getChatId(uidA, uidB) {
   return [uidA, uidB].sort().join("_");
+}
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < MOBILE_BREAKPOINT : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isMobile;
 }
 
 const styles = {
@@ -67,13 +89,13 @@ const styles = {
     display: "flex",
     overflow: "hidden",
   },
-  contactsCol: {
-    width: "240px",
-    borderRight: `1px solid ${THEME.border}`,
+  contactsCol: (isMobile) => ({
+    width: isMobile ? "100%" : "240px",
+    borderRight: isMobile ? "none" : `1px solid ${THEME.border}`,
     display: "flex",
     flexDirection: "column",
     flexShrink: 0,
-  },
+  }),
   contactsHeader: {
     padding: "18px 16px 12px",
     fontSize: "12px",
@@ -122,9 +144,19 @@ const styles = {
     fontSize: "15px",
     fontWeight: 600,
     display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: "10px",
   },
+  backBtn: {
+    background: "none",
+    border: "none",
+    color: THEME.textMuted,
+    fontSize: "18px",
+    cursor: "pointer",
+    padding: 0,
+    lineHeight: 1,
+  },
+  chatHeaderText: { flex: 1, minWidth: 0 },
   blockBtn: {
     background: "none",
     border: `1px solid ${THEME.border}`,
@@ -134,6 +166,7 @@ const styles = {
     fontWeight: 600,
     color: THEME.textMuted,
     cursor: "pointer",
+    flexShrink: 0,
   },
   messagesArea: {
     flex: 1,
@@ -148,11 +181,12 @@ const styles = {
     justifyContent: mine ? "flex-end" : "flex-start",
   }),
   bubble: (mine) => ({
-    maxWidth: "70%",
+    maxWidth: "75%",
     padding: "10px 14px",
     borderRadius: "14px",
     fontSize: "14px",
     lineHeight: 1.4,
+    wordBreak: "break-word",
     background: mine
       ? `linear-gradient(135deg, ${THEME.accent}, ${THEME.accent2})`
       : THEME.surfaceAlt,
@@ -166,6 +200,7 @@ const styles = {
   },
   input: {
     flex: 1,
+    minWidth: 0,
     background: THEME.surfaceAlt,
     border: `1px solid ${THEME.border}`,
     borderRadius: "10px",
@@ -182,6 +217,7 @@ const styles = {
     color: "#14102b",
     fontWeight: 600,
     cursor: "pointer",
+    flexShrink: 0,
   },
   emptyState: {
     flex: 1,
@@ -196,6 +232,7 @@ const styles = {
 };
 
 export default function Chat() {
+  const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
   const [allUsers, setAllUsers] = useState([]);
@@ -334,77 +371,91 @@ export default function Chat() {
     );
   }
 
+  // En móvil: si hay conversación activa, solo se muestra el chat.
+  // Si no hay conversación activa, solo se muestra la lista de contactos.
+  const showContactsList = !isMobile || !activeContact;
+  const showChatPane = !isMobile || !!activeContact;
+
   return (
     <div style={styles.wrapper}>
       <div style={styles.shell}>
-        <div style={styles.contactsCol}>
-          <p style={styles.contactsHeader}>Personas</p>
-          <div style={styles.searchBox}>
-            <input
-              style={styles.searchInput}
-              type="text"
-              placeholder="Buscar por nombre o identidad..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div style={styles.contactsList}>
-            {contacts.length === 0 && (
-              <p style={{ padding: "16px", fontSize: "13px", color: THEME.textMuted }}>
-                {search ? "Nadie coincide con tu búsqueda." : "Todavía no hay más personas registradas."}
-              </p>
-            )}
-            {contacts.map((c) => (
-              <div
-                key={c.uid}
-                style={styles.contactItem(activeContact?.uid === c.uid)}
-                onClick={() => setActiveContact(c)}
-              >
-                <p style={styles.contactName}>{c.displayName || "Sin nombre"}</p>
-                <p style={styles.contactIdentity}>{c.identity}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={styles.chatCol}>
-          {activeContact ? (
-            <>
-              <div style={styles.chatHeader}>
-                <span>
-                  {activeContact.displayName} · {activeContact.identity}
-                </span>
-                <button style={styles.blockBtn} onClick={handleToggleBlock}>
-                  {isBlocked ? "Desbloquear" : "Bloquear"}
-                </button>
-              </div>
-              <div style={styles.messagesArea}>
-                {messages.map((m) => (
-                  <div key={m.id} style={styles.bubbleRow(m.senderId === currentUid)}>
-                    <div style={styles.bubble(m.senderId === currentUid)}>{m.text}</div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-              <form style={styles.inputRow} onSubmit={handleSend}>
-                <input
-                  style={styles.input}
-                  type="text"
-                  placeholder="Escribe un mensaje..."
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                />
-                <button type="submit" style={styles.sendBtn}>
-                  Enviar
-                </button>
-              </form>
-            </>
-          ) : (
-            <div style={styles.emptyState}>
-              Elige a alguien de la lista para empezar a chatear.
+        {showContactsList && (
+          <div style={styles.contactsCol(isMobile)}>
+            <p style={styles.contactsHeader}>Personas</p>
+            <div style={styles.searchBox}>
+              <input
+                style={styles.searchInput}
+                type="text"
+                placeholder="Buscar por nombre o identidad..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-          )}
-        </div>
+            <div style={styles.contactsList}>
+              {contacts.length === 0 && (
+                <p style={{ padding: "16px", fontSize: "13px", color: THEME.textMuted }}>
+                  {search ? "Nadie coincide con tu búsqueda." : "Todavía no hay más personas registradas."}
+                </p>
+              )}
+              {contacts.map((c) => (
+                <div
+                  key={c.uid}
+                  style={styles.contactItem(activeContact?.uid === c.uid)}
+                  onClick={() => setActiveContact(c)}
+                >
+                  <p style={styles.contactName}>{c.displayName || "Sin nombre"}</p>
+                  <p style={styles.contactIdentity}>{c.identity}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showChatPane && (
+          <div style={styles.chatCol}>
+            {activeContact ? (
+              <>
+                <div style={styles.chatHeader}>
+                  {isMobile && (
+                    <button style={styles.backBtn} onClick={() => setActiveContact(null)}>
+                      ←
+                    </button>
+                  )}
+                  <span style={styles.chatHeaderText}>
+                    {activeContact.displayName} · {activeContact.identity}
+                  </span>
+                  <button style={styles.blockBtn} onClick={handleToggleBlock}>
+                    {isBlocked ? "Desbloquear" : "Bloquear"}
+                  </button>
+                </div>
+                <div style={styles.messagesArea}>
+                  {messages.map((m) => (
+                    <div key={m.id} style={styles.bubbleRow(m.senderId === currentUid)}>
+                      <div style={styles.bubble(m.senderId === currentUid)}>{m.text}</div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+                <form style={styles.inputRow} onSubmit={handleSend}>
+                  <input
+                    style={styles.input}
+                    type="text"
+                    placeholder="Escribe un mensaje..."
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                  />
+                  <button type="submit" style={styles.sendBtn}>
+                    Enviar
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div style={styles.emptyState}>
+                Elige a alguien de la lista para empezar a chatear.
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
