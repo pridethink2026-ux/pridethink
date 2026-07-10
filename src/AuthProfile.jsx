@@ -1,11 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { auth, db } from "./firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  onAuthStateChanged,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+
+/*
+  AuthProfile
+  -----------
+  Flujo: Login/Registro -> Elegir identidad libre -> Perfil guardado.
+
+  YA CONECTADO A FIREBASE (Auth + Firestore reales):
+  - Auth real -> createUserWithEmailAndPassword / signInWithEmailAndPassword
+  - Firestore write -> setDoc(doc(db, "users", uid), perfil)
+  - Firestore read  -> getDoc(doc(db, "users", uid))
+
+  Ahora los datos SÍ persisten al recargar la página, y dos personas
+  distintas (tú y tu socio) ven la misma base de datos real.
+*/
 
 const IDENTITY_SUGGESTIONS = [
   "Gato",
@@ -367,19 +382,43 @@ export default function AuthProfile() {
   const [step, setStep] = useState("login"); // login | signup | identity | profile
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [pendingUid, setPendingUid] = useState(null);
   const [user, setUser] = useState(null);
+
+  // Al cargar la página, revisa si Firebase ya tiene una sesión activa guardada.
+  // Si la hay, salta directo al perfil (o a "identity" si aún no tiene perfil).
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const snap = await getDoc(doc(db, "users", firebaseUser.uid));
+        if (snap.exists()) {
+          setUser(snap.data());
+          setStep("profile");
+        } else {
+          setPendingUid(firebaseUser.uid);
+          setStep("identity");
+        }
+      }
+      setCheckingSession(false);
+    });
+    return unsub;
+  }, []);
 
   const handleAuthSubmit = async ({ email, password }) => {
     setError("");
     setLoading(true);
     try {
       if (step === "signup") {
+        // FIREBASE: auth (real) - crea la cuenta en Firebase Authentication
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         setPendingUid(cred.user.uid);
         setStep("identity");
       } else {
+        // FIREBASE: auth (real) - inicia sesión con Firebase Authentication
         const cred = await signInWithEmailAndPassword(auth, email, password);
+
+        // FIREBASE: firestore read (real) - revisa si ya tiene perfil guardado
         const snap = await getDoc(doc(db, "users", cred.user.uid));
         if (snap.exists()) {
           setUser(snap.data());
@@ -410,6 +449,7 @@ export default function AuthProfile() {
     };
 
     try {
+      // FIREBASE: firestore write (real) - guarda el perfil en Firestore
       await setDoc(doc(db, "users", pendingUid), profile);
       setUser(profile);
       setStep("profile");
@@ -421,12 +461,23 @@ export default function AuthProfile() {
   };
 
   const handleLogout = async () => {
+    // FIREBASE: auth (real) - cierra la sesión
     await signOut(auth);
     setUser(null);
     setPendingUid(null);
     setStep("login");
     setError("");
   };
+
+  if (checkingSession) {
+    return (
+      <div style={styles.page}>
+        <div style={{ ...styles.card, textAlign: "center", color: THEME.textMuted }}>
+          Cargando...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
@@ -455,6 +506,7 @@ export default function AuthProfile() {
   );
 }
 
+// Traduce los códigos de error de Firebase a mensajes entendibles en español
 function traducirErrorFirebase(code) {
   const mensajes = {
     "auth/email-already-in-use": "Ya existe una cuenta con ese correo.",
