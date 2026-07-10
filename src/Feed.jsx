@@ -23,14 +23,16 @@ import {
 
   Estructura en Firestore:
   - "posts/{postId}"
-      -> { authorId, authorName, authorIdentity, text, createdAt, likes: [uid...], commentsCount }
+      -> { authorId, authorName, authorIdentity, text, createdAt, likes: [uid...] }
   - "posts/{postId}/comments/{commentId}"
       -> { authorId, authorName, authorIdentity, text, createdAt }
   - "notifications/{uid}/items/{itemId}"
       -> { type: 'like' | 'comment' | 'message', fromUid, fromName, fromIdentity, createdAt, read }
 
-  "commentsCount" se guarda directo en el post (incrementCounter simple)
-  para poder mostrar el número sin tener que abrir los comentarios.
+  El número de comentarios NO se guarda como campo aparte: se escucha la
+  subcolección de comentarios de cada post todo el tiempo (no solo cuando
+  se abre) y el contador es simplemente la cantidad real de documentos.
+  Así nunca puede desincronizarse.
 */
 
 const THEME = {
@@ -276,9 +278,10 @@ function PostCard({ post, currentUid, myProfile }) {
   const iLiked = likes.includes(currentUid);
   const isMine = post.authorId === currentUid;
 
-  // Escucha los comentarios solo mientras el bloque está abierto (ahorra lecturas)
+  // Escucha los comentarios SIEMPRE (no solo al abrir), así el número junto
+  // al ícono de comentarios siempre es exacto, sin depender de que alguien
+  // haga clic para "activar" el conteo correcto.
   useEffect(() => {
-    if (!commentsOpen) return;
     const q = query(
       collection(db, "posts", post.id, "comments"),
       orderBy("createdAt", "asc")
@@ -287,7 +290,7 @@ function PostCard({ post, currentUid, myProfile }) {
       setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return unsub;
-  }, [commentsOpen, post.id]);
+  }, [post.id]);
 
   const toggleLike = async () => {
     const postRef = doc(db, "posts", post.id);
@@ -313,9 +316,6 @@ function PostCard({ post, currentUid, myProfile }) {
       authorIdentity: myProfile?.identity || "",
       text: commentText.trim(),
       createdAt: serverTimestamp(),
-    });
-    await updateDoc(doc(db, "posts", post.id), {
-      commentsCount: (post.commentsCount || 0) + 1,
     });
     await notify(post.authorId, {
       type: "comment",
@@ -393,7 +393,7 @@ function PostCard({ post, currentUid, myProfile }) {
           style={styles.actionBtn(commentsOpen)}
           onClick={() => setCommentsOpen((v) => !v)}
         >
-          💬 {post.commentsCount > 0 ? post.commentsCount : "Comentar"}
+          💬 {comments.length > 0 ? comments.length : "Comentar"}
         </button>
       </div>
 
@@ -487,7 +487,6 @@ export default function Feed() {
         text: text.trim(),
         createdAt: serverTimestamp(),
         likes: [],
-        commentsCount: 0,
       });
       setText("");
     } finally {
