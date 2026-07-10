@@ -273,9 +273,9 @@ function LoginForm({ onSubmit, mode, setMode, error, loading }) {
   );
 }
 
-function IdentityForm({ onSubmit, loading }) {
-  const [displayName, setDisplayName] = useState("");
-  const [identity, setIdentity] = useState("");
+function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
+  const [displayName, setDisplayName] = useState(initialValues?.displayName || "");
+  const [identity, setIdentity] = useState(initialValues?.identity || "");
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -285,11 +285,12 @@ function IdentityForm({ onSubmit, loading }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <p style={styles.eyebrow}>Paso 2 de 2</p>
-      <h1 style={styles.title}>¿Qué eres tú?</h1>
+      <p style={styles.eyebrow}>{isEdit ? "Tu identidad de hoy" : "Paso 2 de 2"}</p>
+      <h1 style={styles.title}>{isEdit ? "¿Cómo te sientes hoy?" : "¿Qué eres tú?"}</h1>
       <p style={styles.subtitle}>
-        No elijas una casilla. Escribe lo que sientes que eres — puede ser
-        una de estas ideas o algo completamente tuyo.
+        {isEdit
+          ? "Cámbiala cuantas veces quieras, cuando quieras. Hoy puedes ser algo distinto a ayer."
+          : "No elijas una casilla. Escribe lo que sientes que eres — puede ser una de estas ideas o algo completamente tuyo."}
       </p>
 
       <label style={styles.label} htmlFor="displayName">
@@ -305,7 +306,7 @@ function IdentityForm({ onSubmit, loading }) {
       />
 
       <label style={styles.label} htmlFor="identity">
-        Tu identidad
+        Tu identidad {isEdit ? "de hoy" : ""}
       </label>
       <input
         id="identity"
@@ -315,6 +316,7 @@ function IdentityForm({ onSubmit, loading }) {
         value={identity}
         onChange={(e) => setIdentity(e.target.value)}
         required
+        autoFocus={isEdit}
       />
 
       <div style={styles.chipRow}>
@@ -330,7 +332,7 @@ function IdentityForm({ onSubmit, loading }) {
       </div>
 
       <button type="submit" style={styles.button} disabled={loading}>
-        {loading ? "Guardando..." : "Guardar mi identidad"}
+        {loading ? "Guardando..." : isEdit ? "Actualizar mi identidad" : "Guardar mi identidad"}
       </button>
     </form>
   );
@@ -359,6 +361,12 @@ function ProfileView({ user, onLogout, onEdit }) {
           <span style={styles.fieldLabel}>Identidad</span>
           <span style={styles.fieldValue}>{user.identity}</span>
         </div>
+        {user.identityUpdatedAt && (
+          <div style={styles.fieldRow}>
+            <span style={styles.fieldLabel}>Última actualización</span>
+            <span style={styles.fieldValue}>{user.identityUpdatedAt}</span>
+          </div>
+        )}
         <div style={styles.fieldRow}>
           <span style={styles.fieldLabel}>Miembro desde</span>
           <span style={styles.fieldValue}>{user.joinedAt}</span>
@@ -366,7 +374,7 @@ function ProfileView({ user, onLogout, onEdit }) {
       </div>
 
       <button style={styles.buttonGhost} onClick={onEdit}>
-        Editar identidad
+        Cambiar mi identidad
       </button>
       <button
         style={{ ...styles.buttonGhost, marginTop: "10px" }}
@@ -442,15 +450,20 @@ export default function AuthProfile() {
       email: auth.currentUser?.email || "",
       displayName,
       identity,
-      joinedAt: new Date().toLocaleDateString("es-ES", {
+      joinedAt: user?.joinedAt || new Date().toLocaleDateString("es-ES", {
         year: "numeric",
         month: "long",
+      }),
+      identityUpdatedAt: new Date().toLocaleDateString("es-ES", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       }),
     };
 
     try {
       // FIREBASE: firestore write (real) - guarda el perfil en Firestore
-      await setDoc(doc(db, "users", pendingUid), profile);
+      await setDoc(doc(db, "users", pendingUid || auth.currentUser?.uid), profile);
       setUser(profile);
       setStep("profile");
     } catch (err) {
@@ -492,7 +505,12 @@ export default function AuthProfile() {
           />
         )}
         {step === "identity" && (
-          <IdentityForm onSubmit={handleIdentitySubmit} loading={loading} />
+          <IdentityForm
+            onSubmit={handleIdentitySubmit}
+            loading={loading}
+            initialValues={user}
+            isEdit={!!user}
+          />
         )}
         {step === "profile" && user && (
           <ProfileView
