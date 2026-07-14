@@ -36,12 +36,40 @@ import {
   Esto evita que el ancho fijo de la lista de contactos aplaste la
   conversación en celulares, que era lo que causaba el texto partido
   en una palabra por línea.
+
+  NOTAS DE VOZ:
+  Se graban con MediaRecorder (webm/opus, ~32kbps) y se guardan como
+  base64 directo en el documento del mensaje (campo audioData), sin usar
+  Firebase Storage (seguimos en el plan gratuito). Con el límite de 60
+  segundos a ese bitrate el audio en base64 pesa unos 300KB como máximo,
+  muy por debajo del límite de 1MB por documento de Firestore.
+  Mensaje de audio: { senderId, type: "audio", audioData, audioDuration, createdAt }
+  Mensaje de texto (como antes): { senderId, text, createdAt }
 */
 
 const MOBILE_BREAKPOINT = 700;
+const MAX_RECORD_SECONDS = 60;
+const AUDIO_MIME_TYPE = "audio/webm;codecs=opus";
+const MAX_AUDIO_BASE64_LENGTH = 900000; // margen de seguridad bajo el límite de 1MB por documento de Firestore
 
 function getChatId(uidA, uidB) {
   return [uidA, uidB].sort().join("_");
+}
+
+function formatDuration(totalSeconds) {
+  const s = Math.max(0, Math.round(totalSeconds || 0));
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 function useIsMobile() {
@@ -208,6 +236,92 @@ const styles = {
     cursor: "pointer",
     flexShrink: 0,
   },
+  micBtn: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    border: "1px solid var(--border)",
+    background: "transparent",
+    color: "var(--text)",
+    fontSize: "16px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  recordingRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "14px 16px",
+    borderTop: "1px solid var(--border)",
+  },
+  recordingDot: {
+    width: "10px",
+    height: "10px",
+    borderRadius: "50%",
+    background: "var(--accent2)",
+    flexShrink: 0,
+  },
+  recordingLabel: {
+    fontSize: "13px",
+    color: "var(--text)",
+    flex: 1,
+  },
+  recordingTime: {
+    fontSize: "13px",
+    fontWeight: 600,
+    color: "var(--accent2)",
+    fontVariantNumeric: "tabular-nums",
+  },
+  recordCancelBtn: {
+    background: "none",
+    border: "1px solid var(--border)",
+    borderRadius: "50%",
+    width: "34px",
+    height: "34px",
+    color: "var(--text-muted)",
+    fontSize: "15px",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  recordSendBtn: {
+    border: "none",
+    borderRadius: "50%",
+    width: "34px",
+    height: "34px",
+    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    color: "var(--bg)",
+    fontSize: "14px",
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  audioMessage: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    minWidth: "150px",
+  },
+  audioPlayBtn: (mine) => ({
+    width: "30px",
+    height: "30px",
+    borderRadius: "50%",
+    border: "none",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "12px",
+    flexShrink: 0,
+    background: mine ? "var(--bg)" : "var(--accent2)",
+    color: mine ? "var(--accent2)" : "var(--bg)",
+  }),
+  audioDuration: (mine) => ({
+    fontSize: "12px",
+    fontWeight: 600,
+    color: mine ? "var(--bg)" : "var(--text-muted)",
+  }),
   emptyState: {
     flex: 1,
     display: "flex",
@@ -220,6 +334,52 @@ const styles = {
   },
 };
 
+function AudioMessage({ src, duration, mine }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onEnded = () => setPlaying(false);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnded);
+    return () => {
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, []);
+
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+    } else {
+      audio.play();
+    }
+  };
+
+  return (
+    <div style={styles.audioMessage}>
+      <audio ref={audioRef} src={src} preload="none" />
+      <button
+        type="button"
+        style={styles.audioPlayBtn(mine)}
+        onClick={toggle}
+        title={playing ? "Pausar" : "Reproducir"}
+      >
+        {playing ? "⏸" : "▶"}
+      </button>
+      <span style={styles.audioDuration(mine)}>🎤 {formatDuration(duration)}</span>
+    </div>
+  );
+}
+
 export default function Chat() {
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
@@ -230,6 +390,18 @@ export default function Chat() {
   const [text, setText] = useState("");
   const [search, setSearch] = useState("");
   const messagesEndRef = useRef(null);
+
+  // Estado del grabador de notas de voz: "idle" | "recording" | "ready"
+  // ("ready" = ya se detuvo por el límite de 60s, esperando que se envíe o cancele)
+  const [recordingState, setRecordingState] = useState("idle");
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [pendingAudio, setPendingAudio] = useState(null); // { blob, duration } mientras está en "ready"
+  const [sendingAudio, setSendingAudio] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
+  const secondsRef = useRef(0);
+  const pendingActionRef = useRef(null); // "cancel" | "send" | "auto"
 
   // Escucha si hay sesión activa (viene del mismo login de AuthProfile)
   useEffect(() => {
@@ -315,6 +487,155 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Cuenta los segundos mientras se está grabando
+  useEffect(() => {
+    if (recordingState !== "recording") return;
+    const id = setInterval(() => {
+      secondsRef.current += 1;
+      setRecordSeconds(secondsRef.current);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [recordingState]);
+
+  // Corta la grabación automáticamente al llegar al límite de 60 segundos
+  useEffect(() => {
+    if (recordingState === "recording" && recordSeconds >= MAX_RECORD_SECONDS) {
+      requestStopRecording("auto");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordSeconds, recordingState]);
+
+  // Si el componente se desmonta (por ejemplo, cambias de pestaña) mientras
+  // el micrófono está activo, apaga el micrófono para no dejarlo encendido.
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  const startRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === "undefined") {
+      alert("Tu navegador no soporta grabación de audio.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      secondsRef.current = 0;
+      setRecordSeconds(0);
+
+      const mimeType = MediaRecorder.isTypeSupported(AUDIO_MIME_TYPE)
+        ? AUDIO_MIME_TYPE
+        : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 32000 });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        const action = pendingActionRef.current;
+        pendingActionRef.current = null;
+        const chunks = chunksRef.current;
+        chunksRef.current = [];
+
+        if (action === "cancel") {
+          setRecordingState("idle");
+          setRecordSeconds(0);
+          secondsRef.current = 0;
+          return;
+        }
+
+        const blob = new Blob(chunks, { type: mimeType });
+        const duration = secondsRef.current;
+
+        if (action === "send") {
+          setRecordingState("idle");
+          setRecordSeconds(0);
+          secondsRef.current = 0;
+          uploadAudioMessage(blob, duration);
+        } else {
+          // se detuvo sola al llegar al límite: espera confirmación del usuario
+          setPendingAudio({ blob, duration });
+          setRecordingState("ready");
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setRecordingState("recording");
+    } catch (err) {
+      alert("No se pudo acceder al micrófono. Revisa los permisos del navegador.");
+    }
+  };
+
+  function requestStopRecording(action) {
+    pendingActionRef.current = action;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  }
+
+  const cancelReadyRecording = () => {
+    setPendingAudio(null);
+    setRecordingState("idle");
+    setRecordSeconds(0);
+    secondsRef.current = 0;
+  };
+
+  const sendReadyRecording = () => {
+    if (!pendingAudio) return;
+    const { blob, duration } = pendingAudio;
+    setPendingAudio(null);
+    setRecordingState("idle");
+    setRecordSeconds(0);
+    secondsRef.current = 0;
+    uploadAudioMessage(blob, duration);
+  };
+
+  const uploadAudioMessage = async (blob, duration) => {
+    if (!activeContact || !currentUid) return;
+    setSendingAudio(true);
+    try {
+      const dataUrl = await blobToDataUrl(blob);
+      if (dataUrl.length > MAX_AUDIO_BASE64_LENGTH) {
+        alert("La nota de voz quedó muy pesada para enviarse. Intenta con una más corta.");
+        return;
+      }
+
+      const chatId = getChatId(currentUid, activeContact.uid);
+      await setDoc(
+        doc(db, "chats", chatId),
+        { participants: [currentUid, activeContact.uid] },
+        { merge: true }
+      );
+
+      await addDoc(collection(db, "chats", chatId, "messages"), {
+        senderId: currentUid,
+        type: "audio",
+        audioData: dataUrl,
+        audioDuration: duration,
+        createdAt: serverTimestamp(),
+      });
+
+      await addDoc(collection(db, "notifications", activeContact.uid, "items"), {
+        type: "message",
+        fromUid: currentUid,
+        fromName: myProfile?.displayName || "Alguien",
+        fromIdentity: myProfile?.identity || "",
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+    } catch (err) {
+      alert("No se pudo enviar la nota de voz. Intenta de nuevo.");
+    } finally {
+      setSendingAudio(false);
+    }
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
     if (!text.trim() || !activeContact || !currentUid) return;
@@ -390,7 +711,9 @@ export default function Chat() {
                 <div
                   key={c.uid}
                   style={styles.contactItem(activeContact?.uid === c.uid)}
-                  onClick={() => setActiveContact(c)}
+                  onClick={() => {
+                    if (recordingState === "idle") setActiveContact(c);
+                  }}
                 >
                   <p style={styles.contactName}>{c.displayName || "Sin nombre"}</p>
                   <p style={styles.contactIdentity}>{c.identity}</p>
@@ -420,23 +743,80 @@ export default function Chat() {
                 <div style={styles.messagesArea}>
                   {messages.map((m) => (
                     <div key={m.id} style={styles.bubbleRow(m.senderId === currentUid)}>
-                      <div style={styles.bubble(m.senderId === currentUid)}>{m.text}</div>
+                      <div style={styles.bubble(m.senderId === currentUid)}>
+                        {m.type === "audio" ? (
+                          <AudioMessage
+                            src={m.audioData}
+                            duration={m.audioDuration}
+                            mine={m.senderId === currentUid}
+                          />
+                        ) : (
+                          m.text
+                        )}
+                      </div>
                     </div>
                   ))}
                   <div ref={messagesEndRef} />
                 </div>
-                <form style={styles.inputRow} onSubmit={handleSend}>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    placeholder="Escribe un mensaje..."
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                  />
-                  <button type="submit" style={styles.sendBtn}>
-                    Enviar
-                  </button>
-                </form>
+                {recordingState === "idle" ? (
+                  <form style={styles.inputRow} onSubmit={handleSend}>
+                    <input
+                      style={styles.input}
+                      type="text"
+                      placeholder="Escribe un mensaje..."
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      style={styles.micBtn}
+                      onClick={startRecording}
+                      title="Grabar nota de voz"
+                    >
+                      🎤
+                    </button>
+                    <button type="submit" style={styles.sendBtn}>
+                      Enviar
+                    </button>
+                  </form>
+                ) : (
+                  <div style={styles.recordingRow}>
+                    {recordingState === "recording" && (
+                      <span className="pt-rec-dot" style={styles.recordingDot} />
+                    )}
+                    <span style={styles.recordingLabel}>
+                      {recordingState === "recording"
+                        ? "Grabando nota de voz..."
+                        : "Nota de voz lista"}
+                    </span>
+                    <span style={styles.recordingTime}>{formatDuration(recordSeconds)}</span>
+                    <button
+                      type="button"
+                      style={styles.recordCancelBtn}
+                      onClick={
+                        recordingState === "recording"
+                          ? () => requestStopRecording("cancel")
+                          : cancelReadyRecording
+                      }
+                      title="Cancelar"
+                    >
+                      ✕
+                    </button>
+                    <button
+                      type="button"
+                      style={styles.recordSendBtn}
+                      onClick={
+                        recordingState === "recording"
+                          ? () => requestStopRecording("send")
+                          : sendReadyRecording
+                      }
+                      disabled={sendingAudio}
+                      title="Enviar nota de voz"
+                    >
+                      ➤
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <div style={styles.emptyState}>

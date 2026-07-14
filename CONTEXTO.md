@@ -29,7 +29,8 @@ categorías fijas. Prototipo funcional en fase de prueba con un socio.
 - `posts/{postId}` → `{ authorId, authorName, authorIdentity, text, createdAt, likes: [uid...] }`
 - `posts/{postId}/comments/{commentId}` → `{ authorId, authorName, authorIdentity, text, createdAt }`
   - El conteo de comentarios NO se guarda como campo aparte: se escucha la subcolección en tiempo real y se cuenta directo, para que nunca se desincronice.
-- `chats/{chatId}/messages/{msgId}` → `{ senderId, text, createdAt }` (chatId = los dos UID ordenados y unidos con "_")
+- `chats/{chatId}/messages/{msgId}` → mensaje de texto: `{ senderId, text, createdAt }`; mensaje de nota de voz: `{ senderId, type: "audio", audioData, audioDuration, createdAt }` (chatId = los dos UID ordenados y unidos con "_")
+  - `audioData` es el audio codificado en base64 (formato webm/opus, ~32kbps) guardado directo en el documento — no se usa Firebase Storage. Con el límite de 60 segundos de grabación pesa ~300KB como máximo, bien por debajo del límite de 1MB por documento de Firestore.
 - `notifications/{uid}/items/{itemId}` → `{ type: 'like'|'comment'|'message', fromUid, fromName, fromIdentity, createdAt, read }`
 
 ## Funcionalidades ya construidas
@@ -44,6 +45,7 @@ categorías fijas. Prototipo funcional en fase de prueba con un socio.
 8. Notificaciones en tiempo real (like, comentario, mensaje nuevo) con campanita y contador de no leídas
 9. Logo de la marca en la pantalla de login y en el encabezado de navegación (responsivo, sin superponerse en móvil)
 10. Temas visuales rotativos: botón 🎨 junto a la campanita abre un menú para elegir entre 4 temas — "Noche Violeta 🌙" (el original), "Arcoíris 🌈", "Océano 🌊" y "Atardecer 🌅" — o el modo "Rotativo 🔄", que cambia de tema automáticamente según el día del año. La preferencia se guarda en `localStorage` y se aplica al cargar la app seteando variables CSS (`--bg`, `--surface`, `--accent`, etc.) en `document.documentElement`, así que toda la app cambia de color al instante sin recargar.
+11. Notas de voz en el chat: botón 🎤 junto al campo de texto graba audio (MediaRecorder, webm/opus, ~32kbps) con indicador de grabación y contador de tiempo, corta sola a los 60 segundos, y se puede cancelar o enviar. Se guarda en base64 dentro del propio documento del mensaje en Firestore (sin Firebase Storage). Los mensajes de audio se muestran con un reproductor simple (play/pausa + duración).
 
 ## Pendientes / ideas para seguir
 
