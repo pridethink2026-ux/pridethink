@@ -38,17 +38,6 @@ import {
   en una palabra por línea.
 */
 
-const THEME = {
-  bg: "#14102b",
-  surface: "#231b47",
-  surfaceAlt: "#2c2358",
-  accent: "#a78bfa",
-  accent2: "#f472b6",
-  text: "#f5f3ff",
-  textMuted: "#b8adf0",
-  border: "rgba(167, 139, 250, 0.25)",
-};
-
 const MOBILE_BREAKPOINT = 700;
 
 function getChatId(uidA, uidB) {
@@ -70,28 +59,28 @@ function useIsMobile() {
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: THEME.bg,
+    background: "var(--bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
     fontFamily:
       "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    color: THEME.text,
+    color: "var(--text)",
     boxSizing: "border-box",
   },
   shell: {
     width: "100%",
     maxWidth: "760px",
     height: "80vh",
-    background: THEME.surface,
+    background: "var(--surface)",
     borderRadius: "20px",
-    border: `1px solid ${THEME.border}`,
+    border: "1px solid var(--border)",
     display: "flex",
     overflow: "hidden",
   },
   contactsCol: (isMobile) => ({
     width: isMobile ? "100%" : "240px",
-    borderRight: isMobile ? "none" : `1px solid ${THEME.border}`,
+    borderRight: isMobile ? "none" : "1px solid var(--border)",
     display: "flex",
     flexDirection: "column",
     flexShrink: 0,
@@ -101,23 +90,23 @@ const styles = {
     fontSize: "12px",
     letterSpacing: "0.1em",
     textTransform: "uppercase",
-    color: THEME.accent2,
+    color: "var(--accent2)",
     fontWeight: 600,
-    borderBottom: `1px solid ${THEME.border}`,
+    borderBottom: "1px solid var(--border)",
   },
   searchBox: {
     padding: "10px 12px",
-    borderBottom: `1px solid ${THEME.border}`,
+    borderBottom: "1px solid var(--border)",
   },
   searchInput: {
     width: "100%",
     boxSizing: "border-box",
-    background: THEME.surfaceAlt,
-    border: `1px solid ${THEME.border}`,
+    background: "var(--surface-alt)",
+    border: "1px solid var(--border)",
     borderRadius: "999px",
     padding: "7px 12px",
     fontSize: "12px",
-    color: THEME.text,
+    color: "var(--text)",
     outline: "none",
   },
   contactsList: {
@@ -127,11 +116,11 @@ const styles = {
   contactItem: (active) => ({
     padding: "12px 16px",
     cursor: "pointer",
-    background: active ? THEME.surfaceAlt : "transparent",
-    borderLeft: active ? `3px solid ${THEME.accent2}` : "3px solid transparent",
+    background: active ? "var(--surface-alt)" : "transparent",
+    borderLeft: active ? "3px solid var(--accent2)" : "3px solid transparent",
   }),
   contactName: { fontSize: "14px", fontWeight: 600, margin: 0 },
-  contactIdentity: { fontSize: "12px", color: THEME.textMuted, margin: "2px 0 0" },
+  contactIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: "2px 0 0" },
   chatCol: {
     flex: 1,
     display: "flex",
@@ -140,7 +129,7 @@ const styles = {
   },
   chatHeader: {
     padding: "16px 20px",
-    borderBottom: `1px solid ${THEME.border}`,
+    borderBottom: "1px solid var(--border)",
     fontSize: "15px",
     fontWeight: 600,
     display: "flex",
@@ -150,7 +139,7 @@ const styles = {
   backBtn: {
     background: "none",
     border: "none",
-    color: THEME.textMuted,
+    color: "var(--text-muted)",
     fontSize: "18px",
     cursor: "pointer",
     padding: 0,
@@ -159,12 +148,12 @@ const styles = {
   chatHeaderText: { flex: 1, minWidth: 0 },
   blockBtn: {
     background: "none",
-    border: `1px solid ${THEME.border}`,
+    border: "1px solid var(--border)",
     borderRadius: "999px",
     padding: "5px 12px",
     fontSize: "12px",
     fontWeight: 600,
-    color: THEME.textMuted,
+    color: "var(--text-muted)",
     cursor: "pointer",
     flexShrink: 0,
   },
@@ -188,33 +177,33 @@ const styles = {
     lineHeight: 1.4,
     wordBreak: "break-word",
     background: mine
-      ? `linear-gradient(135deg, ${THEME.accent}, ${THEME.accent2})`
-      : THEME.surfaceAlt,
-    color: mine ? "#14102b" : THEME.text,
+      ? "linear-gradient(135deg, var(--accent), var(--accent2))"
+      : "var(--surface-alt)",
+    color: mine ? "var(--bg)" : "var(--text)",
   }),
   inputRow: {
     display: "flex",
     gap: "10px",
     padding: "14px 16px",
-    borderTop: `1px solid ${THEME.border}`,
+    borderTop: "1px solid var(--border)",
   },
   input: {
     flex: 1,
     minWidth: 0,
-    background: THEME.surfaceAlt,
-    border: `1px solid ${THEME.border}`,
+    background: "var(--surface-alt)",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     padding: "10px 14px",
     fontSize: "14px",
-    color: THEME.text,
+    color: "var(--text)",
     outline: "none",
   },
   sendBtn: {
     padding: "10px 18px",
     borderRadius: "10px",
     border: "none",
-    background: `linear-gradient(135deg, ${THEME.accent}, ${THEME.accent2})`,
-    color: "#14102b",
+    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    color: "var(--bg)",
     fontWeight: 600,
     cursor: "pointer",
     flexShrink: 0,
@@ -224,7 +213,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: THEME.textMuted,
+    color: "var(--text-muted)",
     fontSize: "14px",
     padding: "24px",
     textAlign: "center",
@@ -363,7 +352,7 @@ export default function Chat() {
     return (
       <div style={styles.wrapper}>
         <div style={{ ...styles.shell, alignItems: "center", justifyContent: "center" }}>
-          <p style={{ color: THEME.textMuted, padding: "0 24px", textAlign: "center" }}>
+          <p style={{ color: "var(--text-muted)", padding: "0 24px", textAlign: "center" }}>
             Inicia sesión primero para usar el chat.
           </p>
         </div>
@@ -393,7 +382,7 @@ export default function Chat() {
             </div>
             <div style={styles.contactsList}>
               {contacts.length === 0 && (
-                <p style={{ padding: "16px", fontSize: "13px", color: THEME.textMuted }}>
+                <p style={{ padding: "16px", fontSize: "13px", color: "var(--text-muted)" }}>
                   {search ? "Nadie coincide con tu búsqueda." : "Todavía no hay más personas registradas."}
                 </p>
               )}

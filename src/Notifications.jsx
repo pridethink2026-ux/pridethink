@@ -23,15 +23,6 @@ import {
       -> { type: 'like' | 'comment' | 'message', fromName, fromIdentity, createdAt, read }
 */
 
-const THEME = {
-  surface: "#231b47",
-  surfaceAlt: "#2c2358",
-  accent2: "#f472b6",
-  text: "#f5f3ff",
-  textMuted: "#b8adf0",
-  border: "rgba(167, 139, 250, 0.25)",
-};
-
 const LABELS = {
   like: (n) => `${n.fromName} le dio like a tu publicación`,
   comment: (n) => `${n.fromName} comentó tu publicación`,
@@ -43,13 +34,13 @@ const styles = {
   bellBtn: {
     position: "relative",
     background: "none",
-    border: `1px solid ${THEME.border}`,
+    border: "1px solid var(--border)",
     borderRadius: "999px",
     width: "38px",
     height: "38px",
     fontSize: "16px",
     cursor: "pointer",
-    color: THEME.text,
+    color: "var(--text)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -58,8 +49,8 @@ const styles = {
     position: "absolute",
     top: "-4px",
     right: "-4px",
-    background: THEME.accent2,
-    color: "#14102b",
+    background: "var(--accent2)",
+    color: "var(--bg)",
     fontSize: "10px",
     fontWeight: 700,
     borderRadius: "999px",
@@ -77,8 +68,8 @@ const styles = {
     width: "300px",
     maxHeight: "360px",
     overflowY: "auto",
-    background: THEME.surface,
-    border: `1px solid ${THEME.border}`,
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
     borderRadius: "14px",
     padding: "8px",
     zIndex: 20,
@@ -87,16 +78,16 @@ const styles = {
   item: (unread) => ({
     padding: "10px 12px",
     borderRadius: "10px",
-    background: unread ? THEME.surfaceAlt : "transparent",
+    background: unread ? "var(--surface-alt)" : "transparent",
     fontSize: "13px",
     marginBottom: "4px",
   }),
-  itemText: { margin: 0, color: THEME.text },
-  itemIdentity: { margin: "2px 0 0", color: THEME.textMuted, fontSize: "11px" },
+  itemText: { margin: 0, color: "var(--text)" },
+  itemIdentity: { margin: "2px 0 0", color: "var(--text-muted)", fontSize: "11px" },
   empty: {
     padding: "20px 12px",
     textAlign: "center",
-    color: THEME.textMuted,
+    color: "var(--text-muted)",
     fontSize: "13px",
   },
 };
