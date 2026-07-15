@@ -5,8 +5,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, onSnapshot, updateDoc, arrayRemove } from "firebase/firestore";
 import Avatar from "./Avatar";
 
 /*
@@ -137,6 +138,15 @@ const styles = {
     cursor: "pointer",
     fontWeight: 500,
   },
+  forgotLink: {
+    display: "block",
+    textAlign: "right",
+    color: "var(--text-muted)",
+    fontSize: "12px",
+    fontWeight: 500,
+    cursor: "pointer",
+    margin: "-10px 0 18px",
+  },
   chipRow: {
     display: "flex",
     flexWrap: "wrap",
@@ -157,10 +167,20 @@ const styles = {
   error: {
     background: "var(--accent2-softer)",
     border: "1px solid var(--accent2-soft-border)",
-    color: "#fbb6ce",
+    color: "var(--accent2)",
     fontSize: "13px",
     borderRadius: "8px",
     padding: "10px 12px",
+    marginBottom: "16px",
+  },
+  success: {
+    background: "var(--accent-softer)",
+    border: "1px solid var(--accent-soft-border)",
+    color: "var(--accent)",
+    fontSize: "13px",
+    lineHeight: 1.5,
+    borderRadius: "8px",
+    padding: "12px 14px",
     marginBottom: "16px",
   },
   profileHeader: {
@@ -208,9 +228,43 @@ const styles = {
     left: on ? "23px" : "2px",
     transition: "left 0.15s",
   }),
+  sectionTitle: {
+    fontSize: "12px",
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "var(--accent2)",
+    fontWeight: 700,
+    margin: "24px 0 10px",
+  },
+  blockedEmpty: {
+    fontSize: "13px",
+    color: "var(--text-muted)",
+    margin: "0 0 4px",
+  },
+  blockedRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "10px 0",
+    borderBottom: "1px solid var(--border)",
+  },
+  blockedInfo: { flex: 1, minWidth: 0 },
+  blockedName: { fontSize: "13px", fontWeight: 600, margin: 0 },
+  blockedIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: "1px 0 0" },
+  unblockBtn: {
+    padding: "6px 14px",
+    borderRadius: "999px",
+    border: "1px solid var(--border)",
+    background: "transparent",
+    color: "var(--text-muted)",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+    flexShrink: 0,
+  },
 };
 
-function LoginForm({ onSubmit, mode, setMode, error, loading }) {
+function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -262,6 +316,15 @@ function LoginForm({ onSubmit, mode, setMode, error, loading }) {
         required
       />
 
+      {mode === "login" && (
+        <span
+          style={styles.forgotLink}
+          onClick={() => onForgotPassword(email)}
+        >
+          ¿Olvidaste tu contraseña?
+        </span>
+      )}
+
       <button type="submit" style={styles.button} disabled={loading}>
         {loading ? "Un momento..." : mode === "login" ? "Entrar" : "Crear cuenta"}
       </button>
@@ -284,6 +347,70 @@ function LoginForm({ onSubmit, mode, setMode, error, loading }) {
         )}
       </p>
     </form>
+  );
+}
+
+function ResetPasswordForm({ initialEmail, onBack }) {
+  const [email, setEmail] = useState(initialEmail || "");
+  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setStatus("sending");
+    setErrorMsg("");
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setStatus("sent");
+    } catch (err) {
+      setStatus("error");
+      setErrorMsg(traducirErrorReset(err.code));
+    }
+  };
+
+  return (
+    <div>
+      <p style={styles.eyebrow}>Recuperar acceso</p>
+      <h1 style={styles.title}>¿Olvidaste tu contraseña?</h1>
+      <p style={styles.subtitle}>
+        Escribe el correo con el que te registraste. Te mandaremos un enlace
+        para crear una contraseña nueva.
+      </p>
+
+      {status === "sent" ? (
+        <div style={styles.success}>
+          Te enviamos un correo para restablecer tu contraseña, revisa
+          también spam.
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          {status === "error" && <div style={styles.error}>{errorMsg}</div>}
+
+          <label style={styles.label} htmlFor="resetEmail">
+            Correo
+          </label>
+          <input
+            id="resetEmail"
+            style={styles.input}
+            type="email"
+            placeholder="nombre@correo.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+
+          <button type="submit" style={styles.button} disabled={status === "sending"}>
+            {status === "sending" ? "Enviando..." : "Enviar enlace"}
+          </button>
+        </form>
+      )}
+
+      <p style={styles.switchRow}>
+        <span style={styles.link} onClick={onBack}>
+          ← Volver a entrar
+        </span>
+      </p>
+    </div>
   );
 }
 
@@ -352,7 +479,32 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
   );
 }
 
-function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy }) {
+function BlockedUserRow({ uid, onUnblock }) {
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "users", uid), (snap) => {
+      setProfile(snap.exists() ? snap.data() : null);
+    });
+    return unsub;
+  }, [uid]);
+
+  return (
+    <div style={styles.blockedRow}>
+      <Avatar uid={uid} name={profile?.displayName || profile?.identity} size="sm" />
+      <div style={styles.blockedInfo}>
+        <p style={styles.blockedName}>{profile?.displayName || "Usuario"}</p>
+        <p style={styles.blockedIdentity}>{profile?.identity}</p>
+      </div>
+      <button style={styles.unblockBtn} onClick={() => onUnblock(uid)}>
+        Desbloquear
+      </button>
+    </div>
+  );
+}
+
+function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock }) {
+  const blockedUsers = user.blockedUsers || [];
   return (
     <div>
       <div style={styles.profileHeader}>
@@ -405,7 +557,16 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy }) {
         </div>
       </div>
 
-      <button style={styles.buttonGhost} onClick={onEdit}>
+      <p style={styles.sectionTitle}>Usuarios bloqueados</p>
+      {blockedUsers.length === 0 ? (
+        <p style={styles.blockedEmpty}>No has bloqueado a nadie.</p>
+      ) : (
+        blockedUsers.map((buid) => (
+          <BlockedUserRow key={buid} uid={buid} onUnblock={onUnblock} />
+        ))
+      )}
+
+      <button style={{ ...styles.buttonGhost, marginTop: "20px" }} onClick={onEdit}>
         Cambiar mi identidad
       </button>
       <button
@@ -419,12 +580,13 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy }) {
 }
 
 export default function AuthProfile() {
-  const [step, setStep] = useState("login"); // login | signup | identity | profile
+  const [step, setStep] = useState("login"); // login | signup | identity | profile | reset
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [pendingUid, setPendingUid] = useState(null);
   const [user, setUser] = useState(null);
+  const [resetEmailPrefill, setResetEmailPrefill] = useState("");
 
   // Al cargar la página, revisa si Firebase ya tiene una sesión activa guardada.
   // Si la hay, salta directo al perfil (o a "identity" si aún no tiene perfil).
@@ -475,6 +637,12 @@ export default function AuthProfile() {
     }
   };
 
+  const handleForgotPassword = (emailTyped) => {
+    setResetEmailPrefill(emailTyped || "");
+    setError("");
+    setStep("reset");
+  };
+
   const handleIdentitySubmit = async ({ displayName, identity }) => {
     setLoading(true);
     setError("");
@@ -518,6 +686,22 @@ export default function AuthProfile() {
     }
   };
 
+  const handleUnblock = async (targetUid) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const updated = {
+      ...user,
+      blockedUsers: (user?.blockedUsers || []).filter((u) => u !== targetUid),
+    };
+    setUser(updated);
+    try {
+      // FIREBASE: firestore write (real) - quita al usuario de blockedUsers
+      await updateDoc(doc(db, "users", uid), { blockedUsers: arrayRemove(targetUid) });
+    } catch (err) {
+      setUser(user); // revierte si falla
+    }
+  };
+
   const handleLogout = async () => {
     // FIREBASE: auth (real) - cierra la sesión
     await signOut(auth);
@@ -549,6 +733,16 @@ export default function AuthProfile() {
               onSubmit={handleAuthSubmit}
               error={error}
               loading={loading}
+              onForgotPassword={handleForgotPassword}
+            />
+          </>
+        )}
+        {step === "reset" && (
+          <>
+            <img src="/logo-icon.png" alt="Pridethink" style={styles.logo} />
+            <ResetPasswordForm
+              initialEmail={resetEmailPrefill}
+              onBack={() => setStep("login")}
             />
           </>
         )}
@@ -567,6 +761,7 @@ export default function AuthProfile() {
             onLogout={handleLogout}
             onEdit={() => setStep("identity")}
             onTogglePrivacy={handleTogglePrivacy}
+            onUnblock={handleUnblock}
           />
         )}
       </div>
@@ -586,4 +781,15 @@ function traducirErrorFirebase(code) {
     "auth/too-many-requests": "Demasiados intentos. Espera un momento e intenta de nuevo.",
   };
   return mensajes[code] || "Ocurrió un error. Intenta de nuevo.";
+}
+
+// Traduce los códigos de error de sendPasswordResetEmail a español
+function traducirErrorReset(code) {
+  const mensajes = {
+    "auth/invalid-email": "Ese correo no tiene un formato válido.",
+    "auth/missing-email": "Escribe tu correo para poder enviarte el enlace.",
+    "auth/user-not-found": "No encontramos ninguna cuenta con ese correo.",
+    "auth/too-many-requests": "Demasiados intentos. Espera un momento e intenta de nuevo.",
+  };
+  return mensajes[code] || "No se pudo enviar el correo. Intenta de nuevo.";
 }

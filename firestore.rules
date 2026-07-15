@@ -1,0 +1,188 @@
+rules_version = '2';
+
+// ============================================================================
+// Reglas de seguridad de Firestore — Pridethink
+// ============================================================================
+// Reemplazan el modo de prueba (que expira solo y deja todo abierto).
+// Principio general: NADA es público. Todo requiere sesión iniciada
+// (request.auth != null), y cada acción se limita a lo mínimo que la app
+// necesita para funcionar. Cualquier cosa no contemplada aquí queda
+// denegada por la regla "catch-all" del final.
+//
+// Cómo instalar: Firebase console -> Firestore Database -> Reglas -> pegar
+// todo este archivo -> Publicar.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------------------------------------------
+    // Funciones auxiliares reutilizadas por varias colecciones
+    // --------------------------------------------------------------------
+
+    // Hay una sesión de Firebase Auth iniciada (cualquier persona registrada).
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    // La persona autenticada es dueña del documento uid (para users/{uid}
+    // y notifications/{uid}/...).
+    function esDueno(uid) {
+      return estaAutenticado() && request.auth.uid == uid;
+    }
+
+    // Para el "toggle" de like en posts: valida que la única diferencia
+    // entre el arreglo "likes" de antes y el de después sea que se agregó
+    // o se quitó EXACTAMENTE el uid de quien hace la petición (nunca el
+    // uid de otra persona, y nunca más de un cambio a la vez).
+    function soloAgregaOQuitaMiLike(antes, despues) {
+      let uid = request.auth.uid;
+      return
+        // Dar like: se agregó mi uid y no desapareció nadie más
+        (despues.size() == antes.size() + 1
+          && despues.hasAll(antes)
+          && (uid in despues)
+          && !(uid in antes))
+        ||
+        // Quitar like: se quitó mi uid y no se agregó nadie más
+        (antes.size() == despues.size() + 1
+          && antes.hasAll(despues)
+          && (uid in antes)
+          && !(uid in despues));
+    }
+
+    // Un chat solo puede ser leído/escrito por sus dos participantes. El id
+    // del chat se arma en el código como [uidA, uidB].sort().join("_")
+    // (ver getChatId en Chat.jsx), así que separar por "_" siempre recupera
+    // los dos uids exactos de la conversación. Los uid de Firebase Auth no
+    // contienen "_", así que no hay ambigüedad al separar.
+    function esParticipanteDelChat(chatId) {
+      return estaAutenticado() && (request.auth.uid in chatId.split('_'));
+    }
+
+    // --------------------------------------------------------------------
+    // users/{uid}
+    // Perfil de cada persona: nombre, identidad, privacidad, a quién
+    // bloqueaste (blockedUsers) y a quién sigues (following).
+    // --------------------------------------------------------------------
+    match /users/{uid} {
+      // Cualquier persona con sesión iniciada puede leer cualquier perfil:
+      // se necesita para el chat (lista de contactos), el muro (autores),
+      // los perfiles públicos, la búsqueda y los contadores de
+      // seguidores/seguidos (que se calculan consultando esta colección).
+      allow read: if estaAutenticado();
+
+      // Solo la propia persona puede crear o editar su documento
+      // (registro inicial, cambiar identidad, privacidad, bloquear a
+      // alguien, seguir a alguien). No se restringen campos individuales
+      // porque la app actualiza distintos subconjuntos de campos con
+      // merge:true (identidad, isPrivate, blockedUsers, following por
+      // separado) y siempre sobre tu propio documento.
+      allow create, update: if esDueno(uid);
+
+      // Nadie borra perfiles desde la app.
+      allow delete: if false;
+    }
+
+    // --------------------------------------------------------------------
+    // posts/{postId}  y  posts/{postId}/comments/{commentId}
+    // --------------------------------------------------------------------
+    match /posts/{postId} {
+      // El muro, la búsqueda y los perfiles públicos leen publicaciones.
+      allow read: if estaAutenticado();
+
+      // Solo puedes crear una publicación firmada con tu propio uid.
+      allow create: if estaAutenticado()
+        && request.resource.data.authorId == request.auth.uid;
+
+      // Solo el autor puede borrar su publicación.
+      allow delete: if estaAutenticado()
+        && resource.data.authorId == request.auth.uid;
+
+      // Editar una publicación tiene dos caminos válidos:
+      allow update: if estaAutenticado()
+        // En ambos casos, nadie puede cambiar quién es el autor del post.
+        && resource.data.authorId == request.resource.data.authorId
+        && (
+          // 1) El autor puede editar cualquier campo suyo (texto, hashtags).
+          resource.data.authorId == request.auth.uid
+          ||
+          // 2) Cualquier OTRA persona autenticada puede dar/quitar like:
+          //    solo se le permite tocar el campo "likes", y solo para
+          //    agregar o quitar su propio uid (nunca el de alguien más).
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+            && soloAgregaOQuitaMiLike(resource.data.likes, request.resource.data.likes)
+          )
+        );
+
+      match /comments/{commentId} {
+        // Cualquier autenticado ve los comentarios de cualquier post visible.
+        allow read: if estaAutenticado();
+
+        // Solo puedes crear un comentario firmado con tu propio uid.
+        allow create: if estaAutenticado()
+          && request.resource.data.authorId == request.auth.uid;
+
+        // Solo el autor del comentario puede borrarlo.
+        allow delete: if estaAutenticado()
+          && resource.data.authorId == request.auth.uid;
+
+        // Hoy la app no permite editar comentarios.
+        allow update: if false;
+      }
+    }
+
+    // --------------------------------------------------------------------
+    // chats/{chatId}  y  chats/{chatId}/messages/{messageId}
+    // --------------------------------------------------------------------
+    match /chats/{chatId} {
+      // El documento "padre" del chat (solo guarda participants: [uidA,uidB])
+      // solo lo pueden leer y escribir esos dos participantes.
+      allow read, write: if esParticipanteDelChat(chatId);
+
+      match /messages/{messageId} {
+        // Solo los dos participantes de la conversación ven los mensajes
+        // (de texto o nota de voz).
+        allow read: if esParticipanteDelChat(chatId);
+
+        // Solo puedes enviar un mensaje si eres participante del chat Y
+        // el mensaje queda firmado con tu propio uid como remitente (no
+        // puedes mandar un mensaje haciéndote pasar por la otra persona).
+        allow create: if esParticipanteDelChat(chatId)
+          && request.resource.data.senderId == request.auth.uid;
+
+        // Hoy la app no permite editar ni borrar mensajes ya enviados.
+        allow update, delete: if false;
+      }
+    }
+
+    // --------------------------------------------------------------------
+    // notifications/{ownerUid}/items/{itemId}
+    // --------------------------------------------------------------------
+    match /notifications/{ownerUid}/items/{itemId} {
+      // Solo el dueño de la bandeja puede leer o borrar sus notificaciones.
+      allow read, delete: if esDueno(ownerUid);
+
+      // El dueño puede marcarlas como leídas, pero solo puede tocar el
+      // campo "read" (no puede reescribir de qué trataba la notificación).
+      allow update: if esDueno(ownerUid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+
+      // Cualquier persona autenticada puede CREAR una notificación para
+      // OTRA persona (así funcionan los avisos de like/comentario/mensaje/
+      // seguidor nuevo) siempre que la firme con su propio uid como
+      // remitente (fromUid) — no puedes notificar en nombre de alguien más.
+      allow create: if estaAutenticado()
+        && request.resource.data.fromUid == request.auth.uid;
+    }
+
+    // --------------------------------------------------------------------
+    // Cualquier otra colección o documento no contemplado arriba:
+    // denegado por defecto (mínimo permiso).
+    // --------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

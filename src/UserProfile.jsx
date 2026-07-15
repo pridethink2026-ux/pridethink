@@ -113,6 +113,17 @@ const styles = {
     border: "1px solid var(--border)",
     borderRadius: "16px",
   },
+  unblockBtn: {
+    marginTop: "14px",
+    padding: "9px 20px",
+    borderRadius: "999px",
+    border: "1px solid var(--border)",
+    background: "transparent",
+    color: "var(--text-muted)",
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
 };
 
 export default function UserProfile({ uid, onBack, onOpenProfile }) {
@@ -177,6 +188,11 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const isFollowing = (myProfile?.following || []).includes(uid);
   const followingCount = (profileUser?.following || []).length;
 
+  const handleUnblock = async () => {
+    if (!currentUid) return;
+    await updateDoc(doc(db, "users", currentUid), { blockedUsers: arrayRemove(uid) });
+  };
+
   const handleToggleFollow = async () => {
     if (!currentUid || isMe) return;
     await updateDoc(doc(db, "users", currentUid), {
@@ -219,13 +235,23 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   }
 
   if (isBlocked) {
+    // Si el bloqueo lo hiciste tú, te dejamos desbloquear desde aquí mismo.
+    // Si te bloquearon a ti, dejamos el mensaje genérico: no revelamos quién bloqueó a quién.
+    const iBlockedThem = myBlocked.includes(uid);
     return (
       <div style={styles.wrapper}>
         <div style={styles.column}>
           <button style={styles.backBtn} onClick={onBack}>
             ← Volver
           </button>
-          <p style={styles.notice}>No puedes ver este perfil.</p>
+          <div style={styles.notice}>
+            <p style={{ margin: 0 }}>No puedes ver este perfil.</p>
+            {iBlockedThem && (
+              <button style={styles.unblockBtn} onClick={handleUnblock}>
+                Desbloquear
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

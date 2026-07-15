@@ -24,6 +24,9 @@ export const THEMES = {
       "--accent2-soft": "rgba(244, 114, 182, 0.15)",
       "--accent2-softer": "rgba(244, 114, 182, 0.12)",
       "--accent2-soft-border": "rgba(244, 114, 182, 0.4)",
+      "--accent-soft": "rgba(167, 139, 250, 0.15)",
+      "--accent-softer": "rgba(167, 139, 250, 0.12)",
+      "--accent-soft-border": "rgba(167, 139, 250, 0.4)",
     },
   },
   arcoiris: {
@@ -41,6 +44,9 @@ export const THEMES = {
       "--accent2-soft": "rgba(251, 113, 133, 0.15)",
       "--accent2-softer": "rgba(251, 113, 133, 0.12)",
       "--accent2-soft-border": "rgba(251, 113, 133, 0.4)",
+      "--accent-soft": "rgba(251, 191, 36, 0.15)",
+      "--accent-softer": "rgba(251, 191, 36, 0.12)",
+      "--accent-soft-border": "rgba(251, 191, 36, 0.4)",
     },
   },
   oceano: {
@@ -58,6 +64,9 @@ export const THEMES = {
       "--accent2-soft": "rgba(56, 189, 248, 0.15)",
       "--accent2-softer": "rgba(56, 189, 248, 0.12)",
       "--accent2-soft-border": "rgba(56, 189, 248, 0.4)",
+      "--accent-soft": "rgba(45, 212, 191, 0.15)",
+      "--accent-softer": "rgba(45, 212, 191, 0.12)",
+      "--accent-soft-border": "rgba(45, 212, 191, 0.4)",
     },
   },
   atardecer: {
@@ -75,6 +84,9 @@ export const THEMES = {
       "--accent2-soft": "rgba(244, 63, 94, 0.15)",
       "--accent2-softer": "rgba(244, 63, 94, 0.12)",
       "--accent2-soft-border": "rgba(244, 63, 94, 0.4)",
+      "--accent-soft": "rgba(251, 146, 60, 0.15)",
+      "--accent-softer": "rgba(251, 146, 60, 0.12)",
+      "--accent-soft-border": "rgba(251, 146, 60, 0.4)",
     },
   },
 };
