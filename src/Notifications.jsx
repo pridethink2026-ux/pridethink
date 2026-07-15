@@ -10,23 +10,36 @@ import {
   limit,
   writeBatch,
 } from "firebase/firestore";
+import Avatar from "./Avatar";
+import { timeAgo } from "./utils";
 
 /*
   Notifications
   -------------
   Campanita con contador de notificaciones no leídas (likes, comentarios,
-  mensajes nuevos). Al abrir el panel se muestran las más recientes; al
-  cerrarlo se marcan todas como leídas.
+  mensajes nuevos, seguidores nuevos). Al abrir el panel se muestran las
+  más recientes; al abrirlo se marcan todas como leídas.
 
   Estructura en Firestore:
   - "notifications/{uid}/items/{itemId}"
-      -> { type: 'like' | 'comment' | 'message', fromName, fromIdentity, createdAt, read }
+      -> { type: 'like' | 'comment' | 'message' | 'follow', fromUid, fromName, fromIdentity, createdAt, read }
+
+  Este archivo exporta tres cosas:
+  - useNotifications(uid): hook con la lógica de datos (items, contador de
+    no leídas, marcar todo como leído). Lo usan tanto el default export
+    como App.js (para el puntito rojo de la barra inferior en móvil) y
+    NotificationsScreen.
+  - Notifications (default): la campanita + panel desplegable, para la
+    barra superior en escritorio.
+  - NotificationsScreen: la misma lista pero como pantalla completa, para
+    la barra de navegación inferior en móvil.
 */
 
 const LABELS = {
   like: (n) => `${n.fromName} le dio like a tu publicación`,
   comment: (n) => `${n.fromName} comentó tu publicación`,
   message: (n) => `${n.fromName} te envió un mensaje`,
+  follow: (n) => `${n.fromName} empezó a seguirte`,
 };
 
 const styles = {
@@ -76,39 +89,68 @@ const styles = {
     boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
   },
   item: (unread) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
     padding: "10px 12px",
     borderRadius: "10px",
     background: unread ? "var(--surface-alt)" : "transparent",
     fontSize: "13px",
     marginBottom: "4px",
+    cursor: "pointer",
   }),
   itemText: { margin: 0, color: "var(--text)" },
-  itemIdentity: { margin: "2px 0 0", color: "var(--text-muted)", fontSize: "11px" },
+  itemTime: { margin: "2px 0 0", color: "var(--text-muted)", fontSize: "11px" },
   empty: {
     padding: "20px 12px",
     textAlign: "center",
     color: "var(--text-muted)",
     fontSize: "13px",
   },
+  screenWrapper: {
+    minHeight: "100vh",
+    background: "var(--bg)",
+    display: "flex",
+    justifyContent: "center",
+    padding: "24px",
+    fontFamily:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    color: "var(--text)",
+    boxSizing: "border-box",
+  },
+  screenColumn: { width: "100%", maxWidth: "560px" },
+  screenTitle: {
+    fontFamily: "'Space Grotesk', 'Inter', sans-serif",
+    fontSize: "20px",
+    fontWeight: 600,
+    margin: "0 0 16px",
+  },
+  screenItem: (unread) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "14px",
+    borderRadius: "14px",
+    background: unread ? "var(--surface-alt)" : "var(--surface)",
+    border: "1px solid var(--border)",
+    fontSize: "14px",
+    marginBottom: "8px",
+    cursor: "pointer",
+  }),
 };
 
-export default function Notifications() {
-  const [currentUid, setCurrentUid] = useState(null);
+// Lógica de datos compartida: notificaciones en tiempo real, contador de
+// no leídas, y marcar todo como leído.
+export function useNotifications(uid) {
   const [items, setItems] = useState([]);
-  const [open, setOpen] = useState(false);
-  const panelRef = useRef(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setCurrentUid(user ? user.uid : null);
-    });
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    if (!currentUid) return;
+    if (!uid) {
+      setItems([]);
+      return;
+    }
     const q = query(
-      collection(db, "notifications", currentUid, "items"),
+      collection(db, "notifications", uid, "items"),
       orderBy("createdAt", "desc"),
       limit(30)
     );
@@ -116,7 +158,51 @@ export default function Notifications() {
       setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return unsub;
-  }, [currentUid]);
+  }, [uid]);
+
+  const unreadCount = items.filter((n) => !n.read).length;
+
+  const markAllRead = async () => {
+    if (!uid || unreadCount === 0) return;
+    const batch = writeBatch(db);
+    items
+      .filter((n) => !n.read)
+      .forEach((n) => {
+        batch.update(doc(db, "notifications", uid, "items", n.id), { read: true });
+      });
+    await batch.commit();
+  };
+
+  return { items, unreadCount, markAllRead };
+}
+
+function NotificationItem({ n, onOpenProfile, dropdown }) {
+  return (
+    <div
+      style={dropdown ? styles.item(!n.read) : styles.screenItem(!n.read)}
+      onClick={() => n.fromUid && onOpenProfile?.(n.fromUid)}
+    >
+      <Avatar uid={n.fromUid} name={n.fromName} size="sm" />
+      <div>
+        <p style={styles.itemText}>{LABELS[n.type] ? LABELS[n.type](n) : "Notificación"}</p>
+        <p style={styles.itemTime}>{timeAgo(n.createdAt)}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function Notifications({ onOpenProfile }) {
+  const [currentUid, setCurrentUid] = useState(null);
+  const [open, setOpen] = useState(false);
+  const panelRef = useRef(null);
+  const { items, unreadCount, markAllRead } = useNotifications(currentUid);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUid(user ? user.uid : null);
+    });
+    return unsub;
+  }, []);
 
   // Cierra el panel al hacer clic afuera
   useEffect(() => {
@@ -129,20 +215,10 @@ export default function Notifications() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  const unreadCount = items.filter((n) => !n.read).length;
-
   const handleToggle = async () => {
     const willOpen = !open;
     setOpen(willOpen);
-    if (willOpen && unreadCount > 0 && currentUid) {
-      const batch = writeBatch(db);
-      items
-        .filter((n) => !n.read)
-        .forEach((n) => {
-          batch.update(doc(db, "notifications", currentUid, "items", n.id), { read: true });
-        });
-      await batch.commit();
-    }
+    if (willOpen) await markAllRead();
   };
 
   if (!currentUid) return null;
@@ -158,13 +234,50 @@ export default function Notifications() {
         <div style={styles.panel}>
           {items.length === 0 && <p style={styles.empty}>Todavía no tienes notificaciones.</p>}
           {items.map((n) => (
-            <div key={n.id} style={styles.item(!n.read)}>
-              <p style={styles.itemText}>{LABELS[n.type] ? LABELS[n.type](n) : "Notificación"}</p>
-              {n.fromIdentity && <p style={styles.itemIdentity}>{n.fromIdentity}</p>}
-            </div>
+            <NotificationItem key={n.id} n={n} onOpenProfile={onOpenProfile} dropdown />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Misma lista, como pantalla completa para la barra de navegación inferior en móvil.
+export function NotificationsScreen({ onOpenProfile }) {
+  const [currentUid, setCurrentUid] = useState(null);
+  const { items, unreadCount, markAllRead } = useNotifications(currentUid);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUid(user ? user.uid : null);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (unreadCount > 0) markAllRead();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUid, unreadCount > 0]);
+
+  if (!currentUid) {
+    return (
+      <div style={styles.screenWrapper}>
+        <div style={styles.screenColumn}>
+          <p style={styles.empty}>Inicia sesión primero para ver tus notificaciones.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.screenWrapper}>
+      <div style={styles.screenColumn}>
+        <h1 style={styles.screenTitle}>Notificaciones</h1>
+        {items.length === 0 && <p style={styles.empty}>Todavía no tienes notificaciones.</p>}
+        {items.map((n) => (
+          <NotificationItem key={n.id} n={n} onOpenProfile={onOpenProfile} dropdown={false} />
+        ))}
+      </div>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import Avatar from "./Avatar";
 
 /*
   AuthProfile
@@ -167,19 +168,6 @@ const styles = {
     alignItems: "center",
     gap: "14px",
     marginBottom: "24px",
-  },
-  avatarCircle: {
-    width: "56px",
-    height: "56px",
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "22px",
-    fontWeight: 700,
-    color: "var(--bg)",
-    flexShrink: 0,
   },
   fieldRow: {
     display: "flex",
@@ -364,12 +352,11 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
   );
 }
 
-function ProfileView({ user, onLogout, onEdit, onTogglePrivacy }) {
-  const initial = (user.identity || "?").charAt(0).toUpperCase();
+function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy }) {
   return (
     <div>
       <div style={styles.profileHeader}>
-        <div style={styles.avatarCircle}>{initial}</div>
+        <Avatar uid={uid} name={user.displayName || user.identity} size="lg" />
         <div>
           <h1 style={{ ...styles.title, fontSize: "20px", margin: 0 }}>
             {user.displayName}
@@ -576,6 +563,7 @@ export default function AuthProfile() {
         {step === "profile" && user && (
           <ProfileView
             user={user}
+            uid={auth.currentUser?.uid}
             onLogout={handleLogout}
             onEdit={() => setStep("identity")}
             onTogglePrivacy={handleTogglePrivacy}

@@ -14,25 +14,35 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
+import Avatar from "./Avatar";
+import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
 
 /*
   Feed
   ----
   Muro social en tiempo real: publicaciones + reacciones (like) + comentarios
   + edición/borrado de tus propios posts + notificaciones a otros usuarios.
+  También: pestañas "Todos" / "Siguiendo", hashtags clickeables con filtro,
+  y perfiles públicos al tocar el avatar o el nombre de cualquier autor.
 
   Estructura en Firestore:
   - "posts/{postId}"
-      -> { authorId, authorName, authorIdentity, text, createdAt, likes: [uid...] }
+      -> { authorId, authorName, authorIdentity, text, createdAt, likes: [uid...], hashtags: ["..."] }
   - "posts/{postId}/comments/{commentId}"
       -> { authorId, authorName, authorIdentity, text, createdAt }
   - "notifications/{uid}/items/{itemId}"
-      -> { type: 'like' | 'comment' | 'message', fromUid, fromName, fromIdentity, createdAt, read }
+      -> { type: 'like' | 'comment' | 'message' | 'follow', fromUid, fromName, fromIdentity, createdAt, read }
 
   El número de comentarios NO se guarda como campo aparte: se escucha la
   subcolección de comentarios de cada post todo el tiempo (no solo cuando
   se abre) y el contador es simplemente la cantidad real de documentos.
-  Así nunca puede desincronizarse.
+  Así nunca puede desincronizarse. Lo mismo aplica a "Siguiendo": no se
+  guarda una lista de posts filtrados, se filtra en el momento comparando
+  contra myProfile.following (mismo patrón que el filtro de bloqueados).
+
+  Los hashtags se detectan al publicar (utils.extractHashtags) y se guardan
+  en minúsculas en el post. Al tocar un hashtag dentro de un post se activa
+  un filtro sobre el muro (chip visible para quitarlo).
 */
 
 const styles = {
@@ -56,7 +66,7 @@ const styles = {
     border: "1px solid var(--border)",
     borderRadius: "16px",
     padding: "18px",
-    marginBottom: "20px",
+    marginBottom: "16px",
   },
   textarea: {
     width: "100%",
@@ -83,6 +93,37 @@ const styles = {
     cursor: "pointer",
     float: "right",
   },
+  tabsRow: {
+    display: "flex",
+    gap: "8px",
+    marginBottom: "12px",
+  },
+  tabBtn: (active) => ({
+    padding: "7px 16px",
+    borderRadius: "999px",
+    border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
+    background: active ? "var(--accent2-soft)" : "transparent",
+    color: active ? "var(--accent2)" : "var(--text-muted)",
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
+  }),
+  hashtagFilterChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 12px",
+    borderRadius: "999px",
+    background: "var(--accent2-soft)",
+    color: "var(--accent2)",
+    fontSize: "13px",
+    fontWeight: 600,
+    marginBottom: "16px",
+  },
+  hashtagFilterClose: {
+    cursor: "pointer",
+    fontWeight: 700,
+  },
   post: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
@@ -92,26 +133,20 @@ const styles = {
   },
   postHeader: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: "10px",
     marginBottom: "10px",
   },
-  avatar: {
-    width: "38px",
-    height: "38px",
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "16px",
-    fontWeight: 700,
-    color: "var(--bg)",
-    flexShrink: 0,
-  },
+  postHeaderText: { cursor: "pointer" },
   authorName: { fontSize: "14px", fontWeight: 600, margin: 0 },
   authorIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: 0 },
+  timeText: { fontSize: "11px", color: "var(--text-muted)", margin: "2px 0 0" },
   postText: { fontSize: "14px", lineHeight: 1.5, margin: "0 0 12px", whiteSpace: "pre-wrap" },
+  hashtag: {
+    color: "var(--accent2)",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
   headerRight: { marginLeft: "auto", display: "flex", gap: "10px" },
   smallLink: {
     background: "none",
@@ -184,19 +219,6 @@ const styles = {
     gap: "8px",
     marginBottom: "10px",
   },
-  commentAvatar: {
-    width: "26px",
-    height: "26px",
-    borderRadius: "50%",
-    background: "var(--surface-alt)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "12px",
-    fontWeight: 700,
-    color: "var(--accent2)",
-    flexShrink: 0,
-  },
   commentBubble: {
     background: "var(--surface-alt)",
     borderRadius: "10px",
@@ -204,7 +226,7 @@ const styles = {
     fontSize: "13px",
     lineHeight: 1.4,
   },
-  commentAuthor: { fontWeight: 600, marginRight: "6px" },
+  commentAuthor: { fontWeight: 600, marginRight: "6px", cursor: "pointer" },
   commentForm: {
     display: "flex",
     gap: "8px",
@@ -241,27 +263,58 @@ const styles = {
     color: "var(--text-muted)",
     padding: "40px 24px",
   },
+  skeletonCard: {
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: "16px",
+    padding: "16px 18px",
+    marginBottom: "14px",
+  },
+  skeletonHeader: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" },
+  skeletonAvatar: { width: "38px", height: "38px", borderRadius: "50%", flexShrink: 0 },
+  skeletonLine: (width, height) => ({ width, height, marginBottom: "8px" }),
 };
 
-// Crea una notificación para otra persona (nunca para ti mismo)
-async function notify(targetUid, { type, fromUid, fromName, fromIdentity }) {
-  if (!targetUid || targetUid === fromUid) return;
-  await addDoc(collection(db, "notifications", targetUid, "items"), {
-    type,
-    fromUid,
-    fromName,
-    fromIdentity,
-    createdAt: serverTimestamp(),
-    read: false,
+// Convierte el texto de un post en piezas de texto normal + hashtags
+// clickeables, usando utils.splitTextWithHashtags.
+function renderPostText(text, onHashtagClick) {
+  return splitTextWithHashtags(text).map((part, i) => {
+    if (!part) return null;
+    if (part.startsWith("#")) {
+      const tag = part.slice(1).toLowerCase();
+      return (
+        <span key={i} style={styles.hashtag} onClick={() => onHashtagClick(tag)}>
+          {part}
+        </span>
+      );
+    }
+    return <React.Fragment key={i}>{part}</React.Fragment>;
   });
 }
 
-function PostCard({ post, currentUid, myProfile }) {
+function PostSkeleton() {
+  return (
+    <div style={styles.skeletonCard}>
+      <div style={styles.skeletonHeader}>
+        <div className="pt-skeleton" style={styles.skeletonAvatar} />
+        <div style={{ flex: 1 }}>
+          <div className="pt-skeleton" style={styles.skeletonLine("40%", "12px")} />
+          <div className="pt-skeleton" style={styles.skeletonLine("25%", "10px")} />
+        </div>
+      </div>
+      <div className="pt-skeleton" style={styles.skeletonLine("100%", "12px")} />
+      <div className="pt-skeleton" style={styles.skeletonLine("70%", "12px")} />
+    </div>
+  );
+}
+
+export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtagClick = () => {} }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(post.text);
+  const [likePop, setLikePop] = useState(false);
 
   const likes = post.likes || [];
   const iLiked = likes.includes(currentUid);
@@ -283,6 +336,10 @@ function PostCard({ post, currentUid, myProfile }) {
 
   const toggleLike = async () => {
     const postRef = doc(db, "posts", post.id);
+    if (!iLiked) {
+      setLikePop(true);
+      setTimeout(() => setLikePop(false), 350);
+    }
     await updateDoc(postRef, {
       likes: iLiked ? arrayRemove(currentUid) : arrayUnion(currentUid),
     });
@@ -317,7 +374,10 @@ function PostCard({ post, currentUid, myProfile }) {
 
   const handleSaveEdit = async () => {
     if (!editText.trim()) return;
-    await updateDoc(doc(db, "posts", post.id), { text: editText.trim() });
+    await updateDoc(doc(db, "posts", post.id), {
+      text: editText.trim(),
+      hashtags: extractHashtags(editText),
+    });
     setEditing(false);
   };
 
@@ -326,15 +386,19 @@ function PostCard({ post, currentUid, myProfile }) {
     await deleteDoc(doc(db, "posts", post.id));
   };
 
-  const initial = (post.authorIdentity || post.authorName || "?").charAt(0).toUpperCase();
-
   return (
     <div style={styles.post}>
       <div style={styles.postHeader}>
-        <div style={styles.avatar}>{initial}</div>
-        <div>
+        <Avatar
+          uid={post.authorId}
+          name={post.authorName || post.authorIdentity}
+          size="md"
+          onClick={() => onOpenProfile(post.authorId)}
+        />
+        <div style={styles.postHeaderText} onClick={() => onOpenProfile(post.authorId)}>
           <p style={styles.authorName}>{post.authorName}</p>
           <p style={styles.authorIdentity}>{post.authorIdentity}</p>
+          <p style={styles.timeText}>{timeAgo(post.createdAt)}</p>
         </div>
         {isMine && !editing && (
           <div style={styles.headerRight}>
@@ -371,12 +435,13 @@ function PostCard({ post, currentUid, myProfile }) {
           </div>
         </>
       ) : (
-        <p style={styles.postText}>{post.text}</p>
+        <p style={styles.postText}>{renderPostText(post.text, onHashtagClick)}</p>
       )}
 
       <div style={styles.actionsRow}>
         <button style={styles.actionBtn(iLiked)} onClick={toggleLike}>
-          {iLiked ? "❤️" : "🤍"} {likes.length > 0 ? likes.length : "Me gusta"}
+          <span className={likePop ? "pt-like-pop" : ""}>{iLiked ? "❤️" : "🤍"}</span>{" "}
+          {likes.length > 0 ? likes.length : "Me gusta"}
         </button>
         <button
           style={styles.actionBtn(commentsOpen)}
@@ -390,11 +455,19 @@ function PostCard({ post, currentUid, myProfile }) {
         <div style={styles.commentsBox}>
           {comments.map((c) => (
             <div key={c.id} style={styles.comment}>
-              <div style={styles.commentAvatar}>
-                {(c.authorIdentity || c.authorName || "?").charAt(0).toUpperCase()}
-              </div>
+              <Avatar
+                uid={c.authorId}
+                name={c.authorName || c.authorIdentity}
+                size="sm"
+                onClick={() => onOpenProfile(c.authorId)}
+              />
               <div style={styles.commentBubble}>
-                <span style={styles.commentAuthor}>{c.authorName}</span>
+                <span
+                  style={styles.commentAuthor}
+                  onClick={() => onOpenProfile(c.authorId)}
+                >
+                  {c.authorName}
+                </span>
                 {c.text}
               </div>
             </div>
@@ -418,13 +491,16 @@ function PostCard({ post, currentUid, myProfile }) {
   );
 }
 
-export default function Feed() {
+export default function Feed({ onOpenProfile }) {
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
   const [usersMap, setUsersMap] = useState({});
   const [posts, setPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
+  const [feedTab, setFeedTab] = useState("todos"); // "todos" | "siguiendo"
+  const [activeHashtag, setActiveHashtag] = useState(null);
 
   // Detecta sesión activa y trae tu propio perfil (nombre/identidad para firmar tus posts)
   useEffect(() => {
@@ -434,7 +510,7 @@ export default function Feed() {
     return unsub;
   }, []);
 
-  // Escucha tu propio perfil en tiempo real (para saber a quién bloqueaste)
+  // Escucha tu propio perfil en tiempo real (para saber a quién bloqueaste y a quién sigues)
   useEffect(() => {
     if (!currentUid) return;
     const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
@@ -460,6 +536,7 @@ export default function Feed() {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setPostsLoading(false);
     });
     return unsub;
   }, []);
@@ -474,6 +551,7 @@ export default function Feed() {
         authorName: myProfile.displayName || "Sin nombre",
         authorIdentity: myProfile.identity || "",
         text: text.trim(),
+        hashtags: extractHashtags(text),
         createdAt: serverTimestamp(),
         likes: [],
       });
@@ -484,6 +562,7 @@ export default function Feed() {
   };
 
   const myBlocked = myProfile?.blockedUsers || [];
+  const myFollowing = myProfile?.following || [];
   const visiblePosts = posts.filter((p) => {
     if (p.authorId === currentUid) return true; // siempre ves tus propios posts
     const author = usersMap[p.authorId];
@@ -492,6 +571,15 @@ export default function Feed() {
     if ((author?.blockedUsers || []).includes(currentUid)) return false;
     return true;
   });
+
+  const tabPosts =
+    feedTab === "siguiendo"
+      ? visiblePosts.filter((p) => myFollowing.includes(p.authorId))
+      : visiblePosts;
+
+  const finalPosts = activeHashtag
+    ? tabPosts.filter((p) => (p.hashtags || []).includes(activeHashtag))
+    : tabPosts;
 
   if (!currentUid) {
     return (
@@ -503,13 +591,17 @@ export default function Feed() {
     );
   }
 
+  let emptyMessage = "Todavía no hay publicaciones. ¡Sé el primero!";
+  if (activeHashtag) emptyMessage = `Nadie ha publicado con #${activeHashtag} todavía.`;
+  else if (feedTab === "siguiendo") emptyMessage = "Sigue a alguien para ver sus publicaciones aquí.";
+
   return (
     <div style={styles.wrapper}>
       <div style={styles.column}>
         <form style={styles.composer} onSubmit={handlePost}>
           <textarea
             style={styles.textarea}
-            placeholder="¿Qué estás pensando o sintiendo?"
+            placeholder="¿Qué estás pensando o sintiendo? Usa #hashtags si quieres"
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -519,13 +611,53 @@ export default function Feed() {
           <div style={{ clear: "both" }} />
         </form>
 
-        {visiblePosts.length === 0 && (
-          <p style={styles.empty}>Todavía no hay publicaciones. ¡Sé el primero!</p>
+        <div style={styles.tabsRow}>
+          <button style={styles.tabBtn(feedTab === "todos")} onClick={() => setFeedTab("todos")}>
+            Todos
+          </button>
+          <button
+            style={styles.tabBtn(feedTab === "siguiendo")}
+            onClick={() => setFeedTab("siguiendo")}
+          >
+            Siguiendo
+          </button>
+        </div>
+
+        {activeHashtag && (
+          <div style={styles.hashtagFilterChip}>
+            #{activeHashtag}
+            <span
+              style={styles.hashtagFilterClose}
+              onClick={() => setActiveHashtag(null)}
+            >
+              ✕
+            </span>
+          </div>
         )}
 
-        {visiblePosts.map((p) => (
-          <PostCard key={p.id} post={p} currentUid={currentUid} myProfile={myProfile} />
-        ))}
+        {postsLoading && (
+          <>
+            <PostSkeleton />
+            <PostSkeleton />
+            <PostSkeleton />
+          </>
+        )}
+
+        {!postsLoading && finalPosts.length === 0 && (
+          <p style={styles.empty}>{emptyMessage}</p>
+        )}
+
+        {!postsLoading &&
+          finalPosts.map((p) => (
+            <PostCard
+              key={p.id}
+              post={p}
+              currentUid={currentUid}
+              myProfile={myProfile}
+              onOpenProfile={onOpenProfile}
+              onHashtagClick={setActiveHashtag}
+            />
+          ))}
       </div>
     </div>
   );

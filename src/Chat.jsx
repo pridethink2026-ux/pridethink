@@ -14,6 +14,8 @@ import {
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
+import Avatar from "./Avatar";
+import { notify, useIsMobile } from "./utils";
 
 /*
   Chat
@@ -47,7 +49,6 @@ import {
   Mensaje de texto (como antes): { senderId, text, createdAt }
 */
 
-const MOBILE_BREAKPOINT = 700;
 const MAX_RECORD_SECONDS = 60;
 const AUDIO_MIME_TYPE = "audio/webm;codecs=opus";
 const MAX_AUDIO_BASE64_LENGTH = 900000; // margen de seguridad bajo el límite de 1MB por documento de Firestore
@@ -70,18 +71,6 @@ function blobToDataUrl(blob) {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
-}
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < MOBILE_BREAKPOINT : false
-  );
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  return isMobile;
 }
 
 const styles = {
@@ -142,6 +131,9 @@ const styles = {
     overflowY: "auto",
   },
   contactItem: (active) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
     padding: "12px 16px",
     cursor: "pointer",
     background: active ? "var(--surface-alt)" : "transparent",
@@ -149,6 +141,14 @@ const styles = {
   }),
   contactName: { fontSize: "14px", fontWeight: 600, margin: 0 },
   contactIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: "2px 0 0" },
+  chatHeaderInfo: {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    cursor: "pointer",
+  },
   chatCol: {
     flex: 1,
     display: "flex",
@@ -173,7 +173,17 @@ const styles = {
     padding: 0,
     lineHeight: 1,
   },
-  chatHeaderText: { flex: 1, minWidth: 0 },
+  chatHeaderText: { flex: 1, minWidth: 0, overflow: "hidden" },
+  chatHeaderName: { margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  chatHeaderIdentity: {
+    margin: "1px 0 0",
+    fontSize: "12px",
+    fontWeight: 400,
+    color: "var(--text-muted)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
   blockBtn: {
     background: "none",
     border: "1px solid var(--border)",
@@ -380,7 +390,7 @@ function AudioMessage({ src, duration, mine }) {
   );
 }
 
-export default function Chat() {
+export default function Chat({ onOpenProfile }) {
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
@@ -621,13 +631,11 @@ export default function Chat() {
         createdAt: serverTimestamp(),
       });
 
-      await addDoc(collection(db, "notifications", activeContact.uid, "items"), {
+      await notify(activeContact.uid, {
         type: "message",
         fromUid: currentUid,
         fromName: myProfile?.displayName || "Alguien",
         fromIdentity: myProfile?.identity || "",
-        createdAt: serverTimestamp(),
-        read: false,
       });
     } catch (err) {
       alert("No se pudo enviar la nota de voz. Intenta de nuevo.");
@@ -657,13 +665,11 @@ export default function Chat() {
     });
 
     // Notifica al destinatario que le llegó un mensaje nuevo
-    await addDoc(collection(db, "notifications", activeContact.uid, "items"), {
+    await notify(activeContact.uid, {
       type: "message",
       fromUid: currentUid,
       fromName: myProfile?.displayName || "Alguien",
       fromIdentity: myProfile?.identity || "",
-      createdAt: serverTimestamp(),
-      read: false,
     });
 
     setText("");
@@ -715,8 +721,11 @@ export default function Chat() {
                     if (recordingState === "idle") setActiveContact(c);
                   }}
                 >
-                  <p style={styles.contactName}>{c.displayName || "Sin nombre"}</p>
-                  <p style={styles.contactIdentity}>{c.identity}</p>
+                  <Avatar uid={c.uid} name={c.displayName || c.identity} size="md" />
+                  <div>
+                    <p style={styles.contactName}>{c.displayName || "Sin nombre"}</p>
+                    <p style={styles.contactIdentity}>{c.identity}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -733,9 +742,20 @@ export default function Chat() {
                       ←
                     </button>
                   )}
-                  <span style={styles.chatHeaderText}>
-                    {activeContact.displayName} · {activeContact.identity}
-                  </span>
+                  <div
+                    style={styles.chatHeaderInfo}
+                    onClick={() => onOpenProfile(activeContact.uid)}
+                  >
+                    <Avatar
+                      uid={activeContact.uid}
+                      name={activeContact.displayName || activeContact.identity}
+                      size="sm"
+                    />
+                    <div style={styles.chatHeaderText}>
+                      <p style={styles.chatHeaderName}>{activeContact.displayName}</p>
+                      <p style={styles.chatHeaderIdentity}>{activeContact.identity}</p>
+                    </div>
+                  </div>
                   <button style={styles.blockBtn} onClick={handleToggleBlock}>
                     {isBlocked ? "Desbloquear" : "Bloquear"}
                   </button>
