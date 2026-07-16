@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
 import AuthProfile from "./AuthProfile";
 import Chat from "./Chat";
 import Feed from "./Feed";
 import Search from "./Search";
 import UserProfile from "./UserProfile";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
+import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
 import {
   THEMES,
@@ -66,6 +68,9 @@ const navStyles = {
     order: 2,
   },
   button: (active) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
     padding: "8px 20px",
     borderRadius: "999px",
     border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
@@ -237,24 +242,31 @@ function ThemeMenu() {
   );
 }
 
-function BottomNav({ active, unreadCount, onNavigate }) {
+function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
   return (
     <div style={bottomNavStyles.bar}>
-      {BOTTOM_TABS.map((tab) => (
-        <button
-          key={tab.key}
-          style={bottomNavStyles.btn(active === tab.key)}
-          onClick={() => onNavigate(tab.key)}
-        >
-          <span style={bottomNavStyles.iconWrap}>
-            {tab.icon}
-            {tab.key === "notificaciones" && unreadCount > 0 && (
-              <span style={bottomNavStyles.dot} />
-            )}
-          </span>
-          <span style={bottomNavStyles.label}>{tab.label}</span>
-        </button>
-      ))}
+      {BOTTOM_TABS.map((tab) => {
+        const isActive = active === tab.key;
+        return (
+          <button
+            key={tab.key}
+            style={bottomNavStyles.btn(isActive)}
+            onClick={() => onNavigate(tab.key)}
+          >
+            <span style={bottomNavStyles.iconWrap}>
+              {tab.key === "feed" ? (
+                <HomeIcon identityText={myIdentity} active={isActive} size={19} />
+              ) : (
+                tab.icon
+              )}
+              {tab.key === "notificaciones" && unreadCount > 0 && (
+                <span style={bottomNavStyles.dot} />
+              )}
+            </span>
+            <span style={bottomNavStyles.label}>{tab.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -263,6 +275,7 @@ function App() {
   const isMobile = useIsMobile();
   const [view, setView] = useState("perfil"); // "perfil" | "feed" | "chat" | "buscar" | "notificaciones"
   const [currentUid, setCurrentUid] = useState(null);
+  const [myIdentity, setMyIdentity] = useState("");
   const [viewingProfileUid, setViewingProfileUid] = useState(null);
   const { unreadCount } = useNotifications(currentUid);
 
@@ -270,6 +283,19 @@ function App() {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
     return unsub;
   }, []);
+
+  // Se escucha en tiempo real para que el icono de Inicio cambie al
+  // instante si el usuario edita su identidad (AuthProfile.jsx).
+  useEffect(() => {
+    if (!currentUid) {
+      setMyIdentity("");
+      return;
+    }
+    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
+      setMyIdentity(snap.exists() ? snap.data().identity || "" : "");
+    });
+    return unsub;
+  }, [currentUid]);
 
   const openProfile = (uid) => setViewingProfileUid(uid);
   const closeProfile = () => setViewingProfileUid(null);
@@ -305,15 +331,21 @@ function App() {
         </div>
         {!isMobile && (
           <div style={navStyles.buttonsGroup}>
-            {DESKTOP_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                style={navStyles.button(!viewingProfileUid && view === tab.key)}
-                onClick={() => navigate(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {DESKTOP_TABS.map((tab) => {
+              const active = !viewingProfileUid && view === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  style={navStyles.button(active)}
+                  onClick={() => navigate(tab.key)}
+                >
+                  {tab.key === "feed" && (
+                    <HomeIcon identityText={myIdentity} active={active} size={17} />
+                  )}
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         )}
         <div style={navStyles.actionsSlot}>
@@ -331,6 +363,7 @@ function App() {
           active={viewingProfileUid ? null : view}
           unreadCount={unreadCount}
           onNavigate={navigate}
+          myIdentity={myIdentity}
         />
       )}
     </div>
