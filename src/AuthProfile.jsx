@@ -7,8 +7,19 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, onSnapshot, updateDoc, arrayRemove } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  onSnapshot,
+  updateDoc,
+  arrayRemove,
+  collection,
+  query,
+  where,
+} from "firebase/firestore";
 import Avatar from "./Avatar";
+import FollowListModal from "./FollowListModal";
 
 /*
   AuthProfile
@@ -43,17 +54,17 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     padding: "24px",
-    fontFamily:
-      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: "var(--font-body)",
     color: "var(--text)",
   },
   card: {
     width: "100%",
     maxWidth: "420px",
     background: "var(--surface)",
-    borderRadius: "20px",
+    borderRadius: "24px",
     border: "1px solid var(--border)",
-    padding: "32px 28px",
+    boxShadow: "0 12px 36px rgba(0,0,0,0.25)",
+    padding: "34px 28px",
     boxSizing: "border-box",
   },
   logo: {
@@ -72,9 +83,9 @@ const styles = {
     margin: "0 0 8px",
   },
   title: {
-    fontFamily: "'Space Grotesk', 'Inter', sans-serif",
+    fontFamily: "var(--font-display)",
     fontSize: "26px",
-    fontWeight: 600,
+    fontWeight: 700,
     margin: "0 0 4px",
     lineHeight: 1.2,
   },
@@ -96,7 +107,7 @@ const styles = {
     boxSizing: "border-box",
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
-    borderRadius: "10px",
+    borderRadius: "12px",
     padding: "11px 14px",
     fontSize: "15px",
     color: "var(--text)",
@@ -106,7 +117,7 @@ const styles = {
   button: {
     width: "100%",
     padding: "13px",
-    borderRadius: "10px",
+    borderRadius: "12px",
     border: "none",
     background: "linear-gradient(135deg, var(--accent), var(--accent2))",
     color: "var(--bg)",
@@ -118,7 +129,7 @@ const styles = {
   buttonGhost: {
     width: "100%",
     padding: "11px",
-    borderRadius: "10px",
+    borderRadius: "12px",
     border: "1px solid var(--border)",
     background: "transparent",
     color: "var(--text)",
@@ -187,8 +198,16 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "14px",
+    marginBottom: "18px",
+  },
+  countsRow: {
+    display: "flex",
+    gap: "28px",
     marginBottom: "24px",
   },
+  countItem: { cursor: "pointer" },
+  countNumber: { fontSize: "16px", fontWeight: 700, margin: 0 },
+  countLabel: { fontSize: "12px", color: "var(--text-muted)", margin: "2px 0 0" },
   fieldRow: {
     display: "flex",
     justifyContent: "space-between",
@@ -229,12 +248,18 @@ const styles = {
     transition: "left 0.15s",
   }),
   sectionTitle: {
-    fontSize: "12px",
-    letterSpacing: "0.08em",
+    fontSize: "13px",
+    letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "var(--accent2)",
     fontWeight: 700,
+    fontFamily: "var(--font-display)",
+    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    WebkitBackgroundClip: "text",
+    backgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    color: "transparent",
     margin: "24px 0 10px",
+    display: "inline-block",
   },
   blockedEmpty: {
     fontSize: "13px",
@@ -503,8 +528,20 @@ function BlockedUserRow({ uid, onUnblock }) {
   );
 }
 
-function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock }) {
+function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock, onOpenProfile }) {
   const blockedUsers = user.blockedUsers || [];
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
+  const followingCount = (user.following || []).length;
+
+  // Seguidores = usuarios cuyo campo "following" contiene tu uid (en tiempo real)
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(collection(db, "users"), where("following", "array-contains", uid));
+    const unsub = onSnapshot(q, (snap) => setFollowersCount(snap.size));
+    return unsub;
+  }, [uid]);
+
   return (
     <div>
       <div style={styles.profileHeader}>
@@ -516,6 +553,28 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock }
           <p style={{ ...styles.subtitle, margin: 0 }}>{user.identity}</p>
         </div>
       </div>
+
+      <div style={styles.countsRow}>
+        <div style={styles.countItem} onClick={() => setFollowModal("followers")}>
+          <p style={styles.countNumber}>{followersCount}</p>
+          <p style={styles.countLabel}>Seguidores</p>
+        </div>
+        <div style={styles.countItem} onClick={() => setFollowModal("following")}>
+          <p style={styles.countNumber}>{followingCount}</p>
+          <p style={styles.countLabel}>Siguiendo</p>
+        </div>
+      </div>
+
+      {followModal && (
+        <FollowListModal
+          mode={followModal}
+          targetUid={uid}
+          currentUid={uid}
+          myProfile={user}
+          onClose={() => setFollowModal(null)}
+          onOpenProfile={onOpenProfile}
+        />
+      )}
 
       <div style={{ marginBottom: "24px" }}>
         <div style={styles.fieldRow}>
@@ -579,7 +638,7 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock }
   );
 }
 
-export default function AuthProfile() {
+export default function AuthProfile({ onOpenProfile }) {
   const [step, setStep] = useState("login"); // login | signup | identity | profile | reset
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -762,6 +821,7 @@ export default function AuthProfile() {
             onEdit={() => setStep("identity")}
             onTogglePrivacy={handleTogglePrivacy}
             onUnblock={handleUnblock}
+            onOpenProfile={onOpenProfile}
           />
         )}
       </div>

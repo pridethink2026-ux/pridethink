@@ -64,6 +64,30 @@ function formatDuration(totalSeconds) {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
+// Ícono de micrófono SVG inline (trazo redondeado, currentColor para
+// heredar el color del botón/estado y adaptarse al tema activo). Cuando
+// "pulsing" es true (grabando), recibe la animación de pulso de index.css.
+function MicIcon({ pulsing }) {
+  return (
+    <svg
+      className={pulsing ? "pt-mic-pulse" : undefined}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+      <path d="M19 11v1a7 7 0 0 1-14 0v-1" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+      <line x1="8.5" y1="22" x2="15.5" y2="22" />
+    </svg>
+  );
+}
+
 function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -80,8 +104,7 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     padding: "24px",
-    fontFamily:
-      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: "var(--font-body)",
     color: "var(--text)",
     boxSizing: "border-box",
   },
@@ -90,8 +113,9 @@ const styles = {
     maxWidth: "760px",
     height: "80vh",
     background: "var(--surface)",
-    borderRadius: "20px",
+    borderRadius: "24px",
     border: "1px solid var(--border)",
+    boxShadow: "0 12px 36px rgba(0,0,0,0.25)",
     display: "flex",
     overflow: "hidden",
   },
@@ -104,11 +128,16 @@ const styles = {
   }),
   contactsHeader: {
     padding: "18px 16px 12px",
-    fontSize: "12px",
-    letterSpacing: "0.1em",
+    fontSize: "13px",
+    letterSpacing: "0.06em",
     textTransform: "uppercase",
-    color: "var(--accent2)",
-    fontWeight: 600,
+    fontWeight: 700,
+    fontFamily: "var(--font-display)",
+    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    WebkitBackgroundClip: "text",
+    backgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    color: "transparent",
     borderBottom: "1px solid var(--border)",
   },
   searchBox: {
@@ -210,7 +239,7 @@ const styles = {
   bubble: (mine) => ({
     maxWidth: "75%",
     padding: "10px 14px",
-    borderRadius: "14px",
+    borderRadius: "16px",
     fontSize: "14px",
     lineHeight: 1.4,
     wordBreak: "break-word",
@@ -230,7 +259,7 @@ const styles = {
     minWidth: 0,
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
-    borderRadius: "10px",
+    borderRadius: "12px",
     padding: "10px 14px",
     fontSize: "14px",
     color: "var(--text)",
@@ -238,7 +267,7 @@ const styles = {
   },
   sendBtn: {
     padding: "10px 18px",
-    borderRadius: "10px",
+    borderRadius: "12px",
     border: "none",
     background: "linear-gradient(135deg, var(--accent), var(--accent2))",
     color: "var(--bg)",
@@ -267,11 +296,10 @@ const styles = {
     padding: "14px 16px",
     borderTop: "1px solid var(--border)",
   },
-  recordingDot: {
-    width: "10px",
-    height: "10px",
-    borderRadius: "50%",
-    background: "var(--accent2)",
+  recordingMic: {
+    display: "flex",
+    alignItems: "center",
+    color: "var(--accent2)",
     flexShrink: 0,
   },
   recordingLabel: {
@@ -793,7 +821,7 @@ export default function Chat({ onOpenProfile }) {
                       onClick={startRecording}
                       title="Grabar nota de voz"
                     >
-                      🎤
+                      <MicIcon />
                     </button>
                     <button type="submit" style={styles.sendBtn}>
                       Enviar
@@ -801,9 +829,9 @@ export default function Chat({ onOpenProfile }) {
                   </form>
                 ) : (
                   <div style={styles.recordingRow}>
-                    {recordingState === "recording" && (
-                      <span className="pt-rec-dot" style={styles.recordingDot} />
-                    )}
+                    <span style={styles.recordingMic}>
+                      <MicIcon pulsing={recordingState === "recording"} />
+                    </span>
                     <span style={styles.recordingLabel}>
                       {recordingState === "recording"
                         ? "Grabando nota de voz..."

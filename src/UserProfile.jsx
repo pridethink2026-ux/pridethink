@@ -14,6 +14,7 @@ import {
 import Avatar from "./Avatar";
 import { PostCard } from "./Feed";
 import { notify } from "./utils";
+import FollowListModal from "./FollowListModal";
 
 /*
   UserProfile
@@ -41,8 +42,7 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     padding: "24px",
-    fontFamily:
-      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: "var(--font-body)",
     color: "var(--text)",
     boxSizing: "border-box",
   },
@@ -64,15 +64,16 @@ const styles = {
   header: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    borderRadius: "16px",
-    padding: "28px 20px",
+    borderRadius: "22px",
+    boxShadow: "0 8px 26px rgba(0,0,0,0.2)",
+    padding: "30px 22px",
     textAlign: "center",
-    marginBottom: "20px",
+    marginBottom: "22px",
   },
   name: {
-    fontFamily: "'Space Grotesk', 'Inter', sans-serif",
-    fontSize: "20px",
-    fontWeight: 600,
+    fontFamily: "var(--font-display)",
+    fontSize: "21px",
+    fontWeight: 700,
     margin: "14px 0 0",
   },
   identity: {
@@ -91,6 +92,7 @@ const styles = {
     gap: "36px",
     margin: "18px 0 4px",
   },
+  countItem: { cursor: "pointer" },
   countNumber: { fontSize: "17px", fontWeight: 700, margin: 0 },
   countLabel: { fontSize: "12px", color: "var(--text-muted)", margin: "2px 0 0" },
   followBtn: (following) => ({
@@ -111,7 +113,8 @@ const styles = {
     padding: "30px 20px",
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    borderRadius: "16px",
+    borderRadius: "20px",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
   },
   unblockBtn: {
     marginTop: "14px",
@@ -133,6 +136,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const [profileLoading, setProfileLoading] = useState(true);
   const [followersCount, setFollowersCount] = useState(0);
   const [posts, setPosts] = useState([]);
+  const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
@@ -275,11 +279,11 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
           )}
 
           <div style={styles.countsRow}>
-            <div>
+            <div style={styles.countItem} onClick={() => setFollowModal("followers")}>
               <p style={styles.countNumber}>{followersCount}</p>
               <p style={styles.countLabel}>Seguidores</p>
             </div>
-            <div>
+            <div style={styles.countItem} onClick={() => setFollowModal("following")}>
               <p style={styles.countNumber}>{followingCount}</p>
               <p style={styles.countLabel}>Siguiendo</p>
             </div>
@@ -308,6 +312,17 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
           ))
         )}
       </div>
+
+      {followModal && (
+        <FollowListModal
+          mode={followModal}
+          targetUid={uid}
+          currentUid={currentUid}
+          myProfile={myProfile}
+          onClose={() => setFollowModal(null)}
+          onOpenProfile={onOpenProfile}
+        />
+      )}
     </div>
   );
 }

@@ -52,8 +52,7 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     padding: "24px",
-    fontFamily:
-      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily: "var(--font-body)",
     color: "var(--text)",
     boxSizing: "border-box",
   },
@@ -64,9 +63,10 @@ const styles = {
   composer: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    borderRadius: "16px",
-    padding: "18px",
-    marginBottom: "16px",
+    borderRadius: "20px",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+    padding: "20px",
+    marginBottom: "18px",
   },
   textarea: {
     width: "100%",
@@ -85,7 +85,7 @@ const styles = {
   postBtn: {
     marginTop: "10px",
     padding: "10px 20px",
-    borderRadius: "10px",
+    borderRadius: "12px",
     border: "none",
     background: "linear-gradient(135deg, var(--accent), var(--accent2))",
     color: "var(--bg)",
@@ -127,9 +127,10 @@ const styles = {
   post: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    borderRadius: "16px",
-    padding: "16px 18px",
-    marginBottom: "14px",
+    borderRadius: "20px",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+    padding: "18px 20px",
+    marginBottom: "16px",
   },
   postHeader: {
     display: "flex",
@@ -266,9 +267,9 @@ const styles = {
   skeletonCard: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    borderRadius: "16px",
-    padding: "16px 18px",
-    marginBottom: "14px",
+    borderRadius: "20px",
+    padding: "18px 20px",
+    marginBottom: "16px",
   },
   skeletonHeader: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" },
   skeletonAvatar: { width: "38px", height: "38px", borderRadius: "50%", flexShrink: 0 },

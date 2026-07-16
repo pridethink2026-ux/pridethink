@@ -53,8 +53,9 @@ const navStyles = {
     justifyContent: "space-between",
     alignItems: "center",
     gap: "10px",
-    padding: "12px 16px",
+    padding: "14px 20px",
     background: "var(--bg)",
+    borderBottom: "1px solid var(--border)",
   },
   buttonsGroup: {
     display: "flex",
@@ -94,11 +95,15 @@ const navStyles = {
     borderRadius: "8px",
   },
   logoText: {
-    fontFamily: "'Space Grotesk', 'Inter', sans-serif",
-    fontSize: "15px",
-    fontWeight: 600,
-    color: "var(--text)",
+    fontFamily: "var(--font-display)",
+    fontSize: "17px",
+    fontWeight: 700,
     whiteSpace: "nowrap",
+    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    WebkitBackgroundClip: "text",
+    backgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    color: "transparent",
   },
 };
 
@@ -124,7 +129,7 @@ const themeStyles = {
     width: "200px",
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    borderRadius: "14px",
+    borderRadius: "18px",
     padding: "8px",
     zIndex: 20,
     boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
@@ -288,7 +293,7 @@ function App() {
   } else if (view === "notificaciones") {
     content = <NotificationsScreen onOpenProfile={openProfile} />;
   } else {
-    content = <AuthProfile />;
+    content = <AuthProfile onOpenProfile={openProfile} />;
   }
 
   return (

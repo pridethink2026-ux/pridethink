@@ -8,6 +8,16 @@
   cambiar de tema repinta toda la app al instante sin recargar.
 */
 
+// Tipografía de marca: se aplica siempre, sin importar el tema de colores
+// activo. "display" es para títulos de sección y el logo (con personalidad),
+// "body" es para texto normal (legible). Ver public/index.html para los
+// <link> de Google Fonts que cargan estas familias.
+const FONT_VARS = {
+  "--font-display": "'Sora', 'Space Grotesk', -apple-system, sans-serif",
+  "--font-body":
+    "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+};
+
 export const THEMES = {
   noche: {
     label: "Noche Violeta",
@@ -114,6 +124,9 @@ export function applyTheme(key) {
   const theme = THEMES[resolvedKey] || THEMES.noche;
   const root = document.documentElement;
   Object.entries(theme.vars).forEach(([prop, value]) => {
+    root.style.setProperty(prop, value);
+  });
+  Object.entries(FONT_VARS).forEach(([prop, value]) => {
     root.style.setProperty(prop, value);
   });
 }
