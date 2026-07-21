@@ -71,8 +71,18 @@ service cloud.firestore {
       // alguien, seguir a alguien). No se restringen campos individuales
       // porque la app actualiza distintos subconjuntos de campos con
       // merge:true (identidad, isPrivate, blockedUsers, following por
-      // separado) y siempre sobre tu propio documento.
-      allow create, update: if esDueno(uid);
+      // separado) y siempre sobre tu propio documento — EXCEPTO
+      // "isVerified" (badge de cuenta verificada), que es la única
+      // excepción a propósito: nadie puede crear su documento con ese
+      // campo (no puede llegar en true desde el registro), y ninguna
+      // actualización puede cambiar su valor. Es la única forma de que
+      // "solo se active a mano desde la consola de Firebase" sea cierto
+      // de verdad y no solo "la interfaz no ofrece un botón para esto" —
+      // la consola usa el SDK de administrador, que no pasa por estas
+      // reglas, así que sigue pudiendo activarlo/desactivarlo sin problema.
+      allow create: if esDueno(uid) && !('isVerified' in request.resource.data);
+      allow update: if esDueno(uid)
+        && request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false);
 
       // Nadie borra perfiles desde la app.
       allow delete: if false;

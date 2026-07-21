@@ -15,6 +15,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 import { PostCard } from "./Feed";
 import { notify, extractHashtags } from "./utils";
 import { useLanguage } from "./LanguageContext";
@@ -135,7 +136,7 @@ const styles = {
     gap: "10px",
   },
   memberRow: { display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" },
-  memberName: { fontSize: "13px", fontWeight: 600, margin: 0 },
+  memberName: { fontSize: "13px", fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "4px" },
   composer: {
     background: "var(--surface)",
     border: "1px solid var(--border)",
@@ -367,7 +368,10 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
                 return (
                   <div key={uid} style={styles.memberRow} onClick={() => onOpenProfile(uid)}>
                     <Avatar uid={uid} name={u?.displayName || u?.identity} identity={u?.identity} size="sm" />
-                    <p style={styles.memberName}>{u?.displayName || "Sin nombre"}</p>
+                    <p style={styles.memberName}>
+                      {u?.displayName || "Sin nombre"}
+                      {u?.isVerified && <VerifiedBadge size="sm" />}
+                    </p>
                   </div>
                 );
               })}

@@ -17,6 +17,7 @@ import { notify } from "./utils";
 import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import ReportButton from "./ReportButton";
+import VerifiedBadge from "./VerifiedBadge";
 import { isEffectivelyOnline, canSeeOnlineStatus } from "./presence";
 
 /*
@@ -82,6 +83,10 @@ const styles = {
     fontSize: "21px",
     fontWeight: 700,
     margin: "14px 0 0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
   },
   identity: {
     fontSize: "14px",
@@ -297,7 +302,10 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
               online={canSeeOnline && isEffectivelyOnline(profileUser)}
             />
           </div>
-          <h1 style={styles.name}>{profileUser.displayName}</h1>
+          <h1 style={styles.name}>
+            {profileUser.displayName}
+            {profileUser.isVerified && <VerifiedBadge size="md" />}
+          </h1>
           <p style={styles.identity}>{profileUser.identity}</p>
           {profileUser.joinedAt && (
             <p style={styles.joined}>Miembro desde {profileUser.joinedAt}</p>

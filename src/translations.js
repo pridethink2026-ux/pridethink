@@ -32,6 +32,7 @@ export const translations = {
   es: {
     // Genérico, usado en más de una pantalla
     "common.loading": "Cargando...",
+    "verified.badge": "Cuenta verificada",
 
     // Navegación (App.js)
     "nav.wall": "Muro",
@@ -326,6 +327,7 @@ export const translations = {
   en: {
     // Generic, used across more than one screen
     "common.loading": "Loading...",
+    "verified.badge": "Verified account",
 
     // Nav (App.js)
     "nav.wall": "Wall",

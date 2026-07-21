@@ -22,6 +22,7 @@ import {
 import Avatar from "./Avatar";
 import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
+import VerifiedBadge from "./VerifiedBadge";
 import { useLanguage } from "./LanguageContext";
 import { MIN_SIGNUP_AGE, getCountryOptions, LANGUAGE_OPTIONS, getGenderOptions, calculateAge } from "./profileFields";
 import { markOffline } from "./presence";
@@ -786,8 +787,9 @@ function ProfileView({
           size="lg"
         />
         <div>
-          <h1 style={{ ...styles.title, fontSize: "20px", margin: 0 }}>
+          <h1 style={{ ...styles.title, fontSize: "20px", margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
             {user.displayName}
+            {user.isVerified && <VerifiedBadge size="md" />}
           </h1>
           <p style={{ ...styles.subtitle, margin: 0 }}>{user.identity}</p>
         </div>

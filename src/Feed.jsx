@@ -38,6 +38,7 @@ import {
 } from "./Explore";
 import Groups from "./Groups";
 import Events from "./Events";
+import VerifiedBadge from "./VerifiedBadge";
 
 /*
   Feed
@@ -218,7 +219,14 @@ const styles = {
     marginBottom: "10px",
   },
   postHeaderText: { cursor: "pointer" },
-  authorName: { fontSize: "14px", fontWeight: 600, margin: 0 },
+  authorName: {
+    fontSize: "14px",
+    fontWeight: 600,
+    margin: 0,
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+  },
   authorIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: 0 },
   timeText: { fontSize: "11px", color: "var(--text-muted)", margin: "2px 0 0" },
   postText: { fontSize: "14px", lineHeight: 1.5, margin: "0 0 12px", whiteSpace: "pre-wrap" },
@@ -413,6 +421,11 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const myBlocked = myProfile?.blockedUsers || [];
   const editMention = useMentionAutocomplete(allUsers, currentUid, myBlocked);
   const commentMention = useMentionAutocomplete(allUsers, currentUid, myBlocked);
+  // Badge de verificado: el post guarda authorName/authorIdentity como
+  // copia del momento en que se publicó, pero isVerified se busca en vivo
+  // en allUsers (ya cargado para las menciones) para reflejar el estado
+  // actual, no una copia vieja.
+  const authorIsVerified = !!allUsers.find((u) => u.uid === post.authorId)?.isVerified;
 
   const myReaction = (post.reactions || {})[currentUid] || null;
   const reactionSummary = getReactionSummary(post.reactions);
@@ -557,7 +570,10 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           onClick={() => onOpenProfile(post.authorId)}
         />
         <div style={styles.postHeaderText} onClick={() => onOpenProfile(post.authorId)}>
-          <p style={styles.authorName}>{post.authorName}</p>
+          <p style={styles.authorName}>
+            {post.authorName}
+            {authorIsVerified && <VerifiedBadge size="sm" />}
+          </p>
           <p style={styles.authorIdentity}>{post.authorIdentity}</p>
           <p style={styles.timeText}>{timeAgo(post.createdAt)}</p>
         </div>

@@ -3,6 +3,7 @@ import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, deleteDoc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 import { useLanguage } from "./LanguageContext";
 import { formatEventDateTime } from "./Events";
 
@@ -114,7 +115,7 @@ const styles = {
     borderBottom: "1px solid var(--border)",
     cursor: "pointer",
   },
-  attendeeName: { fontSize: "13px", fontWeight: 600, margin: 0 },
+  attendeeName: { fontSize: "13px", fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "4px" },
   empty: {
     textAlign: "center",
     color: "var(--text-muted)",
@@ -243,7 +244,10 @@ export default function EventView({ eventId, onBack, onOpenProfile }) {
             return (
               <div key={uid} style={styles.attendeeRow} onClick={() => onOpenProfile(uid)}>
                 <Avatar uid={uid} name={u?.displayName || u?.identity} identity={u?.identity} size="sm" />
-                <p style={styles.attendeeName}>{u?.displayName || "Sin nombre"}</p>
+                <p style={styles.attendeeName}>
+                  {u?.displayName || "Sin nombre"}
+                  {u?.isVerified && <VerifiedBadge size="sm" />}
+                </p>
               </div>
             );
           })}

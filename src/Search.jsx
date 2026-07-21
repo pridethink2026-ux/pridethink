@@ -3,6 +3,7 @@ import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 import { timeAgo } from "./utils";
 
 /*
@@ -70,7 +71,7 @@ const styles = {
     boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
     marginBottom: "10px",
   },
-  userName: { fontSize: "14px", fontWeight: 600, margin: 0 },
+  userName: { fontSize: "14px", fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "4px" },
   userIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: 0 },
   postRow: {
     display: "flex",
@@ -82,7 +83,15 @@ const styles = {
     boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
     marginBottom: "10px",
   },
-  postAuthor: { fontSize: "13px", fontWeight: 600, margin: 0, cursor: "pointer" },
+  postAuthor: {
+    fontSize: "13px",
+    fontWeight: 600,
+    margin: 0,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+  },
   postTime: { fontSize: "11px", color: "var(--text-muted)", margin: "1px 0 6px" },
   postText: { fontSize: "13px", lineHeight: 1.4, margin: 0, whiteSpace: "pre-wrap" },
   empty: {
@@ -218,7 +227,10 @@ export default function Search({ onOpenProfile }) {
                   size="md"
                 />
                 <div>
-                  <p style={styles.userName}>{u.displayName || "Sin nombre"}</p>
+                  <p style={styles.userName}>
+                    {u.displayName || "Sin nombre"}
+                    {u.isVerified && <VerifiedBadge size="sm" />}
+                  </p>
                   <p style={styles.userIdentity}>{u.identity}</p>
                 </div>
               </div>
@@ -241,6 +253,7 @@ export default function Search({ onOpenProfile }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={styles.postAuthor} onClick={() => onOpenProfile(p.authorId)}>
                     {p.authorName}
+                    {usersMap[p.authorId]?.isVerified && <VerifiedBadge size="sm" />}
                   </p>
                   <p style={styles.postTime}>{timeAgo(p.createdAt)}</p>
                   <p style={styles.postText}>{p.text}</p>
