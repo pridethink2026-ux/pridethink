@@ -15,6 +15,7 @@ import Avatar from "./Avatar";
 import { PostCard } from "./Feed";
 import { notify } from "./utils";
 import FollowListModal from "./FollowListModal";
+import ProfileAbout from "./ProfileAbout";
 
 /*
   UserProfile
@@ -174,9 +175,15 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const isBlocked =
     myBlocked.includes(uid) || (profileUser?.blockedUsers || []).includes(currentUid);
   const isPrivateForMe = !!profileUser?.isPrivate && !isMe;
+  // isWallPrivate es independiente de isPrivate: solo oculta la lista de
+  // publicaciones (el resto del perfil sigue visible), mientras que
+  // isPrivate ya ocultaba el muro además de otras cosas (chat, feed
+  // principal). El dueño del perfil (isMe) siempre ve su propio muro.
+  const isWallPrivateForMe = !!profileUser?.isWallPrivate && !isMe;
+  const isWallHidden = isPrivateForMe || isWallPrivateForMe;
 
   useEffect(() => {
-    if (!uid || isBlocked || isPrivateForMe) {
+    if (!uid || isBlocked || isWallHidden) {
       setPosts([]);
       return;
     }
@@ -187,7 +194,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
       setPosts(list);
     });
     return unsub;
-  }, [uid, isBlocked, isPrivateForMe]);
+  }, [uid, isBlocked, isWallHidden]);
 
   const isFollowing = (myProfile?.following || []).includes(uid);
   const followingCount = (profileUser?.following || []).length;
@@ -299,10 +306,14 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
               {isFollowing ? "Dejar de seguir" : "Seguir"}
             </button>
           )}
+
+          <ProfileAbout profileUser={profileUser} />
         </div>
 
         {isPrivateForMe ? (
           <p style={styles.notice}>🔒 Este perfil es privado. No comparte sus publicaciones.</p>
+        ) : isWallPrivateForMe ? (
+          <p style={styles.notice}>🔒 Este muro es privado.</p>
         ) : posts.length === 0 ? (
           <p style={styles.notice}>Todavía no tiene publicaciones.</p>
         ) : (
