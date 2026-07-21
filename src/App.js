@@ -10,6 +10,7 @@ import UserProfile from "./UserProfile";
 import SavedPosts from "./SavedPosts";
 import PostView from "./PostView";
 import GroupView from "./GroupView";
+import EventView from "./EventView";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
@@ -34,13 +35,15 @@ import {
 
   Los perfiles públicos (UserProfile), la pantalla de "Guardados"
   (SavedPosts), una publicación individual (PostView, a donde se navega
-  al tocar la vista previa de un post compartido en el chat) y un grupo
+  al tocar la vista previa de un post compartido en el chat), un grupo
   específico (GroupView, a donde se navega desde la pestaña "Grupos" del
-  muro) se abren todas como una vista superpuesta, con el mismo patrón: se
-  guarda qué se está viendo en un estado aparte ("viewingProfileUid" /
-  "viewingSaved" / "viewingPostId" / "viewingGroupId") y se restaura la
-  pestaña anterior al volver, sin perder en qué pestaña estabas. Las
-  cuatro son mutuamente excluyentes: abrir una cierra las otras tres.
+  muro) y un evento específico (EventView, a donde se navega desde la
+  pestaña "Eventos" del muro) se abren todas como una vista superpuesta,
+  con el mismo patrón: se guarda qué se está viendo en un estado aparte
+  ("viewingProfileUid" / "viewingSaved" / "viewingPostId" /
+  "viewingGroupId" / "viewingEventId") y se restaura la pestaña anterior
+  al volver, sin perder en qué pestaña estabas. Las cinco son mutuamente
+  excluyentes: abrir una cierra las otras cuatro.
 */
 
 // Las etiquetas de las pestañas dependen del idioma activo (LanguageContext),
@@ -299,6 +302,7 @@ function App() {
   const [viewingSaved, setViewingSaved] = useState(false);
   const [viewingPostId, setViewingPostId] = useState(null);
   const [viewingGroupId, setViewingGroupId] = useState(null);
+  const [viewingEventId, setViewingEventId] = useState(null);
   const { unreadCount } = useNotifications(currentUid);
 
   useEffect(() => {
@@ -319,14 +323,15 @@ function App() {
     return unsub;
   }, [currentUid]);
 
-  // Las cuatro vistas superpuestas (perfil público, guardados, post
-  // individual, grupo) son mutuamente excluyentes: abrir cualquiera cierra
-  // las otras tres.
+  // Las cinco vistas superpuestas (perfil público, guardados, post
+  // individual, grupo, evento) son mutuamente excluyentes: abrir cualquiera
+  // cierra las otras cuatro.
   const openProfile = (uid) => {
     setViewingProfileUid(uid);
     setViewingSaved(false);
     setViewingPostId(null);
     setViewingGroupId(null);
+    setViewingEventId(null);
   };
   const closeProfile = () => setViewingProfileUid(null);
 
@@ -335,6 +340,7 @@ function App() {
     setViewingProfileUid(null);
     setViewingPostId(null);
     setViewingGroupId(null);
+    setViewingEventId(null);
   };
   const closeSaved = () => setViewingSaved(false);
 
@@ -343,6 +349,7 @@ function App() {
     setViewingProfileUid(null);
     setViewingSaved(false);
     setViewingGroupId(null);
+    setViewingEventId(null);
   };
   const closePost = () => setViewingPostId(null);
 
@@ -351,8 +358,18 @@ function App() {
     setViewingProfileUid(null);
     setViewingSaved(false);
     setViewingPostId(null);
+    setViewingEventId(null);
   };
   const closeGroup = () => setViewingGroupId(null);
+
+  const openEvent = (eventId) => {
+    setViewingEventId(eventId);
+    setViewingProfileUid(null);
+    setViewingSaved(false);
+    setViewingPostId(null);
+    setViewingGroupId(null);
+  };
+  const closeEvent = () => setViewingEventId(null);
 
   const navigate = (key) => {
     setView(key);
@@ -360,6 +377,7 @@ function App() {
     setViewingSaved(false);
     setViewingPostId(null);
     setViewingGroupId(null);
+    setViewingEventId(null);
   };
 
   let content;
@@ -367,6 +385,8 @@ function App() {
     content = <PostView postId={viewingPostId} onBack={closePost} onOpenProfile={openProfile} />;
   } else if (viewingGroupId) {
     content = <GroupView groupId={viewingGroupId} onBack={closeGroup} onOpenProfile={openProfile} />;
+  } else if (viewingEventId) {
+    content = <EventView eventId={viewingEventId} onBack={closeEvent} onOpenProfile={openProfile} />;
   } else if (viewingSaved) {
     content = <SavedPosts onBack={closeSaved} onOpenProfile={openProfile} />;
   } else if (viewingProfileUid) {
@@ -374,7 +394,7 @@ function App() {
       <UserProfile uid={viewingProfileUid} onBack={closeProfile} onOpenProfile={openProfile} />
     );
   } else if (view === "feed") {
-    content = <Feed onOpenProfile={openProfile} onOpenGroup={openGroup} />;
+    content = <Feed onOpenProfile={openProfile} onOpenGroup={openGroup} onOpenEvent={openEvent} />;
   } else if (view === "chat") {
     content = <Chat onOpenProfile={openProfile} onOpenPost={openPost} />;
   } else if (view === "buscar") {
@@ -387,8 +407,9 @@ function App() {
 
   // Para el resaltado de pestaña activa: ninguna pestaña se ve "activa"
   // mientras haya una vista superpuesta abierta (perfil público, guardados,
-  // un post individual o un grupo).
-  const anyOverlayOpen = !!viewingProfileUid || viewingSaved || !!viewingPostId || !!viewingGroupId;
+  // un post individual, un grupo o un evento).
+  const anyOverlayOpen =
+    !!viewingProfileUid || viewingSaved || !!viewingPostId || !!viewingGroupId || !!viewingEventId;
 
   return (
     <div style={{ paddingBottom: isMobile ? "62px" : 0 }}>
@@ -428,6 +449,8 @@ function App() {
             ? `post-${viewingPostId}`
             : viewingGroupId
             ? `group-${viewingGroupId}`
+            : viewingEventId
+            ? `event-${viewingEventId}`
             : viewingSaved
             ? "saved"
             : viewingProfileUid

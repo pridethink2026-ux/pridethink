@@ -255,6 +255,40 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------
+    // events/{eventId}  y  events/{eventId}/attendees/{uid}
+    // Eventos (título, descripción, fecha/hora, lugar en texto libre, sin
+    // imagen de portada por ahora). Públicos, como los grupos: cualquier
+    // autenticado los ve. Todavía no hay función para editar ni borrar un
+    // evento (no estaba pedido) — ver Pendientes en CONTEXTO.md.
+    // --------------------------------------------------------------------
+    match /events/{eventId} {
+      // Cualquier autenticado ve la lista de eventos y el detalle de cualquiera.
+      allow read: if estaAutenticado();
+
+      // Cualquier autenticado puede crear un evento, firmado como su propio
+      // creador.
+      allow create: if estaAutenticado()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      // Todavía no hay forma de editar ni borrar un evento una vez creado.
+      allow update, delete: if false;
+
+      match /attendees/{uid} {
+        // Cualquier autenticado ve quién va a asistir (lista de asistentes
+        // y conteo en vivo).
+        allow read: if estaAutenticado();
+
+        // Solo podés marcarte a vos mismo como asistente ("Asistiré").
+        allow create: if esDueno(uid);
+
+        // Solo podés borrar tu propia respuesta ("No asistiré").
+        allow delete: if esDueno(uid);
+
+        allow update: if false;
+      }
+    }
+
+    // --------------------------------------------------------------------
     // reports/{reportId}
     // Reportes de publicaciones o usuarios (moderación). Nadie los lee,
     // edita ni borra desde el cliente: solo se revisan a mano desde la
