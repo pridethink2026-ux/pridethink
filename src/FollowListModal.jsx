@@ -179,7 +179,12 @@ export default function FollowListModal({ mode, targetUid, currentUid, myProfile
                 onOpenProfile(p.uid);
               }}
             >
-              <Avatar uid={p.uid} name={p.displayName || p.identity} size="md" />
+              <Avatar
+                uid={p.uid}
+                name={p.displayName || p.identity}
+                identity={p.identity}
+                size="md"
+              />
               <div>
                 <p style={styles.rowName}>{p.displayName || "Sin nombre"}</p>
                 <p style={styles.rowIdentity}>{p.identity}</p>

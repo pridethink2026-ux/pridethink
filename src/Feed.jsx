@@ -393,6 +393,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
         <Avatar
           uid={post.authorId}
           name={post.authorName || post.authorIdentity}
+          identity={post.authorIdentity}
           size="md"
           onClick={() => onOpenProfile(post.authorId)}
         />
@@ -459,6 +460,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
               <Avatar
                 uid={c.authorId}
                 name={c.authorName || c.authorIdentity}
+                identity={c.authorIdentity}
                 size="sm"
                 onClick={() => onOpenProfile(c.authorId)}
               />

@@ -188,7 +188,7 @@ function NotificationItem({ n, onOpenProfile, dropdown }) {
       style={dropdown ? styles.item(!n.read) : styles.screenItem(!n.read)}
       onClick={() => n.fromUid && onOpenProfile?.(n.fromUid)}
     >
-      <Avatar uid={n.fromUid} name={n.fromName} size="sm" />
+      <Avatar uid={n.fromUid} name={n.fromName} identity={n.fromIdentity} size="sm" />
       <div>
         <p style={styles.itemText}>{LABELS[n.type] ? LABELS[n.type](n) : "Notificación"}</p>
         <p style={styles.itemTime}>{timeAgo(n.createdAt)}</p>

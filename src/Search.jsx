@@ -210,7 +210,12 @@ export default function Search({ onOpenProfile }) {
             <p style={styles.sectionTitle}>Personas</p>
             {matchedUsers.map((u) => (
               <div key={u.uid} style={styles.userRow} onClick={() => onOpenProfile(u.uid)}>
-                <Avatar uid={u.uid} name={u.displayName || u.identity} size="md" />
+                <Avatar
+                  uid={u.uid}
+                  name={u.displayName || u.identity}
+                  identity={u.identity}
+                  size="md"
+                />
                 <div>
                   <p style={styles.userName}>{u.displayName || "Sin nombre"}</p>
                   <p style={styles.userIdentity}>{u.identity}</p>
@@ -228,6 +233,7 @@ export default function Search({ onOpenProfile }) {
                 <Avatar
                   uid={p.authorId}
                   name={p.authorName}
+                  identity={p.authorIdentity}
                   size="sm"
                   onClick={() => onOpenProfile(p.authorId)}
                 />

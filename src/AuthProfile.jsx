@@ -516,7 +516,12 @@ function BlockedUserRow({ uid, onUnblock }) {
 
   return (
     <div style={styles.blockedRow}>
-      <Avatar uid={uid} name={profile?.displayName || profile?.identity} size="sm" />
+      <Avatar
+        uid={uid}
+        name={profile?.displayName || profile?.identity}
+        identity={profile?.identity}
+        size="sm"
+      />
       <div style={styles.blockedInfo}>
         <p style={styles.blockedName}>{profile?.displayName || "Usuario"}</p>
         <p style={styles.blockedIdentity}>{profile?.identity}</p>
@@ -545,7 +550,12 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock, 
   return (
     <div>
       <div style={styles.profileHeader}>
-        <Avatar uid={uid} name={user.displayName || user.identity} size="lg" />
+        <Avatar
+          uid={uid}
+          name={user.displayName || user.identity}
+          identity={user.identity}
+          size="lg"
+        />
         <div>
           <h1 style={{ ...styles.title, fontSize: "20px", margin: 0 }}>
             {user.displayName}

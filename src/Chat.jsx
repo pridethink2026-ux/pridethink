@@ -835,7 +835,12 @@ export default function Chat({ onOpenProfile }) {
                     if (recordingState === "idle") setActiveContact(c);
                   }}
                 >
-                  <Avatar uid={c.uid} name={c.displayName || c.identity} size="md" />
+                  <Avatar
+                    uid={c.uid}
+                    name={c.displayName || c.identity}
+                    identity={c.identity}
+                    size="md"
+                  />
                   <div>
                     <p style={styles.contactName}>{c.displayName || "Sin nombre"}</p>
                     <p style={styles.contactIdentity}>{c.identity}</p>
@@ -863,6 +868,7 @@ export default function Chat({ onOpenProfile }) {
                     <Avatar
                       uid={activeContact.uid}
                       name={activeContact.displayName || activeContact.identity}
+                      identity={activeContact.identity}
                       size="sm"
                     />
                     <div style={styles.chatHeaderText}>

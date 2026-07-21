@@ -270,7 +270,12 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
 
         <div style={styles.header}>
           <div style={{ display: "flex", justifyContent: "center" }}>
-            <Avatar uid={uid} name={profileUser.displayName || profileUser.identity} size="lg" />
+            <Avatar
+              uid={uid}
+              name={profileUser.displayName || profileUser.identity}
+              identity={profileUser.identity}
+              size="lg"
+            />
           </div>
           <h1 style={styles.name}>{profileUser.displayName}</h1>
           <p style={styles.identity}>{profileUser.identity}</p>
