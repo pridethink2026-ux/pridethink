@@ -11,6 +11,7 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  setDoc,
   updateDoc,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
@@ -18,6 +19,7 @@ import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils
 import { useLanguage } from "./LanguageContext";
 import ReportButton from "./ReportButton";
 import { getReactionEmoji, getReactionSummary, useReactionPicker, ReactionPicker } from "./Reactions";
+import SharePostModal from "./SharePostModal";
 
 /*
   Feed
@@ -56,6 +58,19 @@ import { getReactionEmoji, getReactionSummary, useReactionPicker, ReactionPicker
   reacción. Un clic simple en el botón alterna entre "sin reacción" y
   "❤️" (el comportamiento de "Me gusta" de siempre); mantener presionado
   (mobile) o pasar el mouse (desktop) abre el selector con los 5 tipos.
+
+  GUARDAR: el botón 🔖 en cada post crea/borra un documento en
+  savedPosts/{miUid}/items/{postId} — SOLO una referencia (el id del post
+  ya es el propio id del documento; no se copia texto ni autor), igual que
+  el botón "Guardados" del perfil (SavedPosts.jsx) resuelve esa lista de
+  ids a posts completos en tiempo real. El id del documento (no
+  autogenerado) hace que "está guardado" sea tan simple como que el
+  documento exista — nunca hay dos referencias al mismo post.
+
+  COMPARTIR POR CHAT: el botón 📤 abre SharePostModal.jsx (selector de
+  contactos, mismo criterio de "quién es visible" que Chat.jsx) para
+  mandar el post como un mensaje tipo "shared_post" en la conversación
+  elegida — ver Chat.jsx para el formato de ese mensaje y cómo se muestra.
 */
 
 const styles = {
@@ -333,12 +348,34 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(post.text);
   const [likePop, setLikePop] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const { open: pickerOpen, setOpen: setPickerOpen, containerRef: reactionRef, triggerProps: reactionTriggerProps, consumeLongPress } =
     useReactionPicker();
 
   const myReaction = (post.reactions || {})[currentUid] || null;
   const reactionSummary = getReactionSummary(post.reactions);
   const isMine = post.authorId === currentUid;
+
+  // Escucha si el post ya está en savedPosts/{miUid}/items/{postId} — el
+  // id del documento es el propio id del post, así que "está guardado" es
+  // solo que el documento exista.
+  useEffect(() => {
+    if (!currentUid) return;
+    const unsub = onSnapshot(doc(db, "savedPosts", currentUid, "items", post.id), (snap) => {
+      setSaved(snap.exists());
+    });
+    return unsub;
+  }, [currentUid, post.id]);
+
+  const toggleSave = async () => {
+    const ref = doc(db, "savedPosts", currentUid, "items", post.id);
+    if (saved) {
+      await deleteDoc(ref);
+    } else {
+      await setDoc(ref, { savedAt: serverTimestamp() });
+    }
+  };
 
   // Escucha los comentarios SIEMPRE (no solo al abrir), así el número junto
   // al ícono de comentarios siempre es exacto, sin depender de que alguien
@@ -506,7 +543,30 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
         >
           💬 {comments.length > 0 ? comments.length : t("feed.comment")}
         </button>
+        <button
+          style={{ ...styles.actionBtn(false), marginLeft: "auto" }}
+          onClick={() => setShareOpen(true)}
+          title={t("feed.sharePost")}
+        >
+          📤
+        </button>
+        <button
+          style={styles.actionBtn(saved)}
+          onClick={toggleSave}
+          title={t(saved ? "feed.unsavePost" : "feed.savePost")}
+        >
+          🔖
+        </button>
       </div>
+
+      {shareOpen && (
+        <SharePostModal
+          post={post}
+          currentUid={currentUid}
+          myProfile={myProfile}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
 
       {commentsOpen && (
         <div style={styles.commentsBox}>

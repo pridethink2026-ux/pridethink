@@ -186,6 +186,19 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------
+    // savedPosts/{ownerUid}/items/{postId}
+    // Lista personal de publicaciones guardadas (SavedPosts.jsx). El
+    // documento en sí es solo una referencia — el id del post ES el id del
+    // documento, no se copia texto ni autor — así que no hace falta
+    // validar ningún campo, solo que sea el dueño de la lista.
+    // --------------------------------------------------------------------
+    match /savedPosts/{ownerUid}/items/{postId} {
+      // Es una lista privada: solo el dueño la lee, agrega o quita
+      // referencias. Nadie más puede ver qué guardó otra persona.
+      allow read, create, update, delete: if esDueno(ownerUid);
+    }
+
+    // --------------------------------------------------------------------
     // reports/{reportId}
     // Reportes de publicaciones o usuarios (moderación). Nadie los lee,
     // edita ni borra desde el cliente: solo se revisan a mano desde la

@@ -7,6 +7,8 @@ import Chat from "./Chat";
 import Feed from "./Feed";
 import Search from "./Search";
 import UserProfile from "./UserProfile";
+import SavedPosts from "./SavedPosts";
+import PostView from "./PostView";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
@@ -29,9 +31,14 @@ import {
   mueven a una barra de navegación fija inferior tipo app (Muro / Buscar /
   Chat / Notificaciones / Perfil), con puntito rojo si hay avisos sin leer.
 
-  Los perfiles públicos (UserProfile) se abren como una vista superpuesta:
-  se guarda el uid que se está viendo en "viewingProfileUid" y se restaura
-  la pestaña anterior al volver, sin perder en qué pestaña estabas.
+  Los perfiles públicos (UserProfile), la pantalla de "Guardados"
+  (SavedPosts) y una publicación individual (PostView, a donde se navega
+  al tocar la vista previa de un post compartido en el chat) se abren
+  todas como una vista superpuesta, con el mismo patrón: se guarda qué se
+  está viendo en un estado aparte ("viewingProfileUid" / "viewingSaved" /
+  "viewingPostId") y se restaura la pestaña anterior al volver, sin perder
+  en qué pestaña estabas. Las tres son mutuamente excluyentes: abrir una
+  cierra las otras dos.
 */
 
 // Las etiquetas de las pestañas dependen del idioma activo (LanguageContext),
@@ -287,6 +294,8 @@ function App() {
   const [currentUid, setCurrentUid] = useState(null);
   const [myIdentity, setMyIdentity] = useState("");
   const [viewingProfileUid, setViewingProfileUid] = useState(null);
+  const [viewingSaved, setViewingSaved] = useState(false);
+  const [viewingPostId, setViewingPostId] = useState(null);
   const { unreadCount } = useNotifications(currentUid);
 
   useEffect(() => {
@@ -307,30 +316,62 @@ function App() {
     return unsub;
   }, [currentUid]);
 
-  const openProfile = (uid) => setViewingProfileUid(uid);
+  // Las tres vistas superpuestas (perfil público, guardados, post
+  // individual) son mutuamente excluyentes: abrir cualquiera cierra las
+  // otras dos.
+  const openProfile = (uid) => {
+    setViewingProfileUid(uid);
+    setViewingSaved(false);
+    setViewingPostId(null);
+  };
   const closeProfile = () => setViewingProfileUid(null);
+
+  const openSaved = () => {
+    setViewingSaved(true);
+    setViewingProfileUid(null);
+    setViewingPostId(null);
+  };
+  const closeSaved = () => setViewingSaved(false);
+
+  const openPost = (postId) => {
+    setViewingPostId(postId);
+    setViewingProfileUid(null);
+    setViewingSaved(false);
+  };
+  const closePost = () => setViewingPostId(null);
 
   const navigate = (key) => {
     setView(key);
     closeProfile();
+    setViewingSaved(false);
+    setViewingPostId(null);
   };
 
   let content;
-  if (viewingProfileUid) {
+  if (viewingPostId) {
+    content = <PostView postId={viewingPostId} onBack={closePost} onOpenProfile={openProfile} />;
+  } else if (viewingSaved) {
+    content = <SavedPosts onBack={closeSaved} onOpenProfile={openProfile} />;
+  } else if (viewingProfileUid) {
     content = (
       <UserProfile uid={viewingProfileUid} onBack={closeProfile} onOpenProfile={openProfile} />
     );
   } else if (view === "feed") {
     content = <Feed onOpenProfile={openProfile} />;
   } else if (view === "chat") {
-    content = <Chat onOpenProfile={openProfile} />;
+    content = <Chat onOpenProfile={openProfile} onOpenPost={openPost} />;
   } else if (view === "buscar") {
     content = <Search onOpenProfile={openProfile} />;
   } else if (view === "notificaciones") {
     content = <NotificationsScreen onOpenProfile={openProfile} />;
   } else {
-    content = <AuthProfile onOpenProfile={openProfile} />;
+    content = <AuthProfile onOpenProfile={openProfile} onOpenSaved={openSaved} />;
   }
+
+  // Para el resaltado de pestaña activa: ninguna pestaña se ve "activa"
+  // mientras haya una vista superpuesta abierta (perfil público, guardados
+  // o un post individual).
+  const anyOverlayOpen = !!viewingProfileUid || viewingSaved || !!viewingPostId;
 
   return (
     <div style={{ paddingBottom: isMobile ? "62px" : 0 }}>
@@ -342,7 +383,7 @@ function App() {
         {!isMobile && (
           <div style={navStyles.buttonsGroup}>
             {getDesktopTabs(t).map((tab) => {
-              const active = !viewingProfileUid && view === tab.key;
+              const active = !anyOverlayOpen && view === tab.key;
               return (
                 <button
                   key={tab.key}
@@ -364,13 +405,24 @@ function App() {
         </div>
       </div>
 
-      <div key={viewingProfileUid ? `profile-${viewingProfileUid}` : view} className="pt-view-fade">
+      <div
+        key={
+          viewingPostId
+            ? `post-${viewingPostId}`
+            : viewingSaved
+            ? "saved"
+            : viewingProfileUid
+            ? `profile-${viewingProfileUid}`
+            : view
+        }
+        className="pt-view-fade"
+      >
         {content}
       </div>
 
       {isMobile && (
         <BottomNav
-          active={viewingProfileUid ? null : view}
+          active={anyOverlayOpen ? null : view}
           unreadCount={unreadCount}
           onNavigate={navigate}
           myIdentity={myIdentity}

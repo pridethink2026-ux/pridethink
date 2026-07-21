@@ -50,19 +50,32 @@ import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./
   muy por debajo del límite de 1MB por documento de Firestore.
   Mensaje de audio: { senderId, type: "audio", audioData, audioDuration, createdAt }
   Mensaje de texto (como antes): { senderId, text, createdAt }
-  Los dos tipos de mensaje pueden tener además `reactions: { [uid]: tipo }`
+  Los tres tipos de mensaje pueden tener además `reactions: { [uid]: tipo }`
   (ver Reactions.jsx, compartido con Feed.jsx) — como mucho reaccionan las
   2 personas de la conversación. Mantener presionado (mobile) o pasar el
-  mouse (desktop) sobre CUALQUIER mensaje (texto o nota de voz) abre el
-  mismo selector de 5 reacciones que en el muro; lo elegido se muestra como
-  una burbujita superpuesta en la esquina del mensaje.
+  mouse (desktop) sobre CUALQUIER mensaje (texto, nota de voz o post
+  compartido) abre el mismo selector de 5 reacciones que en el muro; lo
+  elegido se muestra como una burbujita superpuesta en la esquina del
+  mensaje.
+
+  POST COMPARTIDO (armado desde SharePostModal.jsx, que exporta getChatId
+  de acá para escribir en el mismo chat): mensaje tipo
+  { senderId, type: "shared_post", sharedPostId, createdAt }. A propósito
+  NO guarda una copia del autor/texto del post (mismo principio que
+  savedPosts/{uid}/items/{postId}: solo una referencia) — SharedPostPreview
+  lee el post en vivo con onSnapshot, así que si se edita después de
+  compartirlo la vista previa se actualiza sola, y si se borra muestra un
+  aviso en vez de romperse. Tocar la vista previa llama a onOpenPost(id),
+  que en App.js abre PostView.jsx.
 */
 
 const MAX_RECORD_SECONDS = 60;
 const AUDIO_MIME_TYPE = "audio/webm;codecs=opus";
 const MAX_AUDIO_BASE64_LENGTH = 900000; // margen de seguridad bajo el límite de 1MB por documento de Firestore
 
-function getChatId(uidA, uidB) {
+// Exportada porque SharePostModal.jsx también necesita armar el mismo
+// chatId al compartir una publicación por chat.
+export function getChatId(uidA, uidB) {
   return [uidA, uidB].sort().join("_");
 }
 
@@ -480,6 +493,52 @@ const styles = {
     padding: "24px",
     textAlign: "center",
   },
+  // Tarjeta del post compartido: un borde de acento a la izquierda y un
+  // fondo más oscuro que la burbuja que la contiene (var(--bg) sobre el
+  // degradado propio, var(--surface) sobre el fondo ajeno) la distinguen
+  // de un mensaje de texto normal a simple vista, sin agregar ningún color
+  // nuevo fuera de las variables de tema.
+  sharedPostCard: (mine) => ({
+    padding: "10px 12px",
+    borderRadius: "12px",
+    borderLeft: "3px solid var(--accent2)",
+    background: mine ? "var(--bg)" : "var(--surface)",
+    cursor: "pointer",
+    minWidth: "170px",
+    maxWidth: "220px",
+  }),
+  sharedPostLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    fontSize: "11px",
+    fontWeight: 700,
+    letterSpacing: "0.02em",
+    margin: "0 0 6px",
+    color: "var(--accent2)",
+  },
+  sharedPostAuthor: {
+    fontSize: "13px",
+    fontWeight: 700,
+    margin: "0 0 2px",
+    color: "var(--text)",
+  },
+  sharedPostText: {
+    fontSize: "13px",
+    lineHeight: 1.4,
+    margin: 0,
+    color: "var(--text-muted)",
+    overflow: "hidden",
+    display: "-webkit-box",
+    WebkitLineClamp: 3,
+    WebkitBoxOrient: "vertical",
+  },
+  sharedPostUnavailable: {
+    fontSize: "13px",
+    fontStyle: "italic",
+    margin: 0,
+    color: "var(--text-muted)",
+  },
 };
 
 function AudioMessage({ src, duration, mine, id }) {
@@ -530,11 +589,50 @@ function AudioMessage({ src, duration, mine, id }) {
   );
 }
 
-// Una burbuja de mensaje (texto o nota de voz) + su selector de
-// reacciones. Es su propio componente (no un simple .map() inline) porque
-// useReactionPicker() es un hook y cada mensaje necesita su propia
-// instancia de estado (si abriste el selector no debe abrirse en todos).
-function MessageBubble({ message, mine, currentUid, chatId }) {
+// Vista previa de un post compartido, dentro de la burbuja del mensaje.
+// Lee el post EN VIVO por su id (no hay copia guardada del autor/texto en
+// el mensaje) — si el post se editó después de compartirlo, la vista
+// previa muestra la versión actual; si se borró, muestra un aviso en vez
+// de romperse.
+function SharedPostPreview({ postId, mine, onOpenPost }) {
+  const { t } = useLanguage();
+  const [post, setPost] = useState(undefined); // undefined: cargando | null: no existe
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "posts", postId), (snap) => {
+      setPost(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+    });
+    return unsub;
+  }, [postId]);
+
+  if (post === null) {
+    return (
+      <div style={styles.sharedPostCard(mine)}>
+        <p style={styles.sharedPostLabel}>📝 {t("chat.sharedPostLabel")}</p>
+        <p style={styles.sharedPostUnavailable}>{t("chat.sharedPostUnavailable")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.sharedPostCard(mine)} onClick={() => post && onOpenPost(postId)}>
+      <p style={styles.sharedPostLabel}>📝 {t("chat.sharedPostLabel")}</p>
+      {post && (
+        <>
+          <p style={styles.sharedPostAuthor}>{post.authorName}</p>
+          <p style={styles.sharedPostText}>{post.text}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Una burbuja de mensaje (texto, nota de voz o post compartido) + su
+// selector de reacciones. Es su propio componente (no un simple .map()
+// inline) porque useReactionPicker() es un hook y cada mensaje necesita su
+// propia instancia de estado (si abriste el selector no debe abrirse en
+// todos).
+function MessageBubble({ message, mine, currentUid, chatId, onOpenPost }) {
   const { open, setOpen, containerRef, triggerProps } = useReactionPicker();
   const myReaction = (message.reactions || {})[currentUid] || null;
   const reactionEmojis = getDistinctReactionEmojis(message.reactions);
@@ -556,6 +654,12 @@ function MessageBubble({ message, mine, currentUid, chatId }) {
               src={message.audioData}
               duration={message.audioDuration}
               mine={mine}
+            />
+          ) : message.type === "shared_post" ? (
+            <SharedPostPreview
+              postId={message.sharedPostId}
+              mine={mine}
+              onOpenPost={onOpenPost}
             />
           ) : (
             message.text
@@ -586,7 +690,7 @@ function MessageBubble({ message, mine, currentUid, chatId }) {
   );
 }
 
-export default function Chat({ onOpenProfile }) {
+export default function Chat({ onOpenProfile, onOpenPost }) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
@@ -971,6 +1075,7 @@ export default function Chat({ onOpenProfile }) {
                       mine={m.senderId === currentUid}
                       currentUid={currentUid}
                       chatId={getChatId(currentUid, activeContact.uid)}
+                      onOpenPost={onOpenPost}
                     />
                   ))}
                   <div ref={messagesEndRef} />

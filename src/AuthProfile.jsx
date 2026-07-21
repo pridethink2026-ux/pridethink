@@ -759,6 +759,7 @@ function ProfileView({
   onToggleWallPrivacy,
   onUnblock,
   onOpenProfile,
+  onOpenSaved,
 }) {
   const { language, setLanguage, t } = useLanguage();
   const blockedUsers = user.blockedUsers || [];
@@ -891,7 +892,10 @@ function ProfileView({
         ))
       )}
 
-      <button style={{ ...styles.buttonGhost, marginTop: "20px" }} onClick={onEdit}>
+      <button style={{ ...styles.buttonGhost, marginTop: "20px" }} onClick={onOpenSaved}>
+        {t("saved.openButton")}
+      </button>
+      <button style={{ ...styles.buttonGhost, marginTop: "10px" }} onClick={onEdit}>
         {t("profile.changeIdentity")}
       </button>
       <button
@@ -904,7 +908,7 @@ function ProfileView({
   );
 }
 
-export default function AuthProfile({ onOpenProfile }) {
+export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   const { t } = useLanguage();
   // login | signup | signupPersonal | identity | profile | reset
   const [step, setStep] = useState("login");
@@ -1183,6 +1187,7 @@ export default function AuthProfile({ onOpenProfile }) {
             onToggleWallPrivacy={handleToggleWallPrivacy}
             onUnblock={handleUnblock}
             onOpenProfile={onOpenProfile}
+            onOpenSaved={onOpenSaved}
           />
         )}
       </div>

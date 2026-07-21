@@ -181,6 +181,22 @@ export const translations = {
     "feed.emptyDefault": "Todavía no hay publicaciones. ¡Sé el primero!",
     "feed.emptyHashtag": "Nadie ha publicado con #{hashtag} todavía.",
     "feed.emptyFollowing": "Sigue a alguien para ver sus publicaciones aquí.",
+    "feed.savePost": "Guardar publicación",
+    "feed.unsavePost": "Quitar de guardados",
+    "feed.sharePost": "Compartir por chat",
+
+    // Guardados (SavedPosts.jsx)
+    "saved.title": "Guardados",
+    "saved.backLink": "← Volver",
+    "saved.openButton": "Ver guardados",
+    "saved.empty": "Todavía no guardaste ninguna publicación.",
+    "saved.loginNotice": "Inicia sesión primero para ver tus guardados.",
+
+    // Publicación individual (PostView.jsx)
+    "postView.backLink": "← Volver",
+    "postView.loading": "Cargando publicación...",
+    "postView.notFound": "Esta publicación ya no existe.",
+    "postView.blocked": "No puedes ver esta publicación.",
 
     // Chat (Chat.jsx)
     "chat.peopleHeader": "Personas",
@@ -207,6 +223,10 @@ export const translations = {
     "chat.audioTooLarge":
       "La nota de voz quedó muy pesada para enviarse. Intenta con una más corta.",
     "chat.audioSendError": "No se pudo enviar la nota de voz. Intenta de nuevo.",
+    "chat.shareModalTitle": "Compartir por chat",
+    "chat.shareSent": "¡Compartido!",
+    "chat.sharedPostLabel": "Publicación compartida",
+    "chat.sharedPostUnavailable": "Esta publicación ya no está disponible.",
 
     // Notificaciones (Notifications.jsx)
     "notifications.empty": "Todavía no tienes notificaciones.",
@@ -404,6 +424,22 @@ export const translations = {
     "feed.emptyDefault": "No posts yet. Be the first!",
     "feed.emptyHashtag": "No one has posted with #{hashtag} yet.",
     "feed.emptyFollowing": "Follow someone to see their posts here.",
+    "feed.savePost": "Save post",
+    "feed.unsavePost": "Remove from saved",
+    "feed.sharePost": "Share via chat",
+
+    // Saved posts (SavedPosts.jsx)
+    "saved.title": "Saved",
+    "saved.backLink": "← Back",
+    "saved.openButton": "View saved posts",
+    "saved.empty": "You haven't saved any posts yet.",
+    "saved.loginNotice": "Sign in first to see your saved posts.",
+
+    // Single post view (PostView.jsx)
+    "postView.backLink": "← Back",
+    "postView.loading": "Loading post...",
+    "postView.notFound": "This post no longer exists.",
+    "postView.blocked": "You can't see this post.",
 
     // Chat (Chat.jsx)
     "chat.peopleHeader": "People",
@@ -428,6 +464,10 @@ export const translations = {
     "chat.micPermissionError": "Couldn't access the microphone. Check your browser permissions.",
     "chat.audioTooLarge": "The voice note is too large to send. Try a shorter one.",
     "chat.audioSendError": "Couldn't send the voice note. Try again.",
+    "chat.shareModalTitle": "Share via chat",
+    "chat.shareSent": "Shared!",
+    "chat.sharedPostLabel": "Shared post",
+    "chat.sharedPostUnavailable": "This post is no longer available.",
 
     // Notifications (Notifications.jsx)
     "notifications.empty": "You don't have any notifications yet.",
