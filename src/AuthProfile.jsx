@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { auth, db } from "./firebase";
 import {
   createUserWithEmailAndPassword,
@@ -21,6 +21,7 @@ import {
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import FollowListModal from "./FollowListModal";
+import { useLanguage } from "./LanguageContext";
 
 /*
   AuthProfile
@@ -36,16 +37,22 @@ import FollowListModal from "./FollowListModal";
   distintas (tú y tu socio) ven la misma base de datos real.
 */
 
-const IDENTITY_SUGGESTIONS = [
-  "Gato",
-  "Ardilla",
-  "Libre",
-  "Rey",
-  "Reina",
-  "Creador",
-  "Zorro",
-  "Fenix",
-];
+// Sugerencias de identidad: se muestran traducidas (son solo ideas para
+// inspirar, parte de la interfaz), pero una vez que alguien toca una, ESE
+// texto (en el idioma que se le mostró) pasa a ser su identidad libre —
+// contenido suyo desde ese momento, ya no se vuelve a traducir.
+function getIdentitySuggestions(t) {
+  return [
+    t("identity.suggestion.cat"),
+    t("identity.suggestion.squirrel"),
+    t("identity.suggestion.free"),
+    t("identity.suggestion.king"),
+    t("identity.suggestion.queen"),
+    t("identity.suggestion.creator"),
+    t("identity.suggestion.fox"),
+    t("identity.suggestion.phoenix"),
+  ];
+}
 
 const MIN_SIGNUP_AGE = 18;
 
@@ -80,46 +87,42 @@ const COUNTRY_CODES = [
   "TV", "VU",
 ];
 
-// Convierte los códigos de arriba en { code, name } en español, ordenados
-// alfabéticamente por nombre. Si el navegador no soporta Intl.DisplayNames
-// (muy poco probable hoy), cae a mostrar el código tal cual.
-function getCountryOptions() {
+// Convierte los códigos de arriba en { code, name } en el idioma pedido
+// (Intl.DisplayNames), ordenados alfabéticamente por nombre. El campo que
+// se GUARDA siempre es el código ISO (no el nombre), así que el país
+// queda igual sin importar en qué idioma se registró la persona. Si el
+// navegador no soporta Intl.DisplayNames (muy poco probable hoy), cae a
+// mostrar el código tal cual.
+function getCountryOptions(locale) {
   let displayNames = null;
   try {
-    displayNames = new Intl.DisplayNames(["es"], { type: "region" });
+    displayNames = new Intl.DisplayNames([locale], { type: "region" });
   } catch {
     displayNames = null;
   }
   return COUNTRY_CODES.map((code) => ({
     code,
     name: displayNames ? displayNames.of(code) || code : code,
-  })).sort((a, b) => a.name.localeCompare(b.name, "es"));
+  })).sort((a, b) => a.name.localeCompare(b.name, locale));
 }
-
-const COUNTRY_OPTIONS = getCountryOptions();
 
 const LANGUAGE_OPTIONS = [
   { value: "es", label: "Español" },
   { value: "en", label: "English" },
 ];
 
-// Idioma por defecto según el navegador: si no reporta explícitamente
-// inglés, se queda en español (el idioma principal de la app).
-function detectDefaultLanguage() {
-  const nav =
-    (typeof navigator !== "undefined" &&
-      (navigator.language || (navigator.languages && navigator.languages[0]))) ||
-    "";
-  return nav.toLowerCase().startsWith("en") ? "en" : "es";
+// El VALOR de cada género es un código fijo (no cambia con el idioma, así
+// el dato guardado en Firestore es siempre el mismo); solo la ETIQUETA que
+// se muestra se traduce.
+function getGenderOptions(t) {
+  return [
+    { value: "mujer", label: t("personal.genderWoman") },
+    { value: "hombre", label: t("personal.genderMan") },
+    { value: "no_binario", label: t("personal.genderNonBinary") },
+    { value: "prefiero_no_decir", label: t("personal.genderPreferNotToSay") },
+    { value: "otro", label: t("personal.genderOther") },
+  ];
 }
-
-const GENDER_OPTIONS = [
-  { value: "mujer", label: "Mujer" },
-  { value: "hombre", label: "Hombre" },
-  { value: "no_binario", label: "No binario" },
-  { value: "prefiero_no_decir", label: "Prefiero no decir" },
-  { value: "otro", label: "Otro" },
-];
 
 // Edad exacta (no solo restar años) a partir de una fecha "YYYY-MM-DD":
 // solo cuenta el cumpleaños de este año si ya pasó (o es hoy).
@@ -420,6 +423,7 @@ const styles = {
 };
 
 function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, initialValues }) {
+  const { t } = useLanguage();
   const [email, setEmail] = useState(initialValues?.email || "");
   const [password, setPassword] = useState(initialValues?.password || "");
 
@@ -431,40 +435,38 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, 
   return (
     <form onSubmit={handleSubmit}>
       <p style={styles.eyebrow}>
-        {mode === "login" ? "Bienvenido de vuelta" : "Paso 1 de 3"}
+        {mode === "login" ? t("login.eyebrowBack") : t("login.eyebrowSignupStep1")}
       </p>
       <h1 style={styles.title}>
-        {mode === "login" ? "Entra a tu espacio" : "Sé lo que quieras ser"}
+        {mode === "login" ? t("login.titleLogin") : t("login.titleSignup")}
       </h1>
       <p style={styles.subtitle}>
-        {mode === "login"
-          ? "Ingresa con tu correo y contraseña."
-          : "Sin cajas, sin etiquetas impuestas. Empieza creando tu cuenta."}
+        {mode === "login" ? t("login.subtitleLogin") : t("login.subtitleSignup")}
       </p>
 
       {error && <div style={styles.error}>{error}</div>}
 
       <label style={styles.label} htmlFor="email">
-        Correo
+        {t("login.emailLabel")}
       </label>
       <input
         id="email"
         style={styles.input}
         type="email"
-        placeholder="nombre@correo.com"
+        placeholder={t("login.emailPlaceholder")}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
       />
 
       <label style={styles.label} htmlFor="password">
-        Contraseña
+        {t("login.passwordLabel")}
       </label>
       <input
         id="password"
         style={styles.input}
         type="password"
-        placeholder="Mínimo 6 caracteres"
+        placeholder={t("login.passwordPlaceholder")}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         minLength={6}
@@ -476,27 +478,31 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, 
           style={styles.forgotLink}
           onClick={() => onForgotPassword(email)}
         >
-          ¿Olvidaste tu contraseña?
+          {t("login.forgotPassword")}
         </span>
       )}
 
       <button type="submit" style={styles.button} disabled={loading}>
-        {loading ? "Un momento..." : mode === "login" ? "Entrar" : "Crear cuenta"}
+        {loading
+          ? t("login.submitWait")
+          : mode === "login"
+          ? t("login.submitLogin")
+          : t("login.submitSignup")}
       </button>
 
       <p style={styles.switchRow}>
         {mode === "login" ? (
           <>
-            ¿No tienes cuenta?{" "}
+            {t("login.noAccount")}{" "}
             <span style={styles.link} onClick={() => setMode("signup")}>
-              Regístrate
+              {t("login.signupLink")}
             </span>
           </>
         ) : (
           <>
-            ¿Ya tienes cuenta?{" "}
+            {t("login.hasAccount")}{" "}
             <span style={styles.link} onClick={() => setMode("login")}>
-              Entra
+              {t("login.loginLink")}
             </span>
           </>
         )}
@@ -506,6 +512,7 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, 
 }
 
 function ResetPasswordForm({ initialEmail, onBack }) {
+  const { t } = useLanguage();
   const [email, setEmail] = useState(initialEmail || "");
   const [status, setStatus] = useState("idle"); // idle | sending | sent | error
   const [errorMsg, setErrorMsg] = useState("");
@@ -519,50 +526,44 @@ function ResetPasswordForm({ initialEmail, onBack }) {
       setStatus("sent");
     } catch (err) {
       setStatus("error");
-      setErrorMsg(traducirErrorReset(err.code));
+      setErrorMsg(traducirErrorReset(err.code, t));
     }
   };
 
   return (
     <div>
-      <p style={styles.eyebrow}>Recuperar acceso</p>
-      <h1 style={styles.title}>¿Olvidaste tu contraseña?</h1>
-      <p style={styles.subtitle}>
-        Escribe el correo con el que te registraste. Te mandaremos un enlace
-        para crear una contraseña nueva.
-      </p>
+      <p style={styles.eyebrow}>{t("reset.eyebrow")}</p>
+      <h1 style={styles.title}>{t("reset.title")}</h1>
+      <p style={styles.subtitle}>{t("reset.subtitle")}</p>
 
       {status === "sent" ? (
-        <div style={styles.success}>
-          Te enviamos un correo para restablecer tu contraseña, revisa
-          también spam.
-        </div>
+        <div style={styles.success}>{t("reset.success")}</div>
       ) : (
         <form onSubmit={handleSubmit}>
           {status === "error" && <div style={styles.error}>{errorMsg}</div>}
 
           <label style={styles.label} htmlFor="resetEmail">
-            Correo
+            {t("login.emailLabel")}
           </label>
           <input
             id="resetEmail"
             style={styles.input}
             type="email"
-            placeholder="nombre@correo.com"
+            placeholder={t("login.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
 
           <button type="submit" style={styles.button} disabled={status === "sending"}>
-            {status === "sending" ? "Enviando..." : "Enviar enlace"}
+            {status === "sending" ? t("reset.sending") : t("reset.submit")}
           </button>
         </form>
       )}
 
       <p style={styles.switchRow}>
         <span style={styles.link} onClick={onBack}>
-          ← Volver a entrar
+          {t("reset.backLink")}
         </span>
       </p>
     </div>
@@ -572,13 +573,20 @@ function ResetPasswordForm({ initialEmail, onBack }) {
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
 function PersonalDataForm({ onSubmit, onBack, loading, error }) {
+  const { language, setLanguage, t } = useLanguage();
   const [fullName, setFullName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [country, setCountry] = useState("");
-  const [language, setLanguage] = useState(detectDefaultLanguage());
   const [gender, setGender] = useState("");
   const [genderOther, setGenderOther] = useState("");
   const [accepted, setAccepted] = useState(false);
+
+  // El selector de país e idioma usan directamente el idioma activo de la
+  // interfaz (LanguageContext): elegir un idioma acá cambia la UI al
+  // instante, y el valor ya queda listo para guardarse al terminar el
+  // registro (ver handleSubmit).
+  const countryOptions = useMemo(() => getCountryOptions(language), [language]);
+  const genderOptions = getGenderOptions(t);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -595,32 +603,29 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
   return (
     <form onSubmit={handleSubmit}>
       <span style={styles.backLink} onClick={onBack}>
-        ← Atrás
+        {t("personal.back")}
       </span>
-      <p style={styles.eyebrow}>Paso 2 de 3</p>
-      <h1 style={styles.title}>Cuéntanos un poco de ti</h1>
-      <p style={styles.subtitle}>
-        Estos datos nos ayudan a mantener Pridethink como un espacio seguro.
-        Tu identidad libre la eliges en el siguiente paso.
-      </p>
+      <p style={styles.eyebrow}>{t("personal.eyebrow")}</p>
+      <h1 style={styles.title}>{t("personal.title")}</h1>
+      <p style={styles.subtitle}>{t("personal.subtitle")}</p>
 
       {error && <div style={styles.error}>{error}</div>}
 
       <label style={styles.label} htmlFor="fullName">
-        Nombre completo
+        {t("personal.fullNameLabel")}
       </label>
       <input
         id="fullName"
         style={styles.input}
         type="text"
-        placeholder="Tu nombre y apellido"
+        placeholder={t("personal.fullNamePlaceholder")}
         value={fullName}
         onChange={(e) => setFullName(e.target.value)}
         required
       />
 
       <label style={styles.label} htmlFor="birthDate">
-        Fecha de nacimiento
+        {t("personal.birthDateLabel")}
       </label>
       <input
         id="birthDate"
@@ -633,7 +638,7 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
       />
 
       <label style={styles.label} htmlFor="country">
-        País
+        {t("personal.countryLabel")}
       </label>
       <select
         id="country"
@@ -643,9 +648,9 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
         required
       >
         <option value="" disabled>
-          Selecciona tu país
+          {t("personal.countryPlaceholder")}
         </option>
-        {COUNTRY_OPTIONS.map((c) => (
+        {countryOptions.map((c) => (
           <option key={c.code} value={c.code}>
             {c.name}
           </option>
@@ -653,7 +658,7 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
       </select>
 
       <label style={styles.label} htmlFor="language">
-        Idioma preferido
+        {t("personal.languageLabel")}
       </label>
       <select
         id="language"
@@ -670,7 +675,7 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
       </select>
 
       <label style={styles.label} htmlFor="gender">
-        Género
+        {t("personal.genderLabel")}
       </label>
       <select
         id="gender"
@@ -680,9 +685,9 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
         required
       >
         <option value="" disabled>
-          Selecciona una opción
+          {t("personal.genderPlaceholder")}
         </option>
-        {GENDER_OPTIONS.map((g) => (
+        {genderOptions.map((g) => (
           <option key={g.value} value={g.value}>
             {g.label}
           </option>
@@ -692,13 +697,13 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
       {gender === "otro" && (
         <>
           <label style={styles.label} htmlFor="genderOther">
-            Cuéntanos cuál
+            {t("personal.genderOtherLabel")}
           </label>
           <input
             id="genderOther"
             style={styles.input}
             type="text"
-            placeholder="Escribe tu género"
+            placeholder={t("personal.genderOtherPlaceholder")}
             value={genderOther}
             onChange={(e) => setGenderOther(e.target.value)}
             required
@@ -716,20 +721,22 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
           required
         />
         <label style={styles.checkboxLabel} htmlFor="acceptedTerms">
-          Acepto que soy mayor de 18 años y los términos de uso de Pridethink.
+          {t("personal.termsCheckbox")}
         </label>
       </div>
 
       <button type="submit" style={styles.button} disabled={loading}>
-        {loading ? "Un momento..." : "Continuar"}
+        {loading ? t("personal.submitWait") : t("personal.submit")}
       </button>
     </form>
   );
 }
 
 function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
+  const { t } = useLanguage();
   const [displayName, setDisplayName] = useState(initialValues?.displayName || "");
   const [identity, setIdentity] = useState(initialValues?.identity || "");
+  const suggestions = getIdentitySuggestions(t);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -739,34 +746,34 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <p style={styles.eyebrow}>{isEdit ? "Tu identidad de hoy" : "Paso 3 de 3"}</p>
-      <h1 style={styles.title}>{isEdit ? "¿Cómo te sientes hoy?" : "¿Qué eres tú?"}</h1>
+      <p style={styles.eyebrow}>
+        {isEdit ? t("identity.eyebrowEdit") : t("identity.eyebrowSignupStep3")}
+      </p>
+      <h1 style={styles.title}>{isEdit ? t("identity.titleEdit") : t("identity.titleSignup")}</h1>
       <p style={styles.subtitle}>
-        {isEdit
-          ? "Cámbiala cuantas veces quieras, cuando quieras. Hoy puedes ser algo distinto a ayer."
-          : "No elijas una casilla. Escribe lo que sientes que eres — puede ser una de estas ideas o algo completamente tuyo."}
+        {isEdit ? t("identity.subtitleEdit") : t("identity.subtitleSignup")}
       </p>
 
       <label style={styles.label} htmlFor="displayName">
-        Nombre para mostrar
+        {t("identity.displayNameLabel")}
       </label>
       <input
         id="displayName"
         style={styles.input}
         type="text"
-        placeholder="Como quieres que te vean"
+        placeholder={t("identity.displayNamePlaceholder")}
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
       />
 
       <label style={styles.label} htmlFor="identity">
-        Tu identidad {isEdit ? "de hoy" : ""}
+        {t("identity.identityLabel")} {isEdit ? t("identity.identityLabelToday") : ""}
       </label>
       <input
         id="identity"
         style={styles.input}
         type="text"
-        placeholder="Escribe lo que eres..."
+        placeholder={t("identity.identityPlaceholder")}
         value={identity}
         onChange={(e) => setIdentity(e.target.value)}
         required
@@ -774,7 +781,7 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
       />
 
       <div style={styles.chipRow}>
-        {IDENTITY_SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <span
             key={s}
             style={styles.chip(identity === s)}
@@ -786,13 +793,18 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
       </div>
 
       <button type="submit" style={styles.button} disabled={loading}>
-        {loading ? "Guardando..." : isEdit ? "Actualizar mi identidad" : "Guardar mi identidad"}
+        {loading
+          ? t("identity.submitSaving")
+          : isEdit
+          ? t("identity.submitUpdate")
+          : t("identity.submitSave")}
       </button>
     </form>
   );
 }
 
 function BlockedUserRow({ uid, onUnblock }) {
+  const { t } = useLanguage();
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
@@ -811,17 +823,18 @@ function BlockedUserRow({ uid, onUnblock }) {
         size="sm"
       />
       <div style={styles.blockedInfo}>
-        <p style={styles.blockedName}>{profile?.displayName || "Usuario"}</p>
+        <p style={styles.blockedName}>{profile?.displayName || t("profile.defaultUser")}</p>
         <p style={styles.blockedIdentity}>{profile?.identity}</p>
       </div>
       <button style={styles.unblockBtn} onClick={() => onUnblock(uid)}>
-        Desbloquear
+        {t("profile.unblock")}
       </button>
     </div>
   );
 }
 
 function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock, onOpenProfile }) {
+  const { language, setLanguage, t } = useLanguage();
   const blockedUsers = user.blockedUsers || [];
   const [followersCount, setFollowersCount] = useState(0);
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
@@ -855,11 +868,11 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock, 
       <div style={styles.countsRow}>
         <div style={styles.countItem} onClick={() => setFollowModal("followers")}>
           <p style={styles.countNumber}>{followersCount}</p>
-          <p style={styles.countLabel}>Seguidores</p>
+          <p style={styles.countLabel}>{t("profile.followers")}</p>
         </div>
         <div style={styles.countItem} onClick={() => setFollowModal("following")}>
           <p style={styles.countNumber}>{followingCount}</p>
-          <p style={styles.countLabel}>Siguiendo</p>
+          <p style={styles.countLabel}>{t("profile.following")}</p>
         </div>
       </div>
 
@@ -876,33 +889,31 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock, 
 
       <div style={{ marginBottom: "24px" }}>
         <div style={styles.fieldRow}>
-          <span style={styles.fieldLabel}>Correo</span>
+          <span style={styles.fieldLabel}>{t("profile.emailField")}</span>
           <span style={styles.fieldValue}>{user.email}</span>
         </div>
         <div style={styles.fieldRow}>
-          <span style={styles.fieldLabel}>Identidad</span>
+          <span style={styles.fieldLabel}>{t("profile.identityField")}</span>
           <span style={styles.fieldValue}>{user.identity}</span>
         </div>
         {user.identityUpdatedAt && (
           <div style={styles.fieldRow}>
-            <span style={styles.fieldLabel}>Última actualización</span>
+            <span style={styles.fieldLabel}>{t("profile.lastUpdated")}</span>
             <span style={styles.fieldValue}>{user.identityUpdatedAt}</span>
           </div>
         )}
         <div style={styles.fieldRow}>
-          <span style={styles.fieldLabel}>Miembro desde</span>
+          <span style={styles.fieldLabel}>{t("profile.memberSince")}</span>
           <span style={styles.fieldValue}>{user.joinedAt}</span>
         </div>
 
         <div style={styles.privacyRow}>
           <div>
             <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
-              Perfil privado
+              {t("profile.privateProfile")}
             </p>
             <p style={styles.privacyHint}>
-              {user.isPrivate
-                ? "No apareces en el chat ni tus publicaciones son visibles para otros."
-                : "Apareces en el chat y tus publicaciones son públicas."}
+              {user.isPrivate ? t("profile.privateOn") : t("profile.privateOff")}
             </p>
           </div>
           <div
@@ -912,11 +923,25 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock, 
             <div style={styles.toggleDot(!!user.isPrivate)} />
           </div>
         </div>
+
+        <div style={styles.privacyRow}>
+          <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
+            {t("profile.language")}
+          </p>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <span style={styles.chip(language === "es")} onClick={() => setLanguage("es")}>
+              ES
+            </span>
+            <span style={styles.chip(language === "en")} onClick={() => setLanguage("en")}>
+              EN
+            </span>
+          </div>
+        </div>
       </div>
 
-      <p style={styles.sectionTitle}>Usuarios bloqueados</p>
+      <p style={styles.sectionTitle}>{t("profile.blockedUsers")}</p>
       {blockedUsers.length === 0 ? (
-        <p style={styles.blockedEmpty}>No has bloqueado a nadie.</p>
+        <p style={styles.blockedEmpty}>{t("profile.blockedEmpty")}</p>
       ) : (
         blockedUsers.map((buid) => (
           <BlockedUserRow key={buid} uid={buid} onUnblock={onUnblock} />
@@ -924,19 +949,20 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock, 
       )}
 
       <button style={{ ...styles.buttonGhost, marginTop: "20px" }} onClick={onEdit}>
-        Cambiar mi identidad
+        {t("profile.changeIdentity")}
       </button>
       <button
         style={{ ...styles.buttonGhost, marginTop: "10px" }}
         onClick={onLogout}
       >
-        Cerrar sesión
+        {t("profile.logout")}
       </button>
     </div>
   );
 }
 
 export default function AuthProfile({ onOpenProfile }) {
+  const { t } = useLanguage();
   // login | signup | signupPersonal | identity | profile | reset
   const [step, setStep] = useState("login");
   const [error, setError] = useState("");
@@ -995,7 +1021,7 @@ export default function AuthProfile({ onOpenProfile }) {
         setStep("identity");
       }
     } catch (err) {
-      setError(traducirErrorFirebase(err.code));
+      setError(traducirErrorFirebase(err.code, t));
     } finally {
       setLoading(false);
     }
@@ -1014,11 +1040,11 @@ export default function AuthProfile({ onOpenProfile }) {
     setError("");
     const age = calculateAge(personalData.birthDate);
     if (age === null) {
-      setError("Ingresa una fecha de nacimiento válida.");
+      setError(t("personal.invalidBirthDate"));
       return;
     }
     if (age < MIN_SIGNUP_AGE) {
-      setError("Debes ser mayor de 18 años para crear una cuenta en Pridethink.");
+      setError(t("personal.underage"));
       return;
     }
 
@@ -1035,7 +1061,7 @@ export default function AuthProfile({ onOpenProfile }) {
       setSignupDraft((prev) => ({ ...prev, ...personalData }));
       setStep("identity");
     } catch (err) {
-      setError(traducirErrorFirebase(err.code));
+      setError(traducirErrorFirebase(err.code, t));
     } finally {
       setLoading(false);
     }
@@ -1090,7 +1116,7 @@ export default function AuthProfile({ onOpenProfile }) {
       setSignupDraft({});
       setStep("profile");
     } catch (err) {
-      setError("No se pudo guardar tu perfil. Intenta de nuevo.");
+      setError(t("errors.profileSaveFailed"));
     } finally {
       setLoading(false);
     }
@@ -1139,7 +1165,7 @@ export default function AuthProfile({ onOpenProfile }) {
     return (
       <div style={styles.page}>
         <div style={{ ...styles.card, textAlign: "center", color: "var(--text-muted)" }}>
-          Cargando...
+          {t("common.loading")}
         </div>
       </div>
     );
@@ -1206,27 +1232,32 @@ export default function AuthProfile({ onOpenProfile }) {
   );
 }
 
-// Traduce los códigos de error de Firebase a mensajes entendibles en español
-function traducirErrorFirebase(code) {
-  const mensajes = {
-    "auth/email-already-in-use": "Ya existe una cuenta con ese correo.",
-    "auth/invalid-email": "El correo no es válido.",
-    "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
-    "auth/user-not-found": "Correo o contraseña incorrectos.",
-    "auth/wrong-password": "Correo o contraseña incorrectos.",
-    "auth/invalid-credential": "Correo o contraseña incorrectos.",
-    "auth/too-many-requests": "Demasiados intentos. Espera un momento e intenta de nuevo.",
-  };
-  return mensajes[code] || "Ocurrió un error. Intenta de nuevo.";
+// Traduce los códigos de error de Firebase a un mensaje entendible, en el
+// idioma activo (t viene de useLanguage()).
+const KNOWN_AUTH_ERROR_CODES = [
+  "auth/email-already-in-use",
+  "auth/invalid-email",
+  "auth/weak-password",
+  "auth/user-not-found",
+  "auth/wrong-password",
+  "auth/invalid-credential",
+  "auth/too-many-requests",
+];
+
+function traducirErrorFirebase(code, t) {
+  return KNOWN_AUTH_ERROR_CODES.includes(code) ? t(`errors.${code}`) : t("errors.generic");
 }
 
-// Traduce los códigos de error de sendPasswordResetEmail a español
-function traducirErrorReset(code) {
-  const mensajes = {
-    "auth/invalid-email": "Ese correo no tiene un formato válido.",
-    "auth/missing-email": "Escribe tu correo para poder enviarte el enlace.",
-    "auth/user-not-found": "No encontramos ninguna cuenta con ese correo.",
-    "auth/too-many-requests": "Demasiados intentos. Espera un momento e intenta de nuevo.",
-  };
-  return mensajes[code] || "No se pudo enviar el correo. Intenta de nuevo.";
+// Traduce los códigos de error de sendPasswordResetEmail, en el idioma activo.
+const KNOWN_RESET_ERROR_CODES = [
+  "auth/invalid-email",
+  "auth/missing-email",
+  "auth/user-not-found",
+  "auth/too-many-requests",
+];
+
+function traducirErrorReset(code, t) {
+  return KNOWN_RESET_ERROR_CODES.includes(code)
+    ? t(`errors.reset.${code}`)
+    : t("errors.reset.generic");
 }

@@ -10,6 +10,7 @@ import UserProfile from "./UserProfile";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
+import { useLanguage } from "./LanguageContext";
 import {
   THEMES,
   ROTATIVO_KEY,
@@ -33,20 +34,26 @@ import {
   la pestaña anterior al volver, sin perder en qué pestaña estabas.
 */
 
-const DESKTOP_TABS = [
-  { key: "perfil", label: "Perfil" },
-  { key: "feed", label: "Muro" },
-  { key: "chat", label: "Chat" },
-  { key: "buscar", label: "Buscar" },
-];
+// Las etiquetas de las pestañas dependen del idioma activo (LanguageContext),
+// así que se arman con "t" en vez de ser un arreglo fijo a nivel de módulo.
+function getDesktopTabs(t) {
+  return [
+    { key: "perfil", label: t("nav.profile") },
+    { key: "feed", label: t("nav.wall") },
+    { key: "chat", label: t("nav.chat") },
+    { key: "buscar", label: t("nav.search") },
+  ];
+}
 
-const BOTTOM_TABS = [
-  { key: "feed", label: "Muro", icon: "🏠" },
-  { key: "buscar", label: "Buscar", icon: "🔍" },
-  { key: "chat", label: "Chat", icon: "💬" },
-  { key: "notificaciones", label: "Avisos", icon: "🔔" },
-  { key: "perfil", label: "Perfil", icon: "👤" },
-];
+function getBottomTabs(t) {
+  return [
+    { key: "feed", label: t("nav.wall"), icon: "🏠" },
+    { key: "buscar", label: t("nav.search"), icon: "🔍" },
+    { key: "chat", label: t("nav.chat"), icon: "💬" },
+    { key: "notificaciones", label: t("nav.alerts"), icon: "🔔" },
+    { key: "perfil", label: t("nav.profile"), icon: "👤" },
+  ];
+}
 
 const navStyles = {
   bar: {
@@ -189,6 +196,7 @@ const bottomNavStyles = {
 };
 
 function ThemeMenu() {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState("noche");
   const panelRef = useRef(null);
@@ -234,7 +242,7 @@ function ThemeMenu() {
             style={themeStyles.option(selected === ROTATIVO_KEY)}
             onClick={() => handleSelect(ROTATIVO_KEY)}
           >
-            🔄 Rotativo
+            🔄 {t("nav.themeRotating")}
           </div>
         </div>
       )}
@@ -243,9 +251,10 @@ function ThemeMenu() {
 }
 
 function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
+  const { t } = useLanguage();
   return (
     <div style={bottomNavStyles.bar}>
-      {BOTTOM_TABS.map((tab) => {
+      {getBottomTabs(t).map((tab) => {
         const isActive = active === tab.key;
         return (
           <button
@@ -273,6 +282,7 @@ function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
 
 function App() {
   const isMobile = useIsMobile();
+  const { t } = useLanguage();
   const [view, setView] = useState("perfil"); // "perfil" | "feed" | "chat" | "buscar" | "notificaciones"
   const [currentUid, setCurrentUid] = useState(null);
   const [myIdentity, setMyIdentity] = useState("");
@@ -331,7 +341,7 @@ function App() {
         </div>
         {!isMobile && (
           <div style={navStyles.buttonsGroup}>
-            {DESKTOP_TABS.map((tab) => {
+            {getDesktopTabs(t).map((tab) => {
               const active = !viewingProfileUid && view === tab.key;
               return (
                 <button

@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { notify, useIsMobile } from "./utils";
+import { useLanguage } from "./LanguageContext";
 
 /*
   Chat
@@ -458,6 +459,7 @@ const styles = {
 };
 
 function AudioMessage({ src, duration, mine, id }) {
+  const { t } = useLanguage();
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
 
@@ -494,7 +496,7 @@ function AudioMessage({ src, duration, mine, id }) {
         type="button"
         style={styles.audioPlayBtn(mine)}
         onClick={toggle}
-        title={playing ? "Pausar" : "Reproducir"}
+        title={playing ? t("chat.pauseAudio") : t("chat.playAudio")}
       >
         {playing ? "⏸" : "▶"}
       </button>
@@ -505,6 +507,7 @@ function AudioMessage({ src, duration, mine, id }) {
 }
 
 export default function Chat({ onOpenProfile }) {
+  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
@@ -639,7 +642,7 @@ export default function Chat({ onOpenProfile }) {
 
   const startRecording = async () => {
     if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === "undefined") {
-      alert("Tu navegador no soporta grabación de audio.");
+      alert(t("chat.noMicSupport"));
       return;
     }
     try {
@@ -692,7 +695,7 @@ export default function Chat({ onOpenProfile }) {
       recorder.start();
       setRecordingState("recording");
     } catch (err) {
-      alert("No se pudo acceder al micrófono. Revisa los permisos del navegador.");
+      alert(t("chat.micPermissionError"));
     }
   };
 
@@ -726,7 +729,7 @@ export default function Chat({ onOpenProfile }) {
     try {
       const dataUrl = await blobToDataUrl(blob);
       if (dataUrl.length > MAX_AUDIO_BASE64_LENGTH) {
-        alert("La nota de voz quedó muy pesada para enviarse. Intenta con una más corta.");
+        alert(t("chat.audioTooLarge"));
         return;
       }
 
@@ -752,7 +755,7 @@ export default function Chat({ onOpenProfile }) {
         fromIdentity: myProfile?.identity || "",
       });
     } catch (err) {
-      alert("No se pudo enviar la nota de voz. Intenta de nuevo.");
+      alert(t("chat.audioSendError"));
     } finally {
       setSendingAudio(false);
     }
@@ -794,7 +797,7 @@ export default function Chat({ onOpenProfile }) {
       <div style={styles.wrapper}>
         <div style={{ ...styles.shell, alignItems: "center", justifyContent: "center" }}>
           <p style={{ color: "var(--text-muted)", padding: "0 24px", textAlign: "center" }}>
-            Inicia sesión primero para usar el chat.
+            {t("chat.loginNotice")}
           </p>
         </div>
       </div>
@@ -811,12 +814,12 @@ export default function Chat({ onOpenProfile }) {
       <div style={styles.shell}>
         {showContactsList && (
           <div style={styles.contactsCol(isMobile)}>
-            <p style={styles.contactsHeader}>Personas</p>
+            <p style={styles.contactsHeader}>{t("chat.peopleHeader")}</p>
             <div style={styles.searchBox}>
               <input
                 style={styles.searchInput}
                 type="text"
-                placeholder="Buscar por nombre o identidad..."
+                placeholder={t("chat.searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -824,7 +827,7 @@ export default function Chat({ onOpenProfile }) {
             <div style={styles.contactsList}>
               {contacts.length === 0 && (
                 <p style={{ padding: "16px", fontSize: "13px", color: "var(--text-muted)" }}>
-                  {search ? "Nadie coincide con tu búsqueda." : "Todavía no hay más personas registradas."}
+                  {search ? t("chat.noSearchResults") : t("chat.noContacts")}
                 </p>
               )}
               {contacts.map((c) => (
@@ -842,7 +845,7 @@ export default function Chat({ onOpenProfile }) {
                     size="md"
                   />
                   <div>
-                    <p style={styles.contactName}>{c.displayName || "Sin nombre"}</p>
+                    <p style={styles.contactName}>{c.displayName || t("chat.defaultName")}</p>
                     <p style={styles.contactIdentity}>{c.identity}</p>
                   </div>
                 </div>
@@ -877,7 +880,7 @@ export default function Chat({ onOpenProfile }) {
                     </div>
                   </div>
                   <button style={styles.blockBtn} onClick={handleToggleBlock}>
-                    {isBlocked ? "Desbloquear" : "Bloquear"}
+                    {isBlocked ? t("chat.unblock") : t("chat.block")}
                   </button>
                 </div>
                 <div style={styles.messagesArea}>
@@ -904,7 +907,7 @@ export default function Chat({ onOpenProfile }) {
                     <input
                       style={styles.input}
                       type="text"
-                      placeholder="Escribe un mensaje..."
+                      placeholder={t("chat.messagePlaceholder")}
                       value={text}
                       onChange={(e) => setText(e.target.value)}
                     />
@@ -912,12 +915,12 @@ export default function Chat({ onOpenProfile }) {
                       type="button"
                       style={styles.micBtn}
                       onClick={startRecording}
-                      title="Grabar nota de voz"
+                      title={t("chat.recordVoice")}
                     >
                       <MicIcon />
                     </button>
                     <button type="submit" style={styles.sendBtn}>
-                      Enviar
+                      {t("chat.send")}
                     </button>
                   </form>
                 ) : (
@@ -927,8 +930,8 @@ export default function Chat({ onOpenProfile }) {
                     </span>
                     <span style={styles.recordingLabel}>
                       {recordingState === "recording"
-                        ? "Grabando nota de voz..."
-                        : "Nota de voz lista"}
+                        ? t("chat.recording")
+                        : t("chat.recordingReady")}
                     </span>
                     <span style={styles.recordingTime}>{formatDuration(recordSeconds)}</span>
                     <button
@@ -939,7 +942,7 @@ export default function Chat({ onOpenProfile }) {
                           ? () => requestStopRecording("cancel")
                           : cancelReadyRecording
                       }
-                      title="Cancelar"
+                      title={t("chat.cancel")}
                     >
                       ✕
                     </button>
@@ -952,7 +955,7 @@ export default function Chat({ onOpenProfile }) {
                           : sendReadyRecording
                       }
                       disabled={sendingAudio}
-                      title="Enviar nota de voz"
+                      title={t("chat.sendVoice")}
                     >
                       ➤
                     </button>
@@ -961,7 +964,7 @@ export default function Chat({ onOpenProfile }) {
               </>
             ) : (
               <div style={styles.emptyState}>
-                Elige a alguien de la lista para empezar a chatear.
+                {t("chat.emptyState")}
               </div>
             )}
           </div>

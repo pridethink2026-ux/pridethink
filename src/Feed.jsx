@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
+import { useLanguage } from "./LanguageContext";
 
 /*
   Feed
@@ -310,6 +311,7 @@ function PostSkeleton() {
 }
 
 export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtagClick = () => {} }) {
+  const { t } = useLanguage();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
@@ -383,7 +385,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("¿Borrar esta publicación? No se puede deshacer.")) return;
+    if (!window.confirm(t("feed.deleteConfirm"))) return;
     await deleteDoc(doc(db, "posts", post.id));
   };
 
@@ -405,10 +407,10 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
         {isMine && !editing && (
           <div style={styles.headerRight}>
             <button style={styles.smallLink} onClick={() => setEditing(true)}>
-              Editar
+              {t("feed.edit")}
             </button>
             <button style={styles.smallLink} onClick={handleDelete}>
-              Borrar
+              {t("feed.delete")}
             </button>
           </div>
         )}
@@ -423,7 +425,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           />
           <div style={styles.editRow}>
             <button style={styles.smallBtn} onClick={handleSaveEdit}>
-              Guardar
+              {t("feed.save")}
             </button>
             <button
               style={styles.smallBtnGhost}
@@ -432,7 +434,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
                 setEditing(false);
               }}
             >
-              Cancelar
+              {t("feed.cancelEdit")}
             </button>
           </div>
         </>
@@ -443,13 +445,13 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
       <div style={styles.actionsRow}>
         <button style={styles.actionBtn(iLiked)} onClick={toggleLike}>
           <span className={likePop ? "pt-like-pop" : ""}>{iLiked ? "❤️" : "🤍"}</span>{" "}
-          {likes.length > 0 ? likes.length : "Me gusta"}
+          {likes.length > 0 ? likes.length : t("feed.like")}
         </button>
         <button
           style={styles.actionBtn(commentsOpen)}
           onClick={() => setCommentsOpen((v) => !v)}
         >
-          💬 {comments.length > 0 ? comments.length : "Comentar"}
+          💬 {comments.length > 0 ? comments.length : t("feed.comment")}
         </button>
       </div>
 
@@ -480,12 +482,12 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
             <input
               style={styles.commentInput}
               type="text"
-              placeholder="Escribe un comentario..."
+              placeholder={t("feed.commentPlaceholder")}
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
             />
             <button type="submit" style={styles.commentSendBtn}>
-              Enviar
+              {t("feed.send")}
             </button>
           </form>
         </div>
@@ -495,6 +497,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
 }
 
 export default function Feed({ onOpenProfile }) {
+  const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
   const [usersMap, setUsersMap] = useState({});
@@ -588,15 +591,15 @@ export default function Feed({ onOpenProfile }) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.column}>
-          <p style={styles.loginNotice}>Inicia sesión primero para ver el muro.</p>
+          <p style={styles.loginNotice}>{t("feed.loginNotice")}</p>
         </div>
       </div>
     );
   }
 
-  let emptyMessage = "Todavía no hay publicaciones. ¡Sé el primero!";
-  if (activeHashtag) emptyMessage = `Nadie ha publicado con #${activeHashtag} todavía.`;
-  else if (feedTab === "siguiendo") emptyMessage = "Sigue a alguien para ver sus publicaciones aquí.";
+  let emptyMessage = t("feed.emptyDefault");
+  if (activeHashtag) emptyMessage = t("feed.emptyHashtag", { hashtag: activeHashtag });
+  else if (feedTab === "siguiendo") emptyMessage = t("feed.emptyFollowing");
 
   return (
     <div style={styles.wrapper}>
@@ -604,25 +607,25 @@ export default function Feed({ onOpenProfile }) {
         <form style={styles.composer} onSubmit={handlePost}>
           <textarea
             style={styles.textarea}
-            placeholder="¿Qué estás pensando o sintiendo? Usa #hashtags si quieres"
+            placeholder={t("feed.composerPlaceholder")}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
           <button type="submit" style={styles.postBtn} disabled={posting}>
-            {posting ? "Publicando..." : "Publicar"}
+            {posting ? t("feed.posting") : t("feed.postButton")}
           </button>
           <div style={{ clear: "both" }} />
         </form>
 
         <div style={styles.tabsRow}>
           <button style={styles.tabBtn(feedTab === "todos")} onClick={() => setFeedTab("todos")}>
-            Todos
+            {t("feed.tabAll")}
           </button>
           <button
             style={styles.tabBtn(feedTab === "siguiendo")}
             onClick={() => setFeedTab("siguiendo")}
           >
-            Siguiendo
+            {t("feed.tabFollowing")}
           </button>
         </div>
 

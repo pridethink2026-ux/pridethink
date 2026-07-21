@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { timeAgo } from "./utils";
+import { useLanguage } from "./LanguageContext";
 
 /*
   Notifications
@@ -35,11 +36,14 @@ import { timeAgo } from "./utils";
     la barra de navegación inferior en móvil.
 */
 
+// Cada función recibe la notificación y "t" (de useLanguage) para armar el
+// texto traducido con el nombre de quien la generó (fromName NO se
+// traduce: es contenido del usuario, solo el texto alrededor).
 const LABELS = {
-  like: (n) => `${n.fromName} le dio like a tu publicación`,
-  comment: (n) => `${n.fromName} comentó tu publicación`,
-  message: (n) => `${n.fromName} te envió un mensaje`,
-  follow: (n) => `${n.fromName} empezó a seguirte`,
+  like: (n, t) => t("notifications.like", { name: n.fromName }),
+  comment: (n, t) => t("notifications.comment", { name: n.fromName }),
+  message: (n, t) => t("notifications.message", { name: n.fromName }),
+  follow: (n, t) => t("notifications.follow", { name: n.fromName }),
 };
 
 const styles = {
@@ -183,6 +187,7 @@ export function useNotifications(uid) {
 }
 
 function NotificationItem({ n, onOpenProfile, dropdown }) {
+  const { t } = useLanguage();
   return (
     <div
       style={dropdown ? styles.item(!n.read) : styles.screenItem(!n.read)}
@@ -190,7 +195,9 @@ function NotificationItem({ n, onOpenProfile, dropdown }) {
     >
       <Avatar uid={n.fromUid} name={n.fromName} identity={n.fromIdentity} size="sm" />
       <div>
-        <p style={styles.itemText}>{LABELS[n.type] ? LABELS[n.type](n) : "Notificación"}</p>
+        <p style={styles.itemText}>
+          {LABELS[n.type] ? LABELS[n.type](n, t) : t("notifications.generic")}
+        </p>
         <p style={styles.itemTime}>{timeAgo(n.createdAt)}</p>
       </div>
     </div>
@@ -198,6 +205,7 @@ function NotificationItem({ n, onOpenProfile, dropdown }) {
 }
 
 export default function Notifications({ onOpenProfile }) {
+  const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [open, setOpen] = useState(false);
   const panelRef = useRef(null);
@@ -238,7 +246,7 @@ export default function Notifications({ onOpenProfile }) {
 
       {open && (
         <div style={styles.panel}>
-          {items.length === 0 && <p style={styles.empty}>Todavía no tienes notificaciones.</p>}
+          {items.length === 0 && <p style={styles.empty}>{t("notifications.empty")}</p>}
           {items.map((n) => (
             <NotificationItem key={n.id} n={n} onOpenProfile={onOpenProfile} dropdown />
           ))}
@@ -250,6 +258,7 @@ export default function Notifications({ onOpenProfile }) {
 
 // Misma lista, como pantalla completa para la barra de navegación inferior en móvil.
 export function NotificationsScreen({ onOpenProfile }) {
+  const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const { items, unreadCount, markAllRead } = useNotifications(currentUid);
 
@@ -269,7 +278,7 @@ export function NotificationsScreen({ onOpenProfile }) {
     return (
       <div style={styles.screenWrapper}>
         <div style={styles.screenColumn}>
-          <p style={styles.empty}>Inicia sesión primero para ver tus notificaciones.</p>
+          <p style={styles.empty}>{t("notifications.loginNotice")}</p>
         </div>
       </div>
     );
@@ -278,8 +287,8 @@ export function NotificationsScreen({ onOpenProfile }) {
   return (
     <div style={styles.screenWrapper}>
       <div style={styles.screenColumn}>
-        <h1 style={styles.screenTitle}>Notificaciones</h1>
-        {items.length === 0 && <p style={styles.empty}>Todavía no tienes notificaciones.</p>}
+        <h1 style={styles.screenTitle}>{t("notifications.title")}</h1>
+        {items.length === 0 && <p style={styles.empty}>{t("notifications.empty")}</p>}
         {items.map((n) => (
           <NotificationItem key={n.id} n={n} onOpenProfile={onOpenProfile} dropdown={false} />
         ))}
