@@ -178,6 +178,31 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------
+    // reports/{reportId}
+    // Reportes de publicaciones o usuarios (moderación). Nadie los lee,
+    // edita ni borra desde el cliente: solo se revisan a mano desde la
+    // consola de Firebase (que usa el SDK de administrador y no pasa por
+    // estas reglas).
+    // --------------------------------------------------------------------
+    match /reports/{reportId} {
+      allow read, update, delete: if false;
+
+      // Cualquier autenticado puede crear un reporte firmado con su propio
+      // uid (reporterUid), siempre en estado "pending" (nadie puede crear
+      // uno ya resuelto) y sobre un tipo de contenido válido. El id del
+      // documento lo arma el cliente como
+      // `${reporterUid}_${targetType}_${targetId}` (ver ReportButton.jsx):
+      // si esa persona ya reportó ese mismo target, el documento ya existe
+      // y Firestore trata el intento como "update" en vez de "create" —
+      // como acá no hay `allow update`, se rechaza solo, sin necesitar
+      // leer la colección para revisar duplicados de antemano.
+      allow create: if estaAutenticado()
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.targetType in ["post", "user"];
+    }
+
+    // --------------------------------------------------------------------
     // Cualquier otra colección o documento no contemplado arriba:
     // denegado por defecto (mínimo permiso).
     // --------------------------------------------------------------------

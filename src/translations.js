@@ -227,6 +227,26 @@ export const translations = {
       "Demasiados intentos. Espera un momento e intenta de nuevo.",
     "errors.reset.generic": "No se pudo enviar el correo. Intenta de nuevo.",
     "errors.profileSaveFailed": "No se pudo guardar tu perfil. Intenta de nuevo.",
+
+    // Reportar publicaciones/usuarios (ReportButton.jsx)
+    "report.action": "Reportar",
+    "report.reasonLabel": "Motivo",
+    "report.reasonPlaceholder": "Selecciona un motivo",
+    "report.reasonSpam": "Spam",
+    "report.reasonHateSpeech": "Discurso de odio",
+    "report.reasonHarassment": "Acoso",
+    "report.reasonInappropriate": "Contenido inapropiado",
+    "report.reasonImpersonation": "Suplantación de identidad",
+    "report.reasonOther": "Otro",
+    "report.detailsLabel": "Cuéntanos más (opcional)",
+    "report.detailsPlaceholder": "Describe qué está pasando...",
+    "report.submit": "Enviar reporte",
+    "report.submitting": "Enviando...",
+    "report.success": "Gracias, revisaremos tu reporte.",
+    "report.alreadyReported": "Ya habías reportado esto. Gracias de todas formas.",
+    "report.error": "No se pudo enviar el reporte. Intenta de nuevo.",
+    "report.close": "Cerrar",
+    "report.cancel": "Cancelar",
   },
   en: {
     // Generic, used across more than one screen
@@ -420,6 +440,26 @@ export const translations = {
     "errors.reset.auth/too-many-requests": "Too many attempts. Wait a moment and try again.",
     "errors.reset.generic": "Couldn't send the email. Try again.",
     "errors.profileSaveFailed": "Couldn't save your profile. Try again.",
+
+    // Reporting posts/users (ReportButton.jsx)
+    "report.action": "Report",
+    "report.reasonLabel": "Reason",
+    "report.reasonPlaceholder": "Select a reason",
+    "report.reasonSpam": "Spam",
+    "report.reasonHateSpeech": "Hate speech",
+    "report.reasonHarassment": "Harassment",
+    "report.reasonInappropriate": "Inappropriate content",
+    "report.reasonImpersonation": "Impersonation",
+    "report.reasonOther": "Other",
+    "report.detailsLabel": "Tell us more (optional)",
+    "report.detailsPlaceholder": "Describe what's going on...",
+    "report.submit": "Send report",
+    "report.submitting": "Sending...",
+    "report.success": "Thanks, we'll review your report.",
+    "report.alreadyReported": "You already reported this. Thanks anyway.",
+    "report.error": "Couldn't send the report. Try again.",
+    "report.close": "Close",
+    "report.cancel": "Cancel",
   },
 };
 

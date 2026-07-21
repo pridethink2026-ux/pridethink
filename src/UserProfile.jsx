@@ -16,6 +16,7 @@ import { PostCard } from "./Feed";
 import { notify } from "./utils";
 import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
+import ReportButton from "./ReportButton";
 
 /*
   UserProfile
@@ -271,9 +272,14 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.column}>
-        <button style={styles.backBtn} onClick={onBack}>
-          ← Volver
-        </button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <button style={styles.backBtn} onClick={onBack}>
+            ← Volver
+          </button>
+          {!isMe && currentUid && (
+            <ReportButton targetType="user" targetId={uid} currentUid={currentUid} />
+          )}
+        </div>
 
         <div style={styles.header}>
           <div style={{ display: "flex", justifyContent: "center" }}>

@@ -17,6 +17,7 @@ import {
 import Avatar from "./Avatar";
 import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
 import { useLanguage } from "./LanguageContext";
+import ReportButton from "./ReportButton";
 
 /*
   Feed
@@ -404,14 +405,20 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           <p style={styles.authorIdentity}>{post.authorIdentity}</p>
           <p style={styles.timeText}>{timeAgo(post.createdAt)}</p>
         </div>
-        {isMine && !editing && (
+        {isMine ? (
+          !editing && (
+            <div style={styles.headerRight}>
+              <button style={styles.smallLink} onClick={() => setEditing(true)}>
+                {t("feed.edit")}
+              </button>
+              <button style={styles.smallLink} onClick={handleDelete}>
+                {t("feed.delete")}
+              </button>
+            </div>
+          )
+        ) : (
           <div style={styles.headerRight}>
-            <button style={styles.smallLink} onClick={() => setEditing(true)}>
-              {t("feed.edit")}
-            </button>
-            <button style={styles.smallLink} onClick={handleDelete}>
-              {t("feed.delete")}
-            </button>
+            <ReportButton targetType="post" targetId={post.id} currentUid={currentUid} />
           </div>
         )}
       </div>
