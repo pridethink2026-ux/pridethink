@@ -11,12 +11,14 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  deleteField,
   arrayUnion,
   arrayRemove,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { notify, useIsMobile } from "./utils";
 import { useLanguage } from "./LanguageContext";
+import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
 
 /*
   Chat
@@ -48,6 +50,12 @@ import { useLanguage } from "./LanguageContext";
   muy por debajo del límite de 1MB por documento de Firestore.
   Mensaje de audio: { senderId, type: "audio", audioData, audioDuration, createdAt }
   Mensaje de texto (como antes): { senderId, text, createdAt }
+  Los dos tipos de mensaje pueden tener además `reactions: { [uid]: tipo }`
+  (ver Reactions.jsx, compartido con Feed.jsx) — como mucho reaccionan las
+  2 personas de la conversación. Mantener presionado (mobile) o pasar el
+  mouse (desktop) sobre CUALQUIER mensaje (texto o nota de voz) abre el
+  mismo selector de 5 reacciones que en el muro; lo elegido se muestra como
+  una burbujita superpuesta en la esquina del mensaje.
 */
 
 const MAX_RECORD_SECONDS = 60;
@@ -311,8 +319,24 @@ const styles = {
     display: "flex",
     justifyContent: mine ? "flex-end" : "flex-start",
   }),
-  bubble: (mine) => ({
+  bubbleWrapper: {
+    position: "relative",
     maxWidth: "75%",
+  },
+  reactionBadge: (mine) => ({
+    position: "absolute",
+    bottom: "-9px",
+    [mine ? "left" : "right"]: "-6px",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: "999px",
+    padding: "1px 5px",
+    fontSize: "11px",
+    lineHeight: 1.3,
+    boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+    zIndex: 5,
+  }),
+  bubble: (mine) => ({
     padding: "10px 14px",
     borderRadius: "16px",
     fontSize: "14px",
@@ -502,6 +526,62 @@ function AudioMessage({ src, duration, mine, id }) {
       </button>
       <AudioWaveform seed={id || src} playing={playing} mine={mine} />
       <span style={styles.audioDuration(mine)}>{formatDuration(duration)}</span>
+    </div>
+  );
+}
+
+// Una burbuja de mensaje (texto o nota de voz) + su selector de
+// reacciones. Es su propio componente (no un simple .map() inline) porque
+// useReactionPicker() es un hook y cada mensaje necesita su propia
+// instancia de estado (si abriste el selector no debe abrirse en todos).
+function MessageBubble({ message, mine, currentUid, chatId }) {
+  const { open, setOpen, containerRef, triggerProps } = useReactionPicker();
+  const myReaction = (message.reactions || {})[currentUid] || null;
+  const reactionEmojis = getDistinctReactionEmojis(message.reactions);
+
+  const setMyReaction = async (type) => {
+    const msgRef = doc(db, "chats", chatId, "messages", message.id);
+    await updateDoc(msgRef, {
+      [`reactions.${currentUid}`]: type || deleteField(),
+    });
+  };
+
+  return (
+    <div style={styles.bubbleRow(mine)}>
+      <div ref={containerRef} style={styles.bubbleWrapper} {...triggerProps}>
+        <div style={styles.bubble(mine)}>
+          {message.type === "audio" ? (
+            <AudioMessage
+              id={message.id}
+              src={message.audioData}
+              duration={message.audioDuration}
+              mine={mine}
+            />
+          ) : (
+            message.text
+          )}
+        </div>
+        {reactionEmojis.length > 0 && (
+          <div style={styles.reactionBadge(mine)}>{reactionEmojis.join("")}</div>
+        )}
+        {open && (
+          // bottom: "100%" (sin sumarle espacio) pega el selector justo
+          // arriba de la burbuja, sin gap — igual que en Feed.jsx, para
+          // que mover el mouse de la burbuja al selector no cruce una
+          // "zona muerta" que dispare el cierre antes de tiempo.
+          <ReactionPicker
+            myReaction={myReaction}
+            onSelect={(type) => {
+              setMyReaction(type);
+              setOpen(false);
+            }}
+            style={{
+              bottom: "100%",
+              [mine ? "right" : "left"]: 0,
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -885,20 +965,13 @@ export default function Chat({ onOpenProfile }) {
                 </div>
                 <div style={styles.messagesArea}>
                   {messages.map((m) => (
-                    <div key={m.id} style={styles.bubbleRow(m.senderId === currentUid)}>
-                      <div style={styles.bubble(m.senderId === currentUid)}>
-                        {m.type === "audio" ? (
-                          <AudioMessage
-                            id={m.id}
-                            src={m.audioData}
-                            duration={m.audioDuration}
-                            mine={m.senderId === currentUid}
-                          />
-                        ) : (
-                          m.text
-                        )}
-                      </div>
-                    </div>
+                    <MessageBubble
+                      key={m.id}
+                      message={m}
+                      mine={m.senderId === currentUid}
+                      currentUid={currentUid}
+                      chatId={getChatId(currentUid, activeContact.uid)}
+                    />
                   ))}
                   <div ref={messagesEndRef} />
                 </div>

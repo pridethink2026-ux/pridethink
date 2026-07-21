@@ -6,30 +6,30 @@ import {
   doc,
   addDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   query,
   orderBy,
   serverTimestamp,
   updateDoc,
-  arrayUnion,
-  arrayRemove,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import ReportButton from "./ReportButton";
+import { getReactionEmoji, getReactionSummary, useReactionPicker, ReactionPicker } from "./Reactions";
 
 /*
   Feed
   ----
-  Muro social en tiempo real: publicaciones + reacciones (like) + comentarios
-  + edición/borrado de tus propios posts + notificaciones a otros usuarios.
+  Muro social en tiempo real: publicaciones + reacciones + comentarios +
+  edición/borrado de tus propios posts + notificaciones a otros usuarios.
   También: pestañas "Todos" / "Siguiendo", hashtags clickeables con filtro,
   y perfiles públicos al tocar el avatar o el nombre de cualquier autor.
 
   Estructura en Firestore:
   - "posts/{postId}"
-      -> { authorId, authorName, authorIdentity, text, createdAt, likes: [uid...], hashtags: ["..."] }
+      -> { authorId, authorName, authorIdentity, text, createdAt, reactions: { [uid]: tipo }, hashtags: ["..."] }
   - "posts/{postId}/comments/{commentId}"
       -> { authorId, authorName, authorIdentity, text, createdAt }
   - "notifications/{uid}/items/{itemId}"
@@ -45,6 +45,17 @@ import ReportButton from "./ReportButton";
   Los hashtags se detectan al publicar (utils.extractHashtags) y se guardan
   en minúsculas en el post. Al tocar un hashtag dentro de un post se activa
   un filtro sobre el muro (chip visible para quitarlo).
+
+  REACCIONES (ver Reactions.jsx para la lista de tipos y el selector
+  compartido con Chat.jsx): antes esto era un simple "like" guardado como
+  arreglo de uids (arrayUnion/arrayRemove). Ahora es un mapa
+  `{ [uid]: tipoDeReaccion }` — una reacción por persona, la última que
+  elige pisa la anterior. Se actualiza con `updateDoc` sobre la ruta
+  `reactions.${uid}` (no se puede usar arrayUnion/arrayRemove porque ya no
+  es un arreglo) y se borra con `deleteField()` cuando alguien quita su
+  reacción. Un clic simple en el botón alterna entre "sin reacción" y
+  "❤️" (el comportamiento de "Me gusta" de siempre); mantener presionado
+  (mobile) o pasar el mouse (desktop) abre el selector con los 5 tipos.
 */
 
 const styles = {
@@ -200,6 +211,9 @@ const styles = {
     borderTop: "1px solid var(--border)",
     paddingTop: "10px",
   },
+  reactionWrapper: {
+    position: "relative",
+  },
   actionBtn: (active) => ({
     background: "none",
     border: "none",
@@ -319,9 +333,11 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(post.text);
   const [likePop, setLikePop] = useState(false);
+  const { open: pickerOpen, setOpen: setPickerOpen, containerRef: reactionRef, triggerProps: reactionTriggerProps, consumeLongPress } =
+    useReactionPicker();
 
-  const likes = post.likes || [];
-  const iLiked = likes.includes(currentUid);
+  const myReaction = (post.reactions || {})[currentUid] || null;
+  const reactionSummary = getReactionSummary(post.reactions);
   const isMine = post.authorId === currentUid;
 
   // Escucha los comentarios SIEMPRE (no solo al abrir), así el número junto
@@ -338,23 +354,33 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
     return unsub;
   }, [post.id]);
 
-  const toggleLike = async () => {
+  const setMyReaction = async (type) => {
     const postRef = doc(db, "posts", post.id);
-    if (!iLiked) {
-      setLikePop(true);
-      setTimeout(() => setLikePop(false), 350);
+    const hadReaction = !!myReaction;
+    if (type) {
+      if (!hadReaction) {
+        setLikePop(true);
+        setTimeout(() => setLikePop(false), 350);
+      }
+      await updateDoc(postRef, { [`reactions.${currentUid}`]: type });
+      if (!hadReaction) {
+        await notify(post.authorId, {
+          type: "like",
+          fromUid: currentUid,
+          fromName: myProfile?.displayName || "Alguien",
+          fromIdentity: myProfile?.identity || "",
+        });
+      }
+    } else {
+      await updateDoc(postRef, { [`reactions.${currentUid}`]: deleteField() });
     }
-    await updateDoc(postRef, {
-      likes: iLiked ? arrayRemove(currentUid) : arrayUnion(currentUid),
-    });
-    if (!iLiked) {
-      await notify(post.authorId, {
-        type: "like",
-        fromUid: currentUid,
-        fromName: myProfile?.displayName || "Alguien",
-        fromIdentity: myProfile?.identity || "",
-      });
-    }
+  };
+
+  // Clic simple (sin long-press ni hover previo): alterna "sin reacción" /
+  // "❤️", igual que el botón de "Me gusta" de siempre.
+  const handleQuickReact = () => {
+    if (consumeLongPress()) return;
+    setMyReaction(myReaction ? null : "like");
   };
 
   const handleComment = async (e) => {
@@ -450,10 +476,30 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
       )}
 
       <div style={styles.actionsRow}>
-        <button style={styles.actionBtn(iLiked)} onClick={toggleLike}>
-          <span className={likePop ? "pt-like-pop" : ""}>{iLiked ? "❤️" : "🤍"}</span>{" "}
-          {likes.length > 0 ? likes.length : t("feed.like")}
-        </button>
+        <div ref={reactionRef} style={styles.reactionWrapper} {...reactionTriggerProps}>
+          <button style={styles.actionBtn(!!myReaction)} onClick={handleQuickReact}>
+            <span className={likePop ? "pt-like-pop" : ""}>
+              {myReaction ? getReactionEmoji(myReaction) : "🤍"}
+            </span>{" "}
+            {reactionSummary.length > 0
+              ? reactionSummary.map((r) => `${r.emoji} ${r.count}`).join(" · ")
+              : t("feed.like")}
+          </button>
+          {pickerOpen && (
+            // bottom: "100%" pega el borde inferior del selector justo al
+            // borde superior del botón (cero espacio entre los dos), para
+            // que mover el mouse de uno a otro no pase por una "zona
+            // muerta" fuera de ambos que dispare el cierre por accidente.
+            <ReactionPicker
+              myReaction={myReaction}
+              onSelect={(type) => {
+                setMyReaction(type);
+                setPickerOpen(false);
+              }}
+              style={{ bottom: "100%", left: 0 }}
+            />
+          )}
+        </div>
         <button
           style={styles.actionBtn(commentsOpen)}
           onClick={() => setCommentsOpen((v) => !v)}
@@ -566,7 +612,7 @@ export default function Feed({ onOpenProfile }) {
         text: text.trim(),
         hashtags: extractHashtags(text),
         createdAt: serverTimestamp(),
-        likes: [],
+        reactions: {},
       });
       setText("");
     } finally {

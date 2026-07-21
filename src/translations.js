@@ -155,6 +155,13 @@ export const translations = {
     "profile.birthDateField": "Nacimiento",
     "profile.birthDateWithAge": "{date} ({age} años)",
 
+    // Reacciones (Reactions.jsx, compartido entre Feed.jsx y Chat.jsx)
+    "reaction.like": "Me gusta",
+    "reaction.applause": "Aplauso",
+    "reaction.fire": "Fuego",
+    "reaction.pride": "Orgullo",
+    "reaction.funny": "Me divierte",
+
     // Muro (Feed.jsx)
     "feed.composerPlaceholder": "¿Qué estás pensando o sintiendo? Usa #hashtags si quieres",
     "feed.posting": "Publicando...",
@@ -370,6 +377,13 @@ export const translations = {
     "profile.changeIdentity": "Change my identity",
     "profile.logout": "Log out",
     "profile.defaultUser": "User",
+
+    // Reactions (Reactions.jsx, shared between Feed.jsx and Chat.jsx)
+    "reaction.like": "Like",
+    "reaction.applause": "Applause",
+    "reaction.fire": "Fire",
+    "reaction.pride": "Pride",
+    "reaction.funny": "Funny",
 
     // Wall (Feed.jsx)
     "feed.composerPlaceholder": "What are you thinking or feeling? Use #hashtags if you want",

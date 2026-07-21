@@ -31,24 +31,18 @@ service cloud.firestore {
       return estaAutenticado() && request.auth.uid == uid;
     }
 
-    // Para el "toggle" de like en posts: valida que la única diferencia
-    // entre el arreglo "likes" de antes y el de después sea que se agregó
-    // o se quitó EXACTAMENTE el uid de quien hace la petición (nunca el
-    // uid de otra persona, y nunca más de un cambio a la vez).
-    function soloAgregaOQuitaMiLike(antes, despues) {
+    // Para reaccionar a un post o a un mensaje de chat: las reacciones se
+    // guardan como un mapa { uid: tipo } (ver Reactions.jsx), y esta
+    // función valida que la única diferencia entre el mapa de antes y el
+    // de después sea la entrada de quien hace la petición (nunca la de
+    // otra persona) — y que, si esa entrada quedó presente (agregó o
+    // cambió su reacción, no la quitó), su valor sea uno de los 5 tipos
+    // válidos. Se reutiliza para posts/{postId} y para
+    // chats/{chatId}/messages/{messageId}.
+    function soloTocaMiReaccion(antes, despues) {
       let uid = request.auth.uid;
-      return
-        // Dar like: se agregó mi uid y no desapareció nadie más
-        (despues.size() == antes.size() + 1
-          && despues.hasAll(antes)
-          && (uid in despues)
-          && !(uid in antes))
-        ||
-        // Quitar like: se quitó mi uid y no se agregó nadie más
-        (antes.size() == despues.size() + 1
-          && antes.hasAll(despues)
-          && (uid in antes)
-          && !(uid in despues));
+      return despues.diff(antes).affectedKeys().hasOnly([uid])
+        && (!(uid in despues) || despues[uid] in ['like', 'applause', 'fire', 'pride', 'funny']);
     }
 
     // Un chat solo puede ser leído/escrito por sus dos participantes. El id
@@ -107,12 +101,15 @@ service cloud.firestore {
           // 1) El autor puede editar cualquier campo suyo (texto, hashtags).
           resource.data.authorId == request.auth.uid
           ||
-          // 2) Cualquier OTRA persona autenticada puede dar/quitar like:
-          //    solo se le permite tocar el campo "likes", y solo para
-          //    agregar o quitar su propio uid (nunca el de alguien más).
+          // 2) Cualquier OTRA persona autenticada puede reaccionar: solo se
+          //    le permite tocar el campo "reactions", y solo su propia
+          //    entrada dentro de ese mapa (nunca la de alguien más).
           (
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
-            && soloAgregaOQuitaMiLike(resource.data.likes, request.resource.data.likes)
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            && soloTocaMiReaccion(
+                 resource.data.get('reactions', {}),
+                 request.resource.data.get('reactions', {})
+               )
           )
         );
 
@@ -152,8 +149,19 @@ service cloud.firestore {
         allow create: if esParticipanteDelChat(chatId)
           && request.resource.data.senderId == request.auth.uid;
 
-        // Hoy la app no permite editar ni borrar mensajes ya enviados.
-        allow update, delete: if false;
+        // No se puede editar el contenido de un mensaje ya enviado (texto,
+        // audio, remitente), pero cualquiera de los dos participantes
+        // puede reaccionar: mismo patrón que en posts/{postId}, solo se
+        // permite tocar "reactions" y solo la propia entrada del mapa.
+        allow update: if esParticipanteDelChat(chatId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+          && soloTocaMiReaccion(
+               resource.data.get('reactions', {}),
+               request.resource.data.get('reactions', {})
+             );
+
+        // Hoy la app no permite borrar mensajes ya enviados.
+        allow delete: if false;
       }
     }
 
