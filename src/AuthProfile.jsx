@@ -24,6 +24,7 @@ import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import { useLanguage } from "./LanguageContext";
 import { MIN_SIGNUP_AGE, getCountryOptions, LANGUAGE_OPTIONS, getGenderOptions, calculateAge } from "./profileFields";
+import { markOffline } from "./presence";
 
 /*
   AuthProfile
@@ -1113,6 +1114,10 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   };
 
   const handleLogout = async () => {
+    // Marca "offline" ANTES de cerrar sesión: una vez cerrada, la
+    // escritura ya no pasaría las reglas de Firestore (exigen estar
+    // autenticado) — ver presence.js.
+    await markOffline(auth.currentUser?.uid);
     // FIREBASE: auth (real) - cierra la sesión
     await signOut(auth);
     setUser(null);

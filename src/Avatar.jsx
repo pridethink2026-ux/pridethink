@@ -28,6 +28,13 @@ import { getIdentityColors } from "./identityStyles";
     bandera, el anillo cae al degradado de acento del tema activo
     (`var(--accent)` / `var(--accent2)`), igual que hace `HomeNavIcon.jsx`
     como fallback — ese sí respeta los 4 temas y el modo Rotativo.
+  - El puntito de "en línea" (prop `online`, ver presence.js -> useOnlinePresence
+    / isEffectivelyOnline) usa un verde fijo, no un color de tema: es una
+    señal semántica universal ("verde = conectado") que debe verse igual
+    sin importar qué tema visual esté activo, mismo criterio que las
+    banderas pride de arriba. El borde del puntito sí usa `var(--surface)`
+    (para "recortarlo" del fondo detrás del avatar, que en casi todos los
+    lugares donde se usa `Avatar` es justo esa variable).
 
   Tamaños: "sm" (comentarios), "md" (posts, contactos), "lg" (perfil).
 */
@@ -55,7 +62,7 @@ function getInitials(name) {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-export default function Avatar({ uid, name, identity, size = "md", onClick }) {
+export default function Avatar({ uid, name, identity, size = "md", online = false, onClick }) {
   const { box, font, ring } = SIZES[size] || SIZES.md;
   const seed = uid || name || "?";
   const hue = hashToHue(seed);
@@ -68,6 +75,7 @@ export default function Avatar({ uid, name, identity, size = "md", onClick }) {
       : ["var(--accent)", "var(--accent2)"];
 
   const ringStyle = {
+    position: "relative",
     width: `${box}px`,
     height: `${box}px`,
     minWidth: `${box}px`,
@@ -96,9 +104,23 @@ export default function Avatar({ uid, name, identity, size = "md", onClick }) {
     color: "#fff",
   };
 
+  const dotSize = Math.max(10, Math.round(box * 0.28));
+  const onlineDotStyle = {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: `${dotSize}px`,
+    height: `${dotSize}px`,
+    borderRadius: "50%",
+    background: "#22c55e",
+    border: "2px solid var(--surface)",
+    boxSizing: "border-box",
+  };
+
   return (
     <div style={ringStyle} onClick={onClick} title={name || undefined}>
       <div style={style}>{getInitials(name)}</div>
+      {online && <span style={onlineDotStyle} />}
     </div>
   );
 }

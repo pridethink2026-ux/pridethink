@@ -19,6 +19,7 @@ import Avatar from "./Avatar";
 import { notify, useIsMobile } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
+import { isEffectivelyOnline, formatLastSeen } from "./presence";
 
 /*
   Chat
@@ -67,6 +68,21 @@ import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./
   compartirlo la vista previa se actualiza sola, y si se borra muestra un
   aviso en vez de romperse. Tocar la vista previa llama a onOpenPost(id),
   que en App.js abre PostView.jsx.
+
+  ESTADO "EN LÍNEA" / "ÚLTIMA CONEXIÓN" (ver presence.js): el puntito verde
+  sobre el avatar aparece tanto en cada fila de la lista de contactos como
+  en el encabezado de la conversación activa (`isEffectivelyOnline`, que
+  ya combina el flag guardado con la frescura de "lastSeen" — ver
+  presence.js). No hace falta filtrar por privacidad acá: `visibleContacts`
+  YA excluye del todo a cualquier perfil privado (`if (c.isPrivate) return
+  false`, ver más abajo), así que ningún contacto que aparezca en esta
+  pantalla puede ser privado. El encabezado de la conversación usa la
+  versión MÁS RECIENTE del contacto activo (buscada en `allUsers`, que se
+  actualiza en vivo) en vez de la copia guardada en `activeContact` al
+  hacer clic, para que el estado en línea se actualice mientras estás dentro
+  de la conversación. Si no está en línea, debajo del nombre se muestra
+  "Últ. vez hace X" (`formatLastSeen`, reutiliza `timeAgo()` — formato
+  relativo en español, igual que los posts).
 */
 
 const MAX_RECORD_SECONDS = 60;
@@ -303,6 +319,15 @@ const styles = {
   chatHeaderIdentity: {
     margin: "1px 0 0",
     fontSize: "12px",
+    fontWeight: 400,
+    color: "var(--text-muted)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  chatHeaderLastSeen: {
+    margin: "1px 0 0",
+    fontSize: "11px",
     fontWeight: 400,
     color: "var(--text-muted)",
     whiteSpace: "nowrap",
@@ -766,6 +791,13 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
 
   const isBlocked = activeContact ? myBlocked.includes(activeContact.uid) : false;
 
+  // Versión más reciente del contacto activo (allUsers se actualiza en
+  // vivo) — activeContact es solo una copia tomada al momento del clic,
+  // así que usarlo directo dejaría el estado en línea "congelado".
+  const liveActiveContact = activeContact
+    ? allUsers.find((u) => u.uid === activeContact.uid) || activeContact
+    : null;
+
   const handleToggleBlock = async () => {
     if (!activeContact || !currentUid) return;
     await updateDoc(doc(db, "users", currentUid), {
@@ -1027,6 +1059,7 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
                     name={c.displayName || c.identity}
                     identity={c.identity}
                     size="md"
+                    online={isEffectivelyOnline(c)}
                   />
                   <div>
                     <p style={styles.contactName}>{c.displayName || t("chat.defaultName")}</p>
@@ -1057,10 +1090,14 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
                       name={activeContact.displayName || activeContact.identity}
                       identity={activeContact.identity}
                       size="sm"
+                      online={isEffectivelyOnline(liveActiveContact)}
                     />
                     <div style={styles.chatHeaderText}>
                       <p style={styles.chatHeaderName}>{activeContact.displayName}</p>
                       <p style={styles.chatHeaderIdentity}>{activeContact.identity}</p>
+                      {!isEffectivelyOnline(liveActiveContact) && formatLastSeen(liveActiveContact) && (
+                        <p style={styles.chatHeaderLastSeen}>{formatLastSeen(liveActiveContact)}</p>
+                      )}
                     </div>
                   </div>
                   <button style={styles.blockBtn} onClick={handleToggleBlock}>

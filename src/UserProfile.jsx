@@ -17,6 +17,7 @@ import { notify } from "./utils";
 import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import ReportButton from "./ReportButton";
+import { isEffectivelyOnline, canSeeOnlineStatus } from "./presence";
 
 /*
   UserProfile
@@ -31,6 +32,10 @@ import ReportButton from "./ReportButton";
     perfil no se puede ver en absoluto.
   - Si el perfil es privado (isPrivate) y no eres tú, se muestra lo mínimo
     (avatar, nombre, identidad, contadores) con un aviso, sin publicaciones.
+  - El puntito de "en línea" sobre el avatar (ver presence.js) respeta esa
+    misma privacidad: si el perfil es privado, solo se muestra si hay
+    seguimiento MUTUO entre vos y esa persona (`canSeeOnlineStatus`) — a
+    quien no te sigue y no seguís, no le mostrás si estás conectado o no.
 
   "following" vive en users/{uid}.following: [uid...] (mismo patrón que
   blockedUsers). Los seguidores de un usuario NO se guardan aparte: se
@@ -199,6 +204,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
 
   const isFollowing = (myProfile?.following || []).includes(uid);
   const followingCount = (profileUser?.following || []).length;
+  const canSeeOnline = canSeeOnlineStatus(profileUser, uid, currentUid, myProfile?.following || []);
 
   const handleUnblock = async () => {
     if (!currentUid) return;
@@ -288,6 +294,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
               name={profileUser.displayName || profileUser.identity}
               identity={profileUser.identity}
               size="lg"
+              online={canSeeOnline && isEffectivelyOnline(profileUser)}
             />
           </div>
           <h1 style={styles.name}>{profileUser.displayName}</h1>

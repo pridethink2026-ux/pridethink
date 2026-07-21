@@ -14,6 +14,7 @@ import EventView from "./EventView";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
+import { useOnlinePresence } from "./presence";
 import { useLanguage } from "./LanguageContext";
 import {
   THEMES,
@@ -309,6 +310,14 @@ function App() {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
     return unsub;
   }, []);
+
+  // Marca "en línea" mientras haya sesión (con latido periódico para que
+  // "lastSeen" no quede viejo) y, al mejor esfuerzo, "offline" al cerrar
+  // la pestaña — ver presence.js. El cierre de sesión EXPLÍCITO (botón
+  // "Cerrar sesión") se marca aparte en AuthProfile.jsx, antes de
+  // signOut(auth) (una vez cerrada la sesión, la escritura ya no pasaría
+  // las reglas de Firestore).
+  useOnlinePresence(currentUid);
 
   // Se escucha en tiempo real para que el icono de Inicio cambie al
   // instante si el usuario edita su identidad (AuthProfile.jsx).
