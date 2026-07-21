@@ -894,10 +894,12 @@ function ProfileView({
             <span style={styles.fieldValue}>{user.identityUpdatedAt}</span>
           </div>
         )}
-        <div style={styles.fieldRow}>
-          <span style={styles.fieldLabel}>{t("profile.memberSince")}</span>
-          <span style={styles.fieldValue}>{user.joinedAt}</span>
-        </div>
+        {user.joinedAt && (
+          <div style={styles.fieldRow}>
+            <span style={styles.fieldLabel}>{t("profile.memberSince")}</span>
+            <span style={styles.fieldValue}>{user.joinedAt}</span>
+          </div>
+        )}
 
         <div style={styles.privacyRow}>
           <div>
