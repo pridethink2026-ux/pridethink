@@ -168,6 +168,7 @@ export const translations = {
     "feed.postButton": "Publicar",
     "feed.tabAll": "Todos",
     "feed.tabFollowing": "Siguiendo",
+    "feed.tabExplore": "Explorar",
     "feed.edit": "Editar",
     "feed.delete": "Borrar",
     "feed.save": "Guardar",
@@ -184,6 +185,12 @@ export const translations = {
     "feed.savePost": "Guardar publicación",
     "feed.unsavePost": "Quitar de guardados",
     "feed.sharePost": "Compartir por chat",
+
+    // Explorar (Explore.jsx, tercera pestaña dentro de Feed.jsx)
+    "explore.trendingTitle": "Tendencias",
+    "explore.suggestedPeople": "Personas que quizás conozcas",
+    "explore.follow": "Seguir",
+    "explore.emptyFeed": "Todavía no hay nada nuevo para explorar.",
 
     // Guardados (SavedPosts.jsx)
     "saved.title": "Guardados",
@@ -412,6 +419,7 @@ export const translations = {
     "feed.postButton": "Post",
     "feed.tabAll": "All",
     "feed.tabFollowing": "Following",
+    "feed.tabExplore": "Explore",
     "feed.edit": "Edit",
     "feed.delete": "Delete",
     "feed.save": "Save",
@@ -428,6 +436,12 @@ export const translations = {
     "feed.savePost": "Save post",
     "feed.unsavePost": "Remove from saved",
     "feed.sharePost": "Share via chat",
+
+    // Explore (Explore.jsx, third tab inside Feed.jsx)
+    "explore.trendingTitle": "Trending",
+    "explore.suggestedPeople": "People you may know",
+    "explore.follow": "Follow",
+    "explore.emptyFeed": "Nothing new to explore yet.",
 
     // Saved posts (SavedPosts.jsx)
     "saved.title": "Saved",

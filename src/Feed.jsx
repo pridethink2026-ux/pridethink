@@ -27,6 +27,15 @@ import {
   extractMentionedUids,
   renderTextWithMentions,
 } from "./Mentions";
+import {
+  TrendingHashtags,
+  PeopleSuggestions,
+  getTrendingHashtags,
+  buildAuthorHashtagMap,
+  getPeopleSuggestions,
+  useCommentCounts,
+  rankByPopularity,
+} from "./Explore";
 
 /*
   Feed
@@ -87,6 +96,14 @@ import {
   para poder llevar directo a él). Al renderizar, cualquier "@Nombre" que
   matchee a un usuario real se muestra clickeable; si no matchea a nadie,
   queda como texto normal.
+
+  EXPLORAR (ver Explore.jsx para la lógica y UI compartida): tercera
+  pestaña junto a "Todos"/"Siguiendo" (`feedTab === "explorar"`). Muestra
+  hashtags en tendencia (últimas 72h), sugerencias de personas que no
+  seguís, y un feed de publicaciones de gente que no seguís ordenado por
+  popularidad (reacciones + comentarios) en vez de por fecha. A diferencia
+  de "Todos", acá también se excluye a quien tiene el muro privado
+  (`isWallPrivate`) — ver Explore.jsx para el porqué.
 */
 
 const styles = {
@@ -794,6 +811,54 @@ export default function Feed({ onOpenProfile }) {
     ? tabPosts.filter((p) => (p.hashtags || []).includes(activeHashtag))
     : tabPosts;
 
+  // EXPLORAR: candidatos = de gente que NO seguís (ni sos vos), excluyendo
+  // bloqueados en cualquier dirección, perfiles privados Y muro privado —
+  // esto último a propósito distinto de "Todos" (ver docstring más arriba).
+  const exploreCandidates =
+    feedTab === "explorar"
+      ? posts.filter((p) => {
+          if (p.authorId === currentUid) return false;
+          const author = usersMap[p.authorId];
+          if (author?.isPrivate || author?.isWallPrivate) return false;
+          if (myBlocked.includes(p.authorId)) return false;
+          if ((author?.blockedUsers || []).includes(currentUid)) return false;
+          if (myFollowing.includes(p.authorId)) return false;
+          return true;
+        })
+      : [];
+
+  const exploreFiltered = activeHashtag
+    ? exploreCandidates.filter((p) => (p.hashtags || []).includes(activeHashtag))
+    : exploreCandidates;
+
+  // Un pre-orden barato (solo reacciones, ya disponibles sin consultas
+  // extra) para acotar a cuántas publicaciones les pedimos el conteo de
+  // comentarios (EXPLORE_CANDIDATE_CAP) — evita una consulta por cada post
+  // del muro entero a medida que crezca la cantidad de publicaciones.
+  const EXPLORE_CANDIDATE_CAP = 60;
+  const roughRanked = [...exploreFiltered]
+    .sort((a, b) => {
+      const rA = Object.keys(a.reactions || {}).length;
+      const rB = Object.keys(b.reactions || {}).length;
+      if (rB !== rA) return rB - rA;
+      const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+      const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+      return tB - tA;
+    })
+    .slice(0, EXPLORE_CANDIDATE_CAP);
+
+  const commentCounts = useCommentCounts(roughRanked.map((p) => p.id));
+  const explorePosts = rankByPopularity(roughRanked, commentCounts);
+
+  const trendingHashtags = getTrendingHashtags(visiblePosts);
+  const authorHashtagMap = buildAuthorHashtagMap(posts);
+  const peopleSuggestions = getPeopleSuggestions(
+    Object.entries(usersMap).map(([uid, data]) => ({ uid, ...data })),
+    currentUid,
+    myProfile,
+    authorHashtagMap
+  );
+
   if (!currentUid) {
     return (
       <div style={styles.wrapper}>
@@ -811,27 +876,29 @@ export default function Feed({ onOpenProfile }) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.column}>
-        <form style={styles.composer} onSubmit={handlePost}>
-          <div style={{ position: "relative" }}>
-            <textarea
-              ref={postMention.inputRef}
-              style={styles.textarea}
-              placeholder={t("feed.composerPlaceholder")}
-              value={text}
-              onChange={(e) => postMention.handleMentionChange(e, setText)}
-            />
-            {postMention.mentionOpen && (
-              <MentionSuggestions
-                suggestions={postMention.mentionSuggestions}
-                onSelect={(u) => postMention.selectMention(u, text, setText)}
+        {feedTab !== "explorar" && (
+          <form style={styles.composer} onSubmit={handlePost}>
+            <div style={{ position: "relative" }}>
+              <textarea
+                ref={postMention.inputRef}
+                style={styles.textarea}
+                placeholder={t("feed.composerPlaceholder")}
+                value={text}
+                onChange={(e) => postMention.handleMentionChange(e, setText)}
               />
-            )}
-          </div>
-          <button type="submit" style={styles.postBtn} disabled={posting}>
-            {posting ? t("feed.posting") : t("feed.postButton")}
-          </button>
-          <div style={{ clear: "both" }} />
-        </form>
+              {postMention.mentionOpen && (
+                <MentionSuggestions
+                  suggestions={postMention.mentionSuggestions}
+                  onSelect={(u) => postMention.selectMention(u, text, setText)}
+                />
+              )}
+            </div>
+            <button type="submit" style={styles.postBtn} disabled={posting}>
+              {posting ? t("feed.posting") : t("feed.postButton")}
+            </button>
+            <div style={{ clear: "both" }} />
+          </form>
+        )}
 
         <div style={styles.tabsRow}>
           <button style={styles.tabBtn(feedTab === "todos")} onClick={() => setFeedTab("todos")}>
@@ -843,7 +910,29 @@ export default function Feed({ onOpenProfile }) {
           >
             {t("feed.tabFollowing")}
           </button>
+          <button
+            style={styles.tabBtn(feedTab === "explorar")}
+            onClick={() => setFeedTab("explorar")}
+          >
+            {t("feed.tabExplore")}
+          </button>
         </div>
+
+        {feedTab === "explorar" && (
+          <>
+            <TrendingHashtags
+              hashtags={trendingHashtags}
+              activeHashtag={activeHashtag}
+              onSelect={setActiveHashtag}
+            />
+            <PeopleSuggestions
+              suggestions={peopleSuggestions}
+              currentUid={currentUid}
+              myProfile={myProfile}
+              onOpenProfile={onOpenProfile}
+            />
+          </>
+        )}
 
         {activeHashtag && (
           <div style={styles.hashtagFilterChip}>
@@ -865,12 +954,16 @@ export default function Feed({ onOpenProfile }) {
           </>
         )}
 
-        {!postsLoading && finalPosts.length === 0 && (
+        {!postsLoading && feedTab === "explorar" && explorePosts.length === 0 && (
+          <p style={styles.empty}>{t("explore.emptyFeed")}</p>
+        )}
+
+        {!postsLoading && feedTab !== "explorar" && finalPosts.length === 0 && (
           <p style={styles.empty}>{emptyMessage}</p>
         )}
 
         {!postsLoading &&
-          finalPosts.map((p) => (
+          (feedTab === "explorar" ? explorePosts : finalPosts).map((p) => (
             <PostCard
               key={p.id}
               post={p}
