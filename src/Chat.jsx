@@ -20,6 +20,7 @@ import { notify, useIsMobile } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
 import { isEffectivelyOnline, formatLastSeen } from "./presence";
+import { StickerImage, StickerPicker } from "./Stickers";
 
 /*
   Chat
@@ -68,6 +69,18 @@ import { isEffectivelyOnline, formatLastSeen } from "./presence";
   compartirlo la vista previa se actualiza sola, y si se borra muestra un
   aviso en vez de romperse. Tocar la vista previa llama a onOpenPost(id),
   que en App.js abre PostView.jsx.
+
+  STICKERS (ver Stickers.jsx para el set de imágenes y la lógica
+  compartida): botón nuevo junto al de grabar audio que abre un panel con
+  una grilla de 10 stickers propios (SVG empaquetados en
+  src/assets/stickers/, NO subidos por usuarios — no requieren Firebase
+  Storage ni el plan Blaze). Mensaje tipo
+  { senderId, type: "sticker", stickerId, createdAt }: solo guarda el id
+  del sticker (nunca la imagen ni ninguna copia — mismo principio de "no
+  duplicar datos" que ya usan los posts compartidos y las publicaciones
+  guardadas). Se muestra en tamaño grande, SIN el fondo de burbuja de
+  siempre (a diferencia del texto, la nota de voz y el post compartido,
+  que sí lo tienen) — mismo estilo que las apps de chat conocidas.
 
   ESTADO "EN LÍNEA" / "ÚLTIMA CONEXIÓN" (ver presence.js): el puntito verde
   sobre el avatar aparece tanto en cada fila de la lista de contactos como
@@ -122,6 +135,31 @@ function MicIcon({ pulsing }) {
       <path d="M19 11v1a7 7 0 0 1-14 0v-1" />
       <line x1="12" y1="19" x2="12" y2="22" />
       <line x1="8.5" y1="22" x2="15.5" y2="22" />
+    </svg>
+  );
+}
+
+// Ícono del botón de stickers: una "etiqueta" con la esquina despegada
+// (forma clásica de sticker) y una carita simple adentro — mismo estilo de
+// trazo (currentColor, redondeado) que MicIcon, para que los dos botones
+// combinen.
+function StickerIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14 3H7a4 4 0 0 0-4 4v10a4 4 0 0 0 4 4h7l6-6V7a4 4 0 0 0-4-4z" />
+      <path d="M14 21v-4a2 2 0 0 1 2-2h4" />
+      <circle cx="9" cy="10" r="1" fill="currentColor" stroke="none" />
+      <circle cx="14" cy="10" r="1" fill="currentColor" stroke="none" />
+      <path d="M8.5 14a3.5 3.5 0 0 0 6 0" />
     </svg>
   );
 }
@@ -385,6 +423,13 @@ const styles = {
       : "var(--surface-alt)",
     color: mine ? "var(--bg)" : "var(--text)",
   }),
+  // Sin fondo de burbuja a propósito (pedido explícito: "como en
+  // WhatsApp") — solo un poco de padding para que la reacción no quede
+  // pegada al borde de la imagen.
+  stickerBubble: {
+    padding: "2px",
+    lineHeight: 0,
+  },
   inputRow: {
     display: "flex",
     gap: "10px",
@@ -426,6 +471,21 @@ const styles = {
     justifyContent: "center",
     flexShrink: 0,
   },
+  stickerBtnWrapper: { position: "relative", flexShrink: 0 },
+  stickerBtn: (active) => ({
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
+    background: active ? "var(--accent2-soft)" : "transparent",
+    color: active ? "var(--accent2)" : "var(--text)",
+    fontSize: "16px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  }),
   recordingRow: {
     display: "flex",
     alignItems: "center",
@@ -672,24 +732,30 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost }) {
   return (
     <div style={styles.bubbleRow(mine)}>
       <div ref={containerRef} style={styles.bubbleWrapper} {...triggerProps}>
-        <div style={styles.bubble(mine)}>
-          {message.type === "audio" ? (
-            <AudioMessage
-              id={message.id}
-              src={message.audioData}
-              duration={message.audioDuration}
-              mine={mine}
-            />
-          ) : message.type === "shared_post" ? (
-            <SharedPostPreview
-              postId={message.sharedPostId}
-              mine={mine}
-              onOpenPost={onOpenPost}
-            />
-          ) : (
-            message.text
-          )}
-        </div>
+        {message.type === "sticker" ? (
+          <div style={styles.stickerBubble}>
+            <StickerImage stickerId={message.stickerId} size={96} />
+          </div>
+        ) : (
+          <div style={styles.bubble(mine)}>
+            {message.type === "audio" ? (
+              <AudioMessage
+                id={message.id}
+                src={message.audioData}
+                duration={message.audioDuration}
+                mine={mine}
+              />
+            ) : message.type === "shared_post" ? (
+              <SharedPostPreview
+                postId={message.sharedPostId}
+                mine={mine}
+                onOpenPost={onOpenPost}
+              />
+            ) : (
+              message.text
+            )}
+          </div>
+        )}
         {reactionEmojis.length > 0 && (
           <div style={styles.reactionBadge(mine)}>{reactionEmojis.join("")}</div>
         )}
@@ -725,6 +791,8 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [search, setSearch] = useState("");
+  const [stickerPanelOpen, setStickerPanelOpen] = useState(false);
+  const stickerPanelRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // Estado del grabador de notas de voz: "idle" | "recording" | "ready"
@@ -829,6 +897,18 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Cierra el panel de stickers al tocar/clickear afuera, mismo patrón que
+  // el resto de los paneles desplegables de la app (menú de temas, notificaciones).
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (stickerPanelRef.current && !stickerPanelRef.current.contains(e.target)) {
+        setStickerPanelOpen(false);
+      }
+    }
+    if (stickerPanelOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [stickerPanelOpen]);
 
   // Cuenta los segundos mientras se está grabando
   useEffect(() => {
@@ -1008,6 +1088,32 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
     setText("");
   };
 
+  const handleSendSticker = async (stickerId) => {
+    setStickerPanelOpen(false);
+    if (!activeContact || !currentUid) return;
+
+    const chatId = getChatId(currentUid, activeContact.uid);
+    await setDoc(
+      doc(db, "chats", chatId),
+      { participants: [currentUid, activeContact.uid] },
+      { merge: true }
+    );
+
+    await addDoc(collection(db, "chats", chatId, "messages"), {
+      senderId: currentUid,
+      type: "sticker",
+      stickerId,
+      createdAt: serverTimestamp(),
+    });
+
+    await notify(activeContact.uid, {
+      type: "message",
+      fromUid: currentUid,
+      fromName: myProfile?.displayName || "Alguien",
+      fromIdentity: myProfile?.identity || "",
+    });
+  };
+
   if (!currentUid) {
     return (
       <div style={styles.wrapper}>
@@ -1051,7 +1157,10 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
                   key={c.uid}
                   style={styles.contactItem(activeContact?.uid === c.uid)}
                   onClick={() => {
-                    if (recordingState === "idle") setActiveContact(c);
+                    if (recordingState === "idle") {
+                      setActiveContact(c);
+                      setStickerPanelOpen(false);
+                    }
                   }}
                 >
                   <Avatar
@@ -1126,6 +1235,17 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
                       value={text}
                       onChange={(e) => setText(e.target.value)}
                     />
+                    <div style={styles.stickerBtnWrapper} ref={stickerPanelRef}>
+                      <button
+                        type="button"
+                        style={styles.stickerBtn(stickerPanelOpen)}
+                        onClick={() => setStickerPanelOpen((v) => !v)}
+                        title={t("chat.openStickers")}
+                      >
+                        <StickerIcon />
+                      </button>
+                      {stickerPanelOpen && <StickerPicker onSelect={handleSendSticker} />}
+                    </div>
                     <button
                       type="button"
                       style={styles.micBtn}

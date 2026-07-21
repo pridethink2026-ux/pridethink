@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="thumbsup-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="var(--accent)" />
+      <stop offset="100%" stop-color="var(--accent2)" />
+    </linearGradient>
+  </defs>
+  <path fill="url(#thumbsup-grad)" d="M2 11h3v10H2a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z"/>
+  <path fill="url(#thumbsup-grad)" d="M7 11l4.2-7.8a1.6 1.6 0 0 1 2.9.9L13.4 9H20a2 2 0 0 1 1.9 2.7l-2.6 7.7A2 2 0 0 1 17.4 21H7V11z"/>
+</svg>

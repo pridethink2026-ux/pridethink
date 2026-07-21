@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <clipPath id="trans-flag-clip"><rect x="2" y="3" width="20" height="18" rx="3"/></clipPath>
+  </defs>
+  <g clip-path="url(#trans-flag-clip)">
+    <rect x="2" y="3" width="20" height="3.6" fill="#5BCEFA"/>
+    <rect x="2" y="6.6" width="20" height="3.6" fill="#F5A9B8"/>
+    <rect x="2" y="10.2" width="20" height="3.6" fill="#FFFFFF"/>
+    <rect x="2" y="13.8" width="20" height="3.6" fill="#F5A9B8"/>
+    <rect x="2" y="17.4" width="20" height="3.6" fill="#5BCEFA"/>
+  </g>
+</svg>

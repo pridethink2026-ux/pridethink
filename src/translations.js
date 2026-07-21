@@ -168,6 +168,18 @@ export const translations = {
     "reaction.pride": "Orgullo",
     "reaction.funny": "Me divierte",
 
+    // Stickers (Stickers.jsx, panel del chat)
+    "stickers.heart": "Corazón",
+    "stickers.rainbow": "Arcoíris",
+    "stickers.star": "Estrella",
+    "stickers.sparkles": "Destellos",
+    "stickers.waveHand": "Saludo",
+    "stickers.transFlag": "Bandera trans",
+    "stickers.sun": "Sol",
+    "stickers.balloon": "Globo",
+    "stickers.moon": "Luna",
+    "stickers.thumbsUp": "Pulgar arriba",
+
     // Muro (Feed.jsx)
     "feed.composerPlaceholder": "¿Qué estás pensando o sintiendo? Usa #hashtags si quieres",
     "feed.posting": "Publicando...",
@@ -261,6 +273,7 @@ export const translations = {
     "chat.unblock": "Desbloquear",
     "chat.messagePlaceholder": "Escribe un mensaje...",
     "chat.recordVoice": "Grabar nota de voz",
+    "chat.openStickers": "Enviar un sticker",
     "chat.send": "Enviar",
     "chat.recording": "Grabando nota de voz...",
     "chat.recordingReady": "Nota de voz lista",
@@ -465,6 +478,18 @@ export const translations = {
     "reaction.pride": "Pride",
     "reaction.funny": "Funny",
 
+    // Stickers (Stickers.jsx, chat panel)
+    "stickers.heart": "Heart",
+    "stickers.rainbow": "Rainbow",
+    "stickers.star": "Star",
+    "stickers.sparkles": "Sparkles",
+    "stickers.waveHand": "Wave",
+    "stickers.transFlag": "Trans flag",
+    "stickers.sun": "Sun",
+    "stickers.balloon": "Balloon",
+    "stickers.moon": "Moon",
+    "stickers.thumbsUp": "Thumbs up",
+
     // Wall (Feed.jsx)
     "feed.composerPlaceholder": "What are you thinking or feeling? Use #hashtags if you want",
     "feed.posting": "Posting...",
@@ -558,6 +583,7 @@ export const translations = {
     "chat.unblock": "Unblock",
     "chat.messagePlaceholder": "Write a message...",
     "chat.recordVoice": "Record voice note",
+    "chat.openStickers": "Send a sticker",
     "chat.send": "Send",
     "chat.recording": "Recording voice note...",
     "chat.recordingReady": "Voice note ready",
