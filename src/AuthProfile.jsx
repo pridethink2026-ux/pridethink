@@ -138,6 +138,21 @@ const styles = {
     marginBottom: "18px",
     outline: "none",
   },
+  textarea: {
+    width: "100%",
+    boxSizing: "border-box",
+    background: "var(--surface-alt)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "11px 14px",
+    fontSize: "15px",
+    color: "var(--text)",
+    marginBottom: "4px",
+    outline: "none",
+    resize: "none",
+    minHeight: "70px",
+    fontFamily: "inherit",
+  },
   backLink: {
     display: "inline-block",
     color: "var(--text-muted)",
@@ -251,6 +266,20 @@ const styles = {
     alignItems: "center",
     gap: "14px",
     marginBottom: "18px",
+  },
+  bioText: {
+    fontSize: "13px",
+    color: "var(--text)",
+    lineHeight: 1.4,
+    margin: "6px 0 0",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  },
+  bioCounter: {
+    fontSize: "11px",
+    color: "var(--text-muted)",
+    textAlign: "right",
+    margin: "0 0 18px",
   },
   countsRow: {
     display: "flex",
@@ -655,12 +684,19 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
   const { t } = useLanguage();
   const [displayName, setDisplayName] = useState(initialValues?.displayName || "");
   const [identity, setIdentity] = useState(initialValues?.identity || "");
+  const [bio, setBio] = useState(initialValues?.bio || "");
+  const [datingPreference, setDatingPreference] = useState(initialValues?.datingPreference || "");
   const suggestions = getIdentitySuggestions(t);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!identity.trim()) return;
-    onSubmit({ displayName: displayName.trim() || "Sin nombre", identity: identity.trim() });
+    onSubmit({
+      displayName: displayName.trim() || "Sin nombre",
+      identity: identity.trim(),
+      bio: bio.trim(),
+      datingPreference: datingPreference.trim(),
+    });
   };
 
   return (
@@ -710,6 +746,31 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
           </span>
         ))}
       </div>
+
+      <label style={styles.label} htmlFor="bio">
+        {t("identity.bioLabel")}
+      </label>
+      <textarea
+        id="bio"
+        style={styles.textarea}
+        placeholder={t("identity.bioPlaceholder")}
+        value={bio}
+        onChange={(e) => setBio(e.target.value.slice(0, 150))}
+        maxLength={150}
+      />
+      <p style={styles.bioCounter}>{bio.length}/150</p>
+
+      <label style={styles.label} htmlFor="datingPreference">
+        {t("identity.datingPreferenceLabel")}
+      </label>
+      <input
+        id="datingPreference"
+        style={styles.input}
+        type="text"
+        placeholder={t("identity.datingPreferencePlaceholder")}
+        value={datingPreference}
+        onChange={(e) => setDatingPreference(e.target.value)}
+      />
 
       <button type="submit" style={styles.button} disabled={loading}>
         {loading
@@ -792,6 +853,7 @@ function ProfileView({
             {user.isVerified && <VerifiedBadge size="md" />}
           </h1>
           <p style={{ ...styles.subtitle, margin: 0 }}>{user.identity}</p>
+          {user.bio && <p style={styles.bioText}>{user.bio}</p>}
         </div>
       </div>
 
@@ -1017,7 +1079,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     }
   };
 
-  const handleIdentitySubmit = async ({ displayName, identity }) => {
+  const handleIdentitySubmit = async ({ displayName, identity, bio, datingPreference }) => {
     setLoading(true);
     setError("");
     const uid = pendingUid || auth.currentUser?.uid;
@@ -1053,6 +1115,8 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       ...personalFields,
       displayName,
       identity,
+      bio: bio || "",
+      datingPreference: datingPreference || "",
       identityUpdatedAt: new Date().toLocaleDateString("es-ES", {
         year: "numeric",
         month: "long",

@@ -93,6 +93,14 @@ const styles = {
     color: "var(--text-muted)",
     margin: "2px 0 0",
   },
+  bioText: {
+    fontSize: "13px",
+    color: "var(--text)",
+    lineHeight: 1.4,
+    margin: "10px 0 0",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  },
   joined: {
     fontSize: "12px",
     color: "var(--text-muted)",
@@ -307,6 +315,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
             {profileUser.isVerified && <VerifiedBadge size="md" />}
           </h1>
           <p style={styles.identity}>{profileUser.identity}</p>
+          {profileUser.bio && <p style={styles.bioText}>{profileUser.bio}</p>}
           {profileUser.joinedAt && (
             <p style={styles.joined}>Miembro desde {profileUser.joinedAt}</p>
           )}

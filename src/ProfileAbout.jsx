@@ -15,6 +15,15 @@ import { LANGUAGE_OPTIONS, getGenderOptions, getCountryName, calculateAge } from
   existieran estos campos (o editadas solo por el flujo viejo de
   identidad) pueden no tenerlos, y no tiene sentido mostrar una fila vacía.
 
+  "datingPreference" (texto libre, igual criterio que la identidad: sin
+  categorías fijas) se agregó acá con un corazón 💗 adelante del label —
+  discreto, y SOLO aparece si la persona lo completó (nunca se obliga a
+  compartir esto). Va acá (compartido entre tu propio perfil y el perfil
+  público de otros) a propósito, aunque el pedido original solo mencionaba
+  "el perfil público": mostrarlo también en tu propio perfil te deja
+  confirmar que se guardó bien, sin necesitar visitar tu perfil desde otra
+  cuenta.
+
   La fecha de nacimiento se guarda como Timestamp de Firestore y nunca se
   guarda la edad calculada: se calcula al vuelo con calculateAge() al
   renderizar (mismo principio que los demás conteos derivados de la app).
@@ -85,6 +94,10 @@ export default function ProfileAbout({ profileUser }) {
     countryName && { label: t("profile.countryField"), value: countryName },
     languageName && { label: t("profile.languageField"), value: languageName },
     birthDateText && { label: t("profile.birthDateField"), value: birthDateText },
+    profileUser.datingPreference && {
+      label: `💗 ${t("profile.datingPreferenceField")}`,
+      value: profileUser.datingPreference,
+    },
   ].filter(Boolean);
 
   if (fields.length === 0) return null;
