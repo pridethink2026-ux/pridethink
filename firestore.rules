@@ -85,9 +85,16 @@ service cloud.firestore {
       // El muro, la búsqueda y los perfiles públicos leen publicaciones.
       allow read: if estaAutenticado();
 
-      // Solo puedes crear una publicación firmada con tu propio uid.
+      // Solo puedes crear una publicación firmada con tu propio uid — y si
+      // tiene "groupId" (post de un grupo, ver groups/{groupId} más abajo),
+      // solo si sos miembro de ese grupo (Groups.jsx/GroupView.jsx).
       allow create: if estaAutenticado()
-        && request.resource.data.authorId == request.auth.uid;
+        && request.resource.data.authorId == request.auth.uid
+        && (
+          !('groupId' in request.resource.data)
+          || request.resource.data.groupId == null
+          || exists(/databases/$(database)/documents/groups/$(request.resource.data.groupId)/members/$(request.auth.uid))
+        );
 
       // Solo el autor puede borrar su publicación.
       allow delete: if estaAutenticado()
@@ -98,8 +105,13 @@ service cloud.firestore {
         // En ambos casos, nadie puede cambiar quién es el autor del post.
         && resource.data.authorId == request.resource.data.authorId
         && (
-          // 1) El autor puede editar cualquier campo suyo (texto, hashtags).
-          resource.data.authorId == request.auth.uid
+          // 1) El autor puede editar cualquier campo suyo (texto, hashtags),
+          //    pero no puede mover el post a otro grupo ni sacarlo del suyo
+          //    editándolo después de creado ("groupId" queda fijo).
+          (
+            resource.data.authorId == request.auth.uid
+            && request.resource.data.get('groupId', null) == resource.data.get('groupId', null)
+          )
           ||
           // 2) Cualquier OTRA persona autenticada puede reaccionar: solo se
           //    le permite tocar el campo "reactions", y solo su propia
@@ -196,6 +208,50 @@ service cloud.firestore {
       // Es una lista privada: solo el dueño la lee, agrega o quita
       // referencias. Nadie más puede ver qué guardó otra persona.
       allow read, create, update, delete: if esDueno(ownerUid);
+    }
+
+    // --------------------------------------------------------------------
+    // groups/{groupId}  y  groups/{groupId}/members/{uid}
+    // Grupos/comunidades temáticas (nombre + descripción, sin imagen de
+    // portada por ahora). Son públicos: cualquier autenticado los ve y
+    // puede unirse — no hay grupos "privados" ni invitación. Los posts de
+    // cada grupo viven en la colección posts/{postId} de siempre, con un
+    // campo "groupId" (ver el bloque de posts/{postId} más arriba).
+    // --------------------------------------------------------------------
+    match /groups/{groupId} {
+      // Cualquier autenticado ve la lista de grupos y entra a cualquiera.
+      allow read: if estaAutenticado();
+
+      // Cualquier autenticado puede crear un grupo, firmado como su propio
+      // creador (Groups.jsx también lo suma como primer miembro aparte).
+      allow create: if estaAutenticado()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      // Todavía no hay forma de editar nombre/descripción una vez creado.
+      allow update: if false;
+
+      // Solo quien creó el grupo puede borrarlo.
+      allow delete: if estaAutenticado()
+        && resource.data.createdBy == request.auth.uid;
+
+      match /members/{uid} {
+        // Cualquier autenticado ve quién es miembro (lista de miembros y
+        // conteo en vivo, y para saber si un post nuevo respeta la regla
+        // de arriba en posts/{postId}).
+        allow read: if estaAutenticado();
+
+        // Solo podés agregarte a vos mismo como miembro (unirte).
+        allow create: if esDueno(uid);
+
+        // Podés borrarte a vos mismo (salir del grupo), o si sos quien creó
+        // el grupo, podés borrar cualquier membresía — así, al eliminar el
+        // grupo entero (GroupView.jsx), primero se borran todas las
+        // membresías y después el documento del grupo.
+        allow delete: if esDueno(uid)
+          || get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid;
+
+        allow update: if false;
+      }
     }
 
     // --------------------------------------------------------------------

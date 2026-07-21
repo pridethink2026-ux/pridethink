@@ -36,6 +36,7 @@ import {
   useCommentCounts,
   rankByPopularity,
 } from "./Explore";
+import Groups from "./Groups";
 
 /*
   Feed
@@ -104,6 +105,14 @@ import {
   popularidad (reacciones + comentarios) en vez de por fecha. A diferencia
   de "Todos", acá también se excluye a quien tiene el muro privado
   (`isWallPrivate`) — ver Explore.jsx para el porqué.
+
+  GRUPOS (ver Groups.jsx/GroupView.jsx): cuarta pestaña (`feedTab ===
+  "grupos"`), muestra la lista de grupos en vez de un feed de posts (se
+  oculta el composer y todo lo demás de esta pantalla). Los posts DE UN
+  GRUPO viven en esta misma colección "posts" con un campo "groupId"
+  nuevo, así que "Todos"/"Siguiendo" y Explorar los excluyen explícitamente
+  (`!p.groupId`) — nunca se mezclan con el muro general, solo se ven
+  entrando al grupo (GroupView.jsx).
 */
 
 const styles = {
@@ -703,7 +712,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   );
 }
 
-export default function Feed({ onOpenProfile }) {
+export default function Feed({ onOpenProfile, onOpenGroup }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
@@ -794,6 +803,7 @@ export default function Feed({ onOpenProfile }) {
   const myBlocked = myProfile?.blockedUsers || [];
   const myFollowing = myProfile?.following || [];
   const visiblePosts = posts.filter((p) => {
+    if (p.groupId) return false; // los posts de grupo solo se ven dentro del grupo
     if (p.authorId === currentUid) return true; // siempre ves tus propios posts
     const author = usersMap[p.authorId];
     if (author?.isPrivate) return false;
@@ -817,6 +827,7 @@ export default function Feed({ onOpenProfile }) {
   const exploreCandidates =
     feedTab === "explorar"
       ? posts.filter((p) => {
+          if (p.groupId) return false; // los posts de grupo no aparecen en Explorar
           if (p.authorId === currentUid) return false;
           const author = usersMap[p.authorId];
           if (author?.isPrivate || author?.isWallPrivate) return false;
@@ -876,7 +887,7 @@ export default function Feed({ onOpenProfile }) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.column}>
-        {feedTab !== "explorar" && (
+        {feedTab !== "explorar" && feedTab !== "grupos" && (
           <form style={styles.composer} onSubmit={handlePost}>
             <div style={{ position: "relative" }}>
               <textarea
@@ -916,7 +927,15 @@ export default function Feed({ onOpenProfile }) {
           >
             {t("feed.tabExplore")}
           </button>
+          <button
+            style={styles.tabBtn(feedTab === "grupos")}
+            onClick={() => setFeedTab("grupos")}
+          >
+            {t("feed.tabGroups")}
+          </button>
         </div>
+
+        {feedTab === "grupos" && <Groups onOpenGroup={onOpenGroup} />}
 
         {feedTab === "explorar" && (
           <>
@@ -934,7 +953,7 @@ export default function Feed({ onOpenProfile }) {
           </>
         )}
 
-        {activeHashtag && (
+        {feedTab !== "grupos" && activeHashtag && (
           <div style={styles.hashtagFilterChip}>
             #{activeHashtag}
             <span
@@ -946,7 +965,7 @@ export default function Feed({ onOpenProfile }) {
           </div>
         )}
 
-        {postsLoading && (
+        {feedTab !== "grupos" && postsLoading && (
           <>
             <PostSkeleton />
             <PostSkeleton />
@@ -954,15 +973,16 @@ export default function Feed({ onOpenProfile }) {
           </>
         )}
 
-        {!postsLoading && feedTab === "explorar" && explorePosts.length === 0 && (
+        {feedTab !== "grupos" && !postsLoading && feedTab === "explorar" && explorePosts.length === 0 && (
           <p style={styles.empty}>{t("explore.emptyFeed")}</p>
         )}
 
-        {!postsLoading && feedTab !== "explorar" && finalPosts.length === 0 && (
+        {feedTab !== "grupos" && !postsLoading && feedTab !== "explorar" && finalPosts.length === 0 && (
           <p style={styles.empty}>{emptyMessage}</p>
         )}
 
-        {!postsLoading &&
+        {feedTab !== "grupos" &&
+          !postsLoading &&
           (feedTab === "explorar" ? explorePosts : finalPosts).map((p) => (
             <PostCard
               key={p.id}

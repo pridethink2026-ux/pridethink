@@ -9,6 +9,7 @@ import Search from "./Search";
 import UserProfile from "./UserProfile";
 import SavedPosts from "./SavedPosts";
 import PostView from "./PostView";
+import GroupView from "./GroupView";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
@@ -32,13 +33,14 @@ import {
   Chat / Notificaciones / Perfil), con puntito rojo si hay avisos sin leer.
 
   Los perfiles públicos (UserProfile), la pantalla de "Guardados"
-  (SavedPosts) y una publicación individual (PostView, a donde se navega
-  al tocar la vista previa de un post compartido en el chat) se abren
-  todas como una vista superpuesta, con el mismo patrón: se guarda qué se
-  está viendo en un estado aparte ("viewingProfileUid" / "viewingSaved" /
-  "viewingPostId") y se restaura la pestaña anterior al volver, sin perder
-  en qué pestaña estabas. Las tres son mutuamente excluyentes: abrir una
-  cierra las otras dos.
+  (SavedPosts), una publicación individual (PostView, a donde se navega
+  al tocar la vista previa de un post compartido en el chat) y un grupo
+  específico (GroupView, a donde se navega desde la pestaña "Grupos" del
+  muro) se abren todas como una vista superpuesta, con el mismo patrón: se
+  guarda qué se está viendo en un estado aparte ("viewingProfileUid" /
+  "viewingSaved" / "viewingPostId" / "viewingGroupId") y se restaura la
+  pestaña anterior al volver, sin perder en qué pestaña estabas. Las
+  cuatro son mutuamente excluyentes: abrir una cierra las otras tres.
 */
 
 // Las etiquetas de las pestañas dependen del idioma activo (LanguageContext),
@@ -296,6 +298,7 @@ function App() {
   const [viewingProfileUid, setViewingProfileUid] = useState(null);
   const [viewingSaved, setViewingSaved] = useState(false);
   const [viewingPostId, setViewingPostId] = useState(null);
+  const [viewingGroupId, setViewingGroupId] = useState(null);
   const { unreadCount } = useNotifications(currentUid);
 
   useEffect(() => {
@@ -316,13 +319,14 @@ function App() {
     return unsub;
   }, [currentUid]);
 
-  // Las tres vistas superpuestas (perfil público, guardados, post
-  // individual) son mutuamente excluyentes: abrir cualquiera cierra las
-  // otras dos.
+  // Las cuatro vistas superpuestas (perfil público, guardados, post
+  // individual, grupo) son mutuamente excluyentes: abrir cualquiera cierra
+  // las otras tres.
   const openProfile = (uid) => {
     setViewingProfileUid(uid);
     setViewingSaved(false);
     setViewingPostId(null);
+    setViewingGroupId(null);
   };
   const closeProfile = () => setViewingProfileUid(null);
 
@@ -330,6 +334,7 @@ function App() {
     setViewingSaved(true);
     setViewingProfileUid(null);
     setViewingPostId(null);
+    setViewingGroupId(null);
   };
   const closeSaved = () => setViewingSaved(false);
 
@@ -337,19 +342,31 @@ function App() {
     setViewingPostId(postId);
     setViewingProfileUid(null);
     setViewingSaved(false);
+    setViewingGroupId(null);
   };
   const closePost = () => setViewingPostId(null);
+
+  const openGroup = (groupId) => {
+    setViewingGroupId(groupId);
+    setViewingProfileUid(null);
+    setViewingSaved(false);
+    setViewingPostId(null);
+  };
+  const closeGroup = () => setViewingGroupId(null);
 
   const navigate = (key) => {
     setView(key);
     closeProfile();
     setViewingSaved(false);
     setViewingPostId(null);
+    setViewingGroupId(null);
   };
 
   let content;
   if (viewingPostId) {
     content = <PostView postId={viewingPostId} onBack={closePost} onOpenProfile={openProfile} />;
+  } else if (viewingGroupId) {
+    content = <GroupView groupId={viewingGroupId} onBack={closeGroup} onOpenProfile={openProfile} />;
   } else if (viewingSaved) {
     content = <SavedPosts onBack={closeSaved} onOpenProfile={openProfile} />;
   } else if (viewingProfileUid) {
@@ -357,7 +374,7 @@ function App() {
       <UserProfile uid={viewingProfileUid} onBack={closeProfile} onOpenProfile={openProfile} />
     );
   } else if (view === "feed") {
-    content = <Feed onOpenProfile={openProfile} />;
+    content = <Feed onOpenProfile={openProfile} onOpenGroup={openGroup} />;
   } else if (view === "chat") {
     content = <Chat onOpenProfile={openProfile} onOpenPost={openPost} />;
   } else if (view === "buscar") {
@@ -369,9 +386,9 @@ function App() {
   }
 
   // Para el resaltado de pestaña activa: ninguna pestaña se ve "activa"
-  // mientras haya una vista superpuesta abierta (perfil público, guardados
-  // o un post individual).
-  const anyOverlayOpen = !!viewingProfileUid || viewingSaved || !!viewingPostId;
+  // mientras haya una vista superpuesta abierta (perfil público, guardados,
+  // un post individual o un grupo).
+  const anyOverlayOpen = !!viewingProfileUid || viewingSaved || !!viewingPostId || !!viewingGroupId;
 
   return (
     <div style={{ paddingBottom: isMobile ? "62px" : 0 }}>
@@ -409,6 +426,8 @@ function App() {
         key={
           viewingPostId
             ? `post-${viewingPostId}`
+            : viewingGroupId
+            ? `group-${viewingGroupId}`
             : viewingSaved
             ? "saved"
             : viewingProfileUid

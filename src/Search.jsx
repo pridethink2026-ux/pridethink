@@ -178,6 +178,7 @@ export default function Search({ onOpenProfile }) {
 
   const matchedPosts = q
     ? posts.filter((p) => {
+        if (p.groupId) return false; // los posts de grupo solo se ven dentro del grupo
         if (!isVisibleAuthor(p.authorId, usersMap[p.authorId])) return false;
         const textMatch = (p.text || "").toLowerCase().includes(q);
         const hashtagMatch = (p.hashtags || []).includes(qHashtag);
