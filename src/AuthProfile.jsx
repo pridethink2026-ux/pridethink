@@ -17,6 +17,7 @@ import {
   collection,
   query,
   where,
+  Timestamp,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import FollowListModal from "./FollowListModal";
@@ -45,6 +46,95 @@ const IDENTITY_SUGGESTIONS = [
   "Zorro",
   "Fenix",
 ];
+
+const MIN_SIGNUP_AGE = 18;
+
+// Códigos ISO 3166-1 alpha-2 de países. Los nombres en español se generan
+// con Intl.DisplayNames (ver getCountryOptions), así que agregar un país
+// nuevo es tan simple como sumar su código acá; no hay que escribir el
+// nombre a mano ni mantenerlo traducido.
+const COUNTRY_CODES = [
+  // América
+  "AR", "BO", "BR", "CA", "CL", "CO", "CR", "CU", "DO", "EC", "SV", "US",
+  "GT", "GY", "HT", "HN", "JM", "MX", "NI", "PA", "PY", "PE", "PR", "SR",
+  "TT", "UY", "VE", "AG", "BS", "BB", "BZ", "DM", "GD", "KN", "LC", "VC",
+  // Europa
+  "AL", "AD", "AT", "BY", "BE", "BA", "BG", "HR", "CY", "CZ", "DK", "EE",
+  "FI", "FR", "DE", "GR", "HU", "IS", "IE", "IT", "XK", "LV", "LI", "LT",
+  "LU", "MT", "MD", "MC", "ME", "NL", "MK", "NO", "PL", "PT", "RO", "RU",
+  "SM", "RS", "SK", "SI", "ES", "SE", "CH", "UA", "GB", "VA",
+  // África
+  "DZ", "AO", "BJ", "BW", "BF", "BI", "CV", "CM", "CF", "TD", "KM", "CG",
+  "CD", "CI", "DJ", "EG", "GQ", "ER", "SZ", "ET", "GA", "GM", "GH", "GN",
+  "GW", "KE", "LS", "LR", "LY", "MG", "MW", "ML", "MR", "MU", "MA", "MZ",
+  "NA", "NE", "NG", "RW", "ST", "SN", "SC", "SL", "SO", "ZA", "SS", "SD",
+  "TZ", "TG", "TN", "UG", "ZM", "ZW",
+  // Asia y Medio Oriente
+  "AF", "AM", "AZ", "BH", "BD", "BT", "BN", "KH", "CN", "GE", "IN", "ID",
+  "IR", "IQ", "IL", "JP", "JO", "KZ", "KW", "KG", "LA", "LB", "MY", "MV",
+  "MN", "MM", "NP", "KP", "OM", "PK", "PS", "PH", "QA", "SA", "SG", "KR",
+  "LK", "SY", "TW", "TJ", "TH", "TL", "TR", "TM", "AE", "UZ", "VN", "YE",
+  "HK", "MO",
+  // Oceanía
+  "AU", "FJ", "KI", "MH", "FM", "NR", "NZ", "PW", "PG", "WS", "SB", "TO",
+  "TV", "VU",
+];
+
+// Convierte los códigos de arriba en { code, name } en español, ordenados
+// alfabéticamente por nombre. Si el navegador no soporta Intl.DisplayNames
+// (muy poco probable hoy), cae a mostrar el código tal cual.
+function getCountryOptions() {
+  let displayNames = null;
+  try {
+    displayNames = new Intl.DisplayNames(["es"], { type: "region" });
+  } catch {
+    displayNames = null;
+  }
+  return COUNTRY_CODES.map((code) => ({
+    code,
+    name: displayNames ? displayNames.of(code) || code : code,
+  })).sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
+const COUNTRY_OPTIONS = getCountryOptions();
+
+const LANGUAGE_OPTIONS = [
+  { value: "es", label: "Español" },
+  { value: "en", label: "English" },
+];
+
+// Idioma por defecto según el navegador: si no reporta explícitamente
+// inglés, se queda en español (el idioma principal de la app).
+function detectDefaultLanguage() {
+  const nav =
+    (typeof navigator !== "undefined" &&
+      (navigator.language || (navigator.languages && navigator.languages[0]))) ||
+    "";
+  return nav.toLowerCase().startsWith("en") ? "en" : "es";
+}
+
+const GENDER_OPTIONS = [
+  { value: "mujer", label: "Mujer" },
+  { value: "hombre", label: "Hombre" },
+  { value: "no_binario", label: "No binario" },
+  { value: "prefiero_no_decir", label: "Prefiero no decir" },
+  { value: "otro", label: "Otro" },
+];
+
+// Edad exacta (no solo restar años) a partir de una fecha "YYYY-MM-DD":
+// solo cuenta el cumpleaños de este año si ya pasó (o es hoy).
+function calculateAge(birthDateStr) {
+  if (!birthDateStr) return null;
+  const birth = new Date(birthDateStr);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const yaCumplioEsteAno =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if (!yaCumplioEsteAno) age -= 1;
+  return age;
+}
 
 const styles = {
   page: {
@@ -113,6 +203,46 @@ const styles = {
     color: "var(--text)",
     marginBottom: "18px",
     outline: "none",
+  },
+  select: {
+    width: "100%",
+    boxSizing: "border-box",
+    background: "var(--surface-alt)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "11px 14px",
+    fontSize: "15px",
+    color: "var(--text)",
+    marginBottom: "18px",
+    outline: "none",
+  },
+  backLink: {
+    display: "inline-block",
+    color: "var(--text-muted)",
+    fontSize: "13px",
+    fontWeight: 500,
+    cursor: "pointer",
+    margin: "0 0 14px",
+  },
+  checkboxRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "10px",
+    marginBottom: "20px",
+  },
+  checkboxInput: {
+    width: "18px",
+    height: "18px",
+    marginTop: "2px",
+    flexShrink: 0,
+    accentColor: "var(--accent2)",
+    cursor: "pointer",
+  },
+  checkboxLabel: {
+    fontSize: "13px",
+    color: "var(--text-muted)",
+    lineHeight: 1.4,
+    cursor: "pointer",
   },
   button: {
     width: "100%",
@@ -289,9 +419,9 @@ const styles = {
   },
 };
 
-function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, initialValues }) {
+  const [email, setEmail] = useState(initialValues?.email || "");
+  const [password, setPassword] = useState(initialValues?.password || "");
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -301,7 +431,7 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword }
   return (
     <form onSubmit={handleSubmit}>
       <p style={styles.eyebrow}>
-        {mode === "login" ? "Bienvenido de vuelta" : "Crear cuenta"}
+        {mode === "login" ? "Bienvenido de vuelta" : "Paso 1 de 3"}
       </p>
       <h1 style={styles.title}>
         {mode === "login" ? "Entra a tu espacio" : "Sé lo que quieras ser"}
@@ -439,6 +569,164 @@ function ResetPasswordForm({ initialEmail, onBack }) {
   );
 }
 
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+
+function PersonalDataForm({ onSubmit, onBack, loading, error }) {
+  const [fullName, setFullName] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [country, setCountry] = useState("");
+  const [language, setLanguage] = useState(detectDefaultLanguage());
+  const [gender, setGender] = useState("");
+  const [genderOther, setGenderOther] = useState("");
+  const [accepted, setAccepted] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit({
+      fullName: fullName.trim(),
+      birthDate,
+      country,
+      language,
+      gender,
+      genderOther: gender === "otro" ? genderOther.trim() : "",
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <span style={styles.backLink} onClick={onBack}>
+        ← Atrás
+      </span>
+      <p style={styles.eyebrow}>Paso 2 de 3</p>
+      <h1 style={styles.title}>Cuéntanos un poco de ti</h1>
+      <p style={styles.subtitle}>
+        Estos datos nos ayudan a mantener Pridethink como un espacio seguro.
+        Tu identidad libre la eliges en el siguiente paso.
+      </p>
+
+      {error && <div style={styles.error}>{error}</div>}
+
+      <label style={styles.label} htmlFor="fullName">
+        Nombre completo
+      </label>
+      <input
+        id="fullName"
+        style={styles.input}
+        type="text"
+        placeholder="Tu nombre y apellido"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+        required
+      />
+
+      <label style={styles.label} htmlFor="birthDate">
+        Fecha de nacimiento
+      </label>
+      <input
+        id="birthDate"
+        style={styles.input}
+        type="date"
+        value={birthDate}
+        max={TODAY_ISO}
+        onChange={(e) => setBirthDate(e.target.value)}
+        required
+      />
+
+      <label style={styles.label} htmlFor="country">
+        País
+      </label>
+      <select
+        id="country"
+        style={styles.select}
+        value={country}
+        onChange={(e) => setCountry(e.target.value)}
+        required
+      >
+        <option value="" disabled>
+          Selecciona tu país
+        </option>
+        {COUNTRY_OPTIONS.map((c) => (
+          <option key={c.code} value={c.code}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+
+      <label style={styles.label} htmlFor="language">
+        Idioma preferido
+      </label>
+      <select
+        id="language"
+        style={styles.select}
+        value={language}
+        onChange={(e) => setLanguage(e.target.value)}
+        required
+      >
+        {LANGUAGE_OPTIONS.map((l) => (
+          <option key={l.value} value={l.value}>
+            {l.label}
+          </option>
+        ))}
+      </select>
+
+      <label style={styles.label} htmlFor="gender">
+        Género
+      </label>
+      <select
+        id="gender"
+        style={styles.select}
+        value={gender}
+        onChange={(e) => setGender(e.target.value)}
+        required
+      >
+        <option value="" disabled>
+          Selecciona una opción
+        </option>
+        {GENDER_OPTIONS.map((g) => (
+          <option key={g.value} value={g.value}>
+            {g.label}
+          </option>
+        ))}
+      </select>
+
+      {gender === "otro" && (
+        <>
+          <label style={styles.label} htmlFor="genderOther">
+            Cuéntanos cuál
+          </label>
+          <input
+            id="genderOther"
+            style={styles.input}
+            type="text"
+            placeholder="Escribe tu género"
+            value={genderOther}
+            onChange={(e) => setGenderOther(e.target.value)}
+            required
+          />
+        </>
+      )}
+
+      <div style={styles.checkboxRow}>
+        <input
+          id="acceptedTerms"
+          style={styles.checkboxInput}
+          type="checkbox"
+          checked={accepted}
+          onChange={(e) => setAccepted(e.target.checked)}
+          required
+        />
+        <label style={styles.checkboxLabel} htmlFor="acceptedTerms">
+          Acepto que soy mayor de 18 años y los términos de uso de Pridethink.
+        </label>
+      </div>
+
+      <button type="submit" style={styles.button} disabled={loading}>
+        {loading ? "Un momento..." : "Continuar"}
+      </button>
+    </form>
+  );
+}
+
 function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
   const [displayName, setDisplayName] = useState(initialValues?.displayName || "");
   const [identity, setIdentity] = useState(initialValues?.identity || "");
@@ -451,7 +739,7 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <p style={styles.eyebrow}>{isEdit ? "Tu identidad de hoy" : "Paso 2 de 2"}</p>
+      <p style={styles.eyebrow}>{isEdit ? "Tu identidad de hoy" : "Paso 3 de 3"}</p>
       <h1 style={styles.title}>{isEdit ? "¿Cómo te sientes hoy?" : "¿Qué eres tú?"}</h1>
       <p style={styles.subtitle}>
         {isEdit
@@ -649,13 +937,19 @@ function ProfileView({ user, uid, onLogout, onEdit, onTogglePrivacy, onUnblock, 
 }
 
 export default function AuthProfile({ onOpenProfile }) {
-  const [step, setStep] = useState("login"); // login | signup | identity | profile | reset
+  // login | signup | signupPersonal | identity | profile | reset
+  const [step, setStep] = useState("login");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [pendingUid, setPendingUid] = useState(null);
   const [user, setUser] = useState(null);
   const [resetEmailPrefill, setResetEmailPrefill] = useState("");
+  // Datos de registro que se van juntando entre los pasos "Cuenta" y "Datos
+  // personales" ANTES de crear nada en Firebase, para poder bloquear el
+  // registro completo (ni cuenta de Auth ni documento en Firestore) si la
+  // persona resulta ser menor de edad.
+  const [signupDraft, setSignupDraft] = useState({});
 
   // Al cargar la página, revisa si Firebase ya tiene una sesión activa guardada.
   // Si la hay, salta directo al perfil (o a "identity" si aún no tiene perfil).
@@ -678,26 +972,27 @@ export default function AuthProfile({ onOpenProfile }) {
 
   const handleAuthSubmit = async ({ email, password }) => {
     setError("");
+    if (step === "signup") {
+      // Todavía NO se toca Firebase acá: solo se guarda el borrador y se
+      // pasa al paso de datos personales, donde se verifica la edad ANTES
+      // de crear la cuenta de verdad (ver handlePersonalSubmit).
+      setSignupDraft({ email, password });
+      setStep("signupPersonal");
+      return;
+    }
     setLoading(true);
     try {
-      if (step === "signup") {
-        // FIREBASE: auth (real) - crea la cuenta en Firebase Authentication
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
+      // FIREBASE: auth (real) - inicia sesión con Firebase Authentication
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+
+      // FIREBASE: firestore read (real) - revisa si ya tiene perfil guardado
+      const snap = await getDoc(doc(db, "users", cred.user.uid));
+      if (snap.exists()) {
+        setUser(snap.data());
+        setStep("profile");
+      } else {
         setPendingUid(cred.user.uid);
         setStep("identity");
-      } else {
-        // FIREBASE: auth (real) - inicia sesión con Firebase Authentication
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-
-        // FIREBASE: firestore read (real) - revisa si ya tiene perfil guardado
-        const snap = await getDoc(doc(db, "users", cred.user.uid));
-        if (snap.exists()) {
-          setUser(snap.data());
-          setStep("profile");
-        } else {
-          setPendingUid(cred.user.uid);
-          setStep("identity");
-        }
       }
     } catch (err) {
       setError(traducirErrorFirebase(err.code));
@@ -712,17 +1007,75 @@ export default function AuthProfile({ onOpenProfile }) {
     setStep("reset");
   };
 
+  // Paso "Datos personales": valida la edad ANTES de crear cualquier cosa
+  // en Firebase. Si es menor de edad, bloquea acá mismo y no llega a
+  // createUserWithEmailAndPassword ni a Firestore.
+  const handlePersonalSubmit = async (personalData) => {
+    setError("");
+    const age = calculateAge(personalData.birthDate);
+    if (age === null) {
+      setError("Ingresa una fecha de nacimiento válida.");
+      return;
+    }
+    if (age < MIN_SIGNUP_AGE) {
+      setError("Debes ser mayor de 18 años para crear una cuenta en Pridethink.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // FIREBASE: auth (real) - recién ahora se crea la cuenta, ya
+      // confirmada la mayoría de edad
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        signupDraft.email,
+        signupDraft.password
+      );
+      setPendingUid(cred.user.uid);
+      setSignupDraft((prev) => ({ ...prev, ...personalData }));
+      setStep("identity");
+    } catch (err) {
+      setError(traducirErrorFirebase(err.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleIdentitySubmit = async ({ displayName, identity }) => {
     setLoading(true);
     setError("");
-    const profile = {
-      email: auth.currentUser?.email || "",
+    const uid = pendingUid || auth.currentUser?.uid;
+    const isNewSignup = !user;
+
+    // En un registro nuevo se guardan también los datos personales
+    // juntados en los pasos anteriores. Al EDITAR (isNewSignup === false)
+    // no se reenvían: con merge:true, no tocarlos deja intactos los que ya
+    // están guardados en Firestore (país, fecha de nacimiento, etc.).
+    const personalFields = isNewSignup
+      ? {
+          email: auth.currentUser?.email || signupDraft.email || "",
+          fullName: signupDraft.fullName || "",
+          birthDate: signupDraft.birthDate
+            ? Timestamp.fromDate(new Date(signupDraft.birthDate))
+            : null,
+          country: signupDraft.country || "",
+          language: signupDraft.language || "es",
+          gender: signupDraft.gender || "",
+          genderOther: signupDraft.gender === "otro" ? signupDraft.genderOther || "" : "",
+          isPrivate: false,
+          blockedUsers: [],
+          following: [],
+          joinedAt: new Date().toLocaleDateString("es-ES", {
+            year: "numeric",
+            month: "long",
+          }),
+        }
+      : {};
+
+    const profileUpdate = {
+      ...personalFields,
       displayName,
       identity,
-      joinedAt: user?.joinedAt || new Date().toLocaleDateString("es-ES", {
-        year: "numeric",
-        month: "long",
-      }),
       identityUpdatedAt: new Date().toLocaleDateString("es-ES", {
         year: "numeric",
         month: "long",
@@ -732,8 +1085,9 @@ export default function AuthProfile({ onOpenProfile }) {
 
     try {
       // FIREBASE: firestore write (real) - guarda el perfil en Firestore
-      await setDoc(doc(db, "users", pendingUid || auth.currentUser?.uid), profile);
-      setUser(profile);
+      await setDoc(doc(db, "users", uid), profileUpdate, { merge: true });
+      setUser({ ...(user || {}), ...profileUpdate });
+      setSignupDraft({});
       setStep("profile");
     } catch (err) {
       setError("No se pudo guardar tu perfil. Intenta de nuevo.");
@@ -776,6 +1130,7 @@ export default function AuthProfile({ onOpenProfile }) {
     await signOut(auth);
     setUser(null);
     setPendingUid(null);
+    setSignupDraft({});
     setStep("login");
     setError("");
   };
@@ -803,6 +1158,7 @@ export default function AuthProfile({ onOpenProfile }) {
               error={error}
               loading={loading}
               onForgotPassword={handleForgotPassword}
+              initialValues={step === "signup" ? signupDraft : undefined}
             />
           </>
         )}
@@ -814,6 +1170,17 @@ export default function AuthProfile({ onOpenProfile }) {
               onBack={() => setStep("login")}
             />
           </>
+        )}
+        {step === "signupPersonal" && (
+          <PersonalDataForm
+            onSubmit={handlePersonalSubmit}
+            onBack={() => {
+              setError("");
+              setStep("signup");
+            }}
+            loading={loading}
+            error={error}
+          />
         )}
         {step === "identity" && (
           <IdentityForm
