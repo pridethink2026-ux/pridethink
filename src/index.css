@@ -90,3 +90,21 @@ code {
     transform: translateY(0);
   }
 }
+
+.pt-wave-bar {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.pt-wave-bar.pt-wave-playing {
+  animation: pt-wave-eq 0.9s ease-in-out infinite;
+}
+
+@keyframes pt-wave-eq {
+  0%, 100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -95,6 +95,80 @@ function blobToDataUrl(blob) {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+// Waveform decorativa de las notas de voz: no representa el audio real
+// (no lo analizamos), son barras con alturas pseudo-aleatorias pero FIJAS
+// por mensaje, para que cada nota se vea distinta sin cambiar en cada
+// render. La semilla es el id del mensaje en Firestore, así que tanto
+// quien la envía como quien la recibe ven exactamente el mismo patrón.
+const WAVEFORM_BARS = 24;
+const WAVEFORM_BAR_WIDTH = 1.8;
+const WAVEFORM_BAR_GAP = 1.8;
+const WAVEFORM_VIEW_HEIGHT = 22;
+const WAVEFORM_MIN_BAR = 4;
+const WAVEFORM_MAX_BAR = 20;
+
+function hashSeed(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return h >>> 0;
+}
+
+// PRNG determinista (mulberry32) a partir de la semilla numérica de arriba.
+function seededRandom(seed) {
+  let t = seed;
+  return function () {
+    t = (t + 0x6d2b79f5) | 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function getWaveformHeights(seedText) {
+  const next = seededRandom(hashSeed(String(seedText)));
+  const heights = [];
+  for (let i = 0; i < WAVEFORM_BARS; i++) {
+    heights.push(WAVEFORM_MIN_BAR + next() * (WAVEFORM_MAX_BAR - WAVEFORM_MIN_BAR));
+  }
+  return heights;
+}
+
+// Barras SVG delgadas. El color sale de una variable de tema distinta según
+// el tipo de burbuja (fondo degradado propio vs. fondo oscuro ajeno) para
+// que siempre haya buen contraste, y solo se animan (efecto ecualizador)
+// mientras el audio se está reproduciendo.
+function AudioWaveform({ seed, playing, mine }) {
+  const heights = useMemo(() => getWaveformHeights(seed), [seed]);
+  const totalWidth =
+    WAVEFORM_BARS * WAVEFORM_BAR_WIDTH + (WAVEFORM_BARS - 1) * WAVEFORM_BAR_GAP;
+
+  return (
+    <svg
+      viewBox={`0 0 ${totalWidth} ${WAVEFORM_VIEW_HEIGHT}`}
+      width={totalWidth}
+      height={WAVEFORM_VIEW_HEIGHT}
+      style={styles.waveform(mine)}
+      aria-hidden="true"
+    >
+      {heights.map((h, i) => (
+        <rect
+          key={i}
+          className={playing ? "pt-wave-bar pt-wave-playing" : "pt-wave-bar"}
+          x={i * (WAVEFORM_BAR_WIDTH + WAVEFORM_BAR_GAP)}
+          y={(WAVEFORM_VIEW_HEIGHT - h) / 2}
+          width={WAVEFORM_BAR_WIDTH}
+          height={h}
+          rx={WAVEFORM_BAR_WIDTH / 2}
+          fill="currentColor"
+          style={{ animationDelay: `${i * 0.045}s` }}
+        />
+      ))}
+    </svg>
+  );
 }
 
 const styles = {
@@ -338,8 +412,9 @@ const styles = {
   audioMessage: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
-    minWidth: "150px",
+    gap: "8px",
+    minWidth: "0",
+    maxWidth: "100%",
   },
   audioPlayBtn: (mine) => ({
     width: "30px",
@@ -355,9 +430,19 @@ const styles = {
     background: mine ? "var(--bg)" : "var(--accent2)",
     color: mine ? "var(--accent2)" : "var(--bg)",
   }),
+  // Barras de la waveform: contraste distinto según la burbuja sea propia
+  // (fondo degradado rosa, necesita un color oscuro) o ajena (fondo oscuro,
+  // necesita un color claro/muted) — mismas variables ya usadas para el
+  // texto de duración de al lado, así que siempre combinan.
+  waveform: (mine) => ({
+    flexShrink: 0,
+    maxWidth: "100%",
+    color: mine ? "var(--bg)" : "var(--text-muted)",
+  }),
   audioDuration: (mine) => ({
     fontSize: "12px",
     fontWeight: 600,
+    flexShrink: 0,
     color: mine ? "var(--bg)" : "var(--text-muted)",
   }),
   emptyState: {
@@ -372,7 +457,7 @@ const styles = {
   },
 };
 
-function AudioMessage({ src, duration, mine }) {
+function AudioMessage({ src, duration, mine, id }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
 
@@ -413,7 +498,8 @@ function AudioMessage({ src, duration, mine }) {
       >
         {playing ? "⏸" : "▶"}
       </button>
-      <span style={styles.audioDuration(mine)}>🎤 {formatDuration(duration)}</span>
+      <AudioWaveform seed={id || src} playing={playing} mine={mine} />
+      <span style={styles.audioDuration(mine)}>{formatDuration(duration)}</span>
     </div>
   );
 }
@@ -794,6 +880,7 @@ export default function Chat({ onOpenProfile }) {
                       <div style={styles.bubble(m.senderId === currentUid)}>
                         {m.type === "audio" ? (
                           <AudioMessage
+                            id={m.id}
                             src={m.audioData}
                             duration={m.audioDuration}
                             mine={m.senderId === currentUid}

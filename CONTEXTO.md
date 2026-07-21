@@ -79,6 +79,11 @@ categorías fijas. Prototipo funcional en fase de prueba con un socio.
     - La detección de palabras clave ignora mayúsculas/minúsculas y acentos, y usa límites de palabra para evitar falsos positivos (por ejemplo, "no binario" no dispara la regla de "bi", y "cansado" no dispara la de "can").
     - El ícono se atenúa (opacidad ~55%) cuando la pestaña Muro no está activa, y se ve a color completo cuando sí lo está — igual que el resto de la nav distingue pestaña activa/inactiva.
     - Para agregar una forma o bandera nueva solo hay que sumar una entrada a `SHAPE_RULES` o `COLOR_RULES` en `homeIcon.js`.
+27. **Burbujas de nota de voz con waveform**: el reproductor de audio del chat (`AudioMessage` en `Chat.jsx`) ya no muestra el emoji 🎤 junto a la duración — ahora es botón play/pausa + una waveform decorativa (SVG, `AudioWaveform`) + duración.
+    - La waveform son 24 barras SVG delgadas con alturas pseudo-aleatorias generadas con un PRNG determinista (`seededRandom`/`hashSeed` en `Chat.jsx`) sembrado con el `id` del mensaje en Firestore, así que cada nota de voz se ve distinta pero SIEMPRE con el mismo patrón (no cambia entre renders ni se ve diferente para quien envía vs. quien recibe).
+    - Mientras el audio se reproduce, las barras se animan tipo ecualizador (clase `.pt-wave-bar.pt-wave-playing`, `@keyframes pt-wave-eq` en `index.css`, sube/baja con `scaleY`) con `animationDelay` escalonado por barra (`i * 0.045s`) para que la onda se vea viva y no sincronizada. En pausa o antes de reproducir, las barras quedan estáticas (sin la clase `pt-wave-playing`).
+    - El color de las barras sale de variables de tema existentes, no de un color fijo: `var(--bg)` en burbujas propias (fondo degradado rosa del tema, necesita un trazo oscuro para contraste) y `var(--text-muted)` en burbujas del otro usuario (fondo oscuro `--surface-alt`) — mismas variables que ya usaba el texto de duración, así que el color de tema (cualquiera de los 4, o Rotativo) siempre se ve bien.
+    - Dimensiones ajustadas (barras angostas de 1.8px, fila con `gap: 8px`, todo con `flexShrink: 0`) para que la burbuja de audio (ancho fijo, no crece con el 75% de la burbuja de chat) quepa sin desbordarse ni en pantallas de celular angostas.
 
 ## Pendientes / ideas para seguir
 
