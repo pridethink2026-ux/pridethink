@@ -23,7 +23,10 @@ import { useLanguage } from "./LanguageContext";
 
   Estructura en Firestore:
   - "notifications/{uid}/items/{itemId}"
-      -> { type: 'like' | 'comment' | 'message' | 'follow', fromUid, fromName, fromIdentity, createdAt, read }
+      -> { type: 'like' | 'comment' | 'message' | 'follow' | 'mention', fromUid, fromName, fromIdentity, createdAt, read, postId? }
+      -> "postId" solo lo trae "mention" (ver utils.notify y Mentions.jsx):
+         al tocar esa notificación se navega directo al post en vez de al
+         perfil de quien la generó.
 
   Este archivo exporta tres cosas:
   - useNotifications(uid): hook con la lógica de datos (items, contador de
@@ -44,6 +47,7 @@ const LABELS = {
   comment: (n, t) => t("notifications.comment", { name: n.fromName }),
   message: (n, t) => t("notifications.message", { name: n.fromName }),
   follow: (n, t) => t("notifications.follow", { name: n.fromName }),
+  mention: (n, t) => t("notifications.mention", { name: n.fromName }),
 };
 
 const styles = {
@@ -186,12 +190,19 @@ export function useNotifications(uid) {
   return { items, unreadCount, markAllRead };
 }
 
-function NotificationItem({ n, onOpenProfile, dropdown }) {
+function NotificationItem({ n, onOpenProfile, onOpenPost, dropdown }) {
   const { t } = useLanguage();
+  const handleClick = () => {
+    if (n.type === "mention" && n.postId && onOpenPost) {
+      onOpenPost(n.postId);
+      return;
+    }
+    if (n.fromUid) onOpenProfile?.(n.fromUid);
+  };
   return (
     <div
       style={dropdown ? styles.item(!n.read) : styles.screenItem(!n.read)}
-      onClick={() => n.fromUid && onOpenProfile?.(n.fromUid)}
+      onClick={handleClick}
     >
       <Avatar uid={n.fromUid} name={n.fromName} identity={n.fromIdentity} size="sm" />
       <div>
@@ -204,7 +215,7 @@ function NotificationItem({ n, onOpenProfile, dropdown }) {
   );
 }
 
-export default function Notifications({ onOpenProfile }) {
+export default function Notifications({ onOpenProfile, onOpenPost }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [open, setOpen] = useState(false);
@@ -248,7 +259,13 @@ export default function Notifications({ onOpenProfile }) {
         <div style={styles.panel}>
           {items.length === 0 && <p style={styles.empty}>{t("notifications.empty")}</p>}
           {items.map((n) => (
-            <NotificationItem key={n.id} n={n} onOpenProfile={onOpenProfile} dropdown />
+            <NotificationItem
+              key={n.id}
+              n={n}
+              onOpenProfile={onOpenProfile}
+              onOpenPost={onOpenPost}
+              dropdown
+            />
           ))}
         </div>
       )}
@@ -257,7 +274,7 @@ export default function Notifications({ onOpenProfile }) {
 }
 
 // Misma lista, como pantalla completa para la barra de navegación inferior en móvil.
-export function NotificationsScreen({ onOpenProfile }) {
+export function NotificationsScreen({ onOpenProfile, onOpenPost }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const { items, unreadCount, markAllRead } = useNotifications(currentUid);
@@ -290,7 +307,13 @@ export function NotificationsScreen({ onOpenProfile }) {
         <h1 style={styles.screenTitle}>{t("notifications.title")}</h1>
         {items.length === 0 && <p style={styles.empty}>{t("notifications.empty")}</p>}
         {items.map((n) => (
-          <NotificationItem key={n.id} n={n} onOpenProfile={onOpenProfile} dropdown={false} />
+          <NotificationItem
+            key={n.id}
+            n={n}
+            onOpenProfile={onOpenProfile}
+            onOpenPost={onOpenPost}
+            dropdown={false}
+          />
         ))}
       </div>
     </div>

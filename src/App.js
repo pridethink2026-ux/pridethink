@@ -363,7 +363,7 @@ function App() {
   } else if (view === "buscar") {
     content = <Search onOpenProfile={openProfile} />;
   } else if (view === "notificaciones") {
-    content = <NotificationsScreen onOpenProfile={openProfile} />;
+    content = <NotificationsScreen onOpenProfile={openProfile} onOpenPost={openPost} />;
   } else {
     content = <AuthProfile onOpenProfile={openProfile} onOpenSaved={openSaved} />;
   }
@@ -401,7 +401,7 @@ function App() {
         )}
         <div style={navStyles.actionsSlot}>
           <ThemeMenu />
-          {!isMobile && <Notifications onOpenProfile={openProfile} />}
+          {!isMobile && <Notifications onOpenProfile={openProfile} onOpenPost={openPost} />}
         </div>
       </div>
 

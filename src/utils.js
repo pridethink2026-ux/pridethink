@@ -23,17 +23,21 @@ export function useIsMobile(breakpoint = 700) {
 }
 
 // Crea una notificación para otra persona (nunca para ti mismo). Mismo
-// patrón para likes, comentarios, mensajes nuevos y seguidores nuevos.
-export async function notify(targetUid, { type, fromUid, fromName, fromIdentity }) {
+// patrón para likes, comentarios, mensajes nuevos, seguidores nuevos y
+// menciones. "postId" es opcional (solo lo usan las menciones, para poder
+// llevar directo al post/comentario donde ocurrió — ver Notifications.jsx).
+export async function notify(targetUid, { type, fromUid, fromName, fromIdentity, postId }) {
   if (!targetUid || targetUid === fromUid) return;
-  await addDoc(collection(db, "notifications", targetUid, "items"), {
+  const data = {
     type,
     fromUid,
     fromName,
     fromIdentity,
     createdAt: serverTimestamp(),
     read: false,
-  });
+  };
+  if (postId) data.postId = postId;
+  await addDoc(collection(db, "notifications", targetUid, "items"), data);
 }
 
 // Tiempo relativo en español: "hace 5 min", "hace 2 h", "ayer", o fecha si es más viejo.

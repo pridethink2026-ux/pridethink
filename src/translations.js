@@ -236,6 +236,7 @@ export const translations = {
     "notifications.comment": "{name} comentó tu publicación",
     "notifications.message": "{name} te envió un mensaje",
     "notifications.follow": "{name} empezó a seguirte",
+    "notifications.mention": "{name} te mencionó",
     "notifications.generic": "Notificación",
 
     // Errores de Firebase Auth (login/registro/recuperar contraseña)
@@ -477,6 +478,7 @@ export const translations = {
     "notifications.comment": "{name} commented on your post",
     "notifications.message": "{name} sent you a message",
     "notifications.follow": "{name} started following you",
+    "notifications.mention": "{name} mentioned you",
     "notifications.generic": "Notification",
 
     // Firebase Auth errors (login/signup/forgot password)

@@ -20,6 +20,13 @@ import { useLanguage } from "./LanguageContext";
 import ReportButton from "./ReportButton";
 import { getReactionEmoji, getReactionSummary, useReactionPicker, ReactionPicker } from "./Reactions";
 import SharePostModal from "./SharePostModal";
+import {
+  useAllUsers,
+  useMentionAutocomplete,
+  MentionSuggestions,
+  extractMentionedUids,
+  renderTextWithMentions,
+} from "./Mentions";
 
 /*
   Feed
@@ -71,6 +78,15 @@ import SharePostModal from "./SharePostModal";
   contactos, mismo criterio de "quién es visible" que Chat.jsx) para
   mandar el post como un mensaje tipo "shared_post" en la conversación
   elegida — ver Chat.jsx para el formato de ese mensaje y cómo se muestra.
+
+  MENCIONES (ver Mentions.jsx para la lógica y UI compartida): al escribir
+  "@" + letras en el composer, un comentario, o al editar un post, se abre
+  un menú de sugerencias de usuarios. Al publicar/comentar/editar se guarda
+  `mentionedUids` (array de uids, sin duplicar ningún otro dato) y se
+  notifica a cada persona mencionada (`type: "mention"`, con el id del post
+  para poder llevar directo a él). Al renderizar, cualquier "@Nombre" que
+  matchee a un usuario real se muestra clickeable; si no matchea a nadie,
+  queda como texto normal.
 */
 
 const styles = {
@@ -264,8 +280,10 @@ const styles = {
     gap: "8px",
     marginTop: "8px",
   },
+  commentInputWrapper: { position: "relative", flex: 1 },
   commentInput: {
-    flex: 1,
+    width: "100%",
+    boxSizing: "border-box",
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
     borderRadius: "999px",
@@ -308,8 +326,10 @@ const styles = {
 };
 
 // Convierte el texto de un post en piezas de texto normal + hashtags
-// clickeables, usando utils.splitTextWithHashtags.
-function renderPostText(text, onHashtagClick) {
+// clickeables (utils.splitTextWithHashtags), y dentro de cada pieza de
+// texto normal, además detecta menciones @usuario clickeables
+// (Mentions.renderTextWithMentions).
+function renderPostText(text, users, onHashtagClick, onOpenProfile) {
   return splitTextWithHashtags(text).map((part, i) => {
     if (!part) return null;
     if (part.startsWith("#")) {
@@ -320,7 +340,9 @@ function renderPostText(text, onHashtagClick) {
         </span>
       );
     }
-    return <React.Fragment key={i}>{part}</React.Fragment>;
+    return (
+      <React.Fragment key={i}>{renderTextWithMentions(part, users, onOpenProfile)}</React.Fragment>
+    );
   });
 }
 
@@ -352,6 +374,10 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const [shareOpen, setShareOpen] = useState(false);
   const { open: pickerOpen, setOpen: setPickerOpen, containerRef: reactionRef, triggerProps: reactionTriggerProps, consumeLongPress } =
     useReactionPicker();
+  const allUsers = useAllUsers();
+  const myBlocked = myProfile?.blockedUsers || [];
+  const editMention = useMentionAutocomplete(allUsers, currentUid, myBlocked);
+  const commentMention = useMentionAutocomplete(allUsers, currentUid, myBlocked);
 
   const myReaction = (post.reactions || {})[currentUid] || null;
   const reactionSummary = getReactionSummary(post.reactions);
@@ -423,11 +449,14 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const handleComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
+    const trimmed = commentText.trim();
+    const mentionedUids = extractMentionedUids(trimmed, allUsers, currentUid);
     await addDoc(collection(db, "posts", post.id, "comments"), {
       authorId: currentUid,
       authorName: myProfile?.displayName || "Sin nombre",
       authorIdentity: myProfile?.identity || "",
-      text: commentText.trim(),
+      text: trimmed,
+      mentionedUids,
       createdAt: serverTimestamp(),
     });
     await notify(post.authorId, {
@@ -436,16 +465,45 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
       fromName: myProfile?.displayName || "Alguien",
       fromIdentity: myProfile?.identity || "",
     });
+    await Promise.all(
+      mentionedUids.map((uid) =>
+        notify(uid, {
+          type: "mention",
+          fromUid: currentUid,
+          fromName: myProfile?.displayName || "Alguien",
+          fromIdentity: myProfile?.identity || "",
+          postId: post.id,
+        })
+      )
+    );
     setCommentText("");
+    commentMention.closeMentions();
   };
 
   const handleSaveEdit = async () => {
     if (!editText.trim()) return;
+    const trimmed = editText.trim();
+    const mentionedUids = extractMentionedUids(trimmed, allUsers, currentUid);
+    const previouslyMentioned = post.mentionedUids || [];
+    const newlyMentioned = mentionedUids.filter((uid) => !previouslyMentioned.includes(uid));
     await updateDoc(doc(db, "posts", post.id), {
-      text: editText.trim(),
-      hashtags: extractHashtags(editText),
+      text: trimmed,
+      hashtags: extractHashtags(trimmed),
+      mentionedUids,
     });
+    await Promise.all(
+      newlyMentioned.map((uid) =>
+        notify(uid, {
+          type: "mention",
+          fromUid: currentUid,
+          fromName: myProfile?.displayName || "Alguien",
+          fromIdentity: myProfile?.identity || "",
+          postId: post.id,
+        })
+      )
+    );
     setEditing(false);
+    editMention.closeMentions();
   };
 
   const handleDelete = async () => {
@@ -488,11 +546,20 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
 
       {editing ? (
         <>
-          <textarea
-            style={styles.editTextarea}
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-          />
+          <div style={{ position: "relative" }}>
+            <textarea
+              ref={editMention.inputRef}
+              style={styles.editTextarea}
+              value={editText}
+              onChange={(e) => editMention.handleMentionChange(e, setEditText)}
+            />
+            {editMention.mentionOpen && (
+              <MentionSuggestions
+                suggestions={editMention.mentionSuggestions}
+                onSelect={(u) => editMention.selectMention(u, editText, setEditText)}
+              />
+            )}
+          </div>
           <div style={styles.editRow}>
             <button style={styles.smallBtn} onClick={handleSaveEdit}>
               {t("feed.save")}
@@ -502,6 +569,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
               onClick={() => {
                 setEditText(post.text);
                 setEditing(false);
+                editMention.closeMentions();
               }}
             >
               {t("feed.cancelEdit")}
@@ -509,7 +577,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           </div>
         </>
       ) : (
-        <p style={styles.postText}>{renderPostText(post.text, onHashtagClick)}</p>
+        <p style={styles.postText}>{renderPostText(post.text, allUsers, onHashtagClick, onOpenProfile)}</p>
       )}
 
       <div style={styles.actionsRow}>
@@ -586,19 +654,28 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
                 >
                   {c.authorName}
                 </span>
-                {c.text}
+                {renderTextWithMentions(c.text, allUsers, onOpenProfile)}
               </div>
             </div>
           ))}
 
           <form style={styles.commentForm} onSubmit={handleComment}>
-            <input
-              style={styles.commentInput}
-              type="text"
-              placeholder={t("feed.commentPlaceholder")}
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-            />
+            <div style={styles.commentInputWrapper}>
+              <input
+                ref={commentMention.inputRef}
+                style={styles.commentInput}
+                type="text"
+                placeholder={t("feed.commentPlaceholder")}
+                value={commentText}
+                onChange={(e) => commentMention.handleMentionChange(e, setCommentText)}
+              />
+              {commentMention.mentionOpen && (
+                <MentionSuggestions
+                  suggestions={commentMention.mentionSuggestions}
+                  onSelect={(u) => commentMention.selectMention(u, commentText, setCommentText)}
+                />
+              )}
+            </div>
             <button type="submit" style={styles.commentSendBtn}>
               {t("feed.send")}
             </button>
@@ -620,6 +697,8 @@ export default function Feed({ onOpenProfile }) {
   const [posting, setPosting] = useState(false);
   const [feedTab, setFeedTab] = useState("todos"); // "todos" | "siguiendo"
   const [activeHashtag, setActiveHashtag] = useState(null);
+  const allUsers = useAllUsers();
+  const postMention = useMentionAutocomplete(allUsers, currentUid, myProfile?.blockedUsers || []);
 
   // Detecta sesión activa y trae tu propio perfil (nombre/identidad para firmar tus posts)
   useEffect(() => {
@@ -665,16 +744,31 @@ export default function Feed({ onOpenProfile }) {
     if (!text.trim() || !currentUid || !myProfile) return;
     setPosting(true);
     try {
-      await addDoc(collection(db, "posts"), {
+      const trimmed = text.trim();
+      const mentionedUids = extractMentionedUids(trimmed, allUsers, currentUid);
+      const postRef = await addDoc(collection(db, "posts"), {
         authorId: currentUid,
         authorName: myProfile.displayName || "Sin nombre",
         authorIdentity: myProfile.identity || "",
-        text: text.trim(),
-        hashtags: extractHashtags(text),
+        text: trimmed,
+        hashtags: extractHashtags(trimmed),
+        mentionedUids,
         createdAt: serverTimestamp(),
         reactions: {},
       });
+      await Promise.all(
+        mentionedUids.map((uid) =>
+          notify(uid, {
+            type: "mention",
+            fromUid: currentUid,
+            fromName: myProfile.displayName || "Alguien",
+            fromIdentity: myProfile.identity || "",
+            postId: postRef.id,
+          })
+        )
+      );
       setText("");
+      postMention.closeMentions();
     } finally {
       setPosting(false);
     }
@@ -718,12 +812,21 @@ export default function Feed({ onOpenProfile }) {
     <div style={styles.wrapper}>
       <div style={styles.column}>
         <form style={styles.composer} onSubmit={handlePost}>
-          <textarea
-            style={styles.textarea}
-            placeholder={t("feed.composerPlaceholder")}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
+          <div style={{ position: "relative" }}>
+            <textarea
+              ref={postMention.inputRef}
+              style={styles.textarea}
+              placeholder={t("feed.composerPlaceholder")}
+              value={text}
+              onChange={(e) => postMention.handleMentionChange(e, setText)}
+            />
+            {postMention.mentionOpen && (
+              <MentionSuggestions
+                suggestions={postMention.mentionSuggestions}
+                onSelect={(u) => postMention.selectMention(u, text, setText)}
+              />
+            )}
+          </div>
           <button type="submit" style={styles.postBtn} disabled={posting}>
             {posting ? t("feed.posting") : t("feed.postButton")}
           </button>
