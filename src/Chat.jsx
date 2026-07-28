@@ -20,6 +20,7 @@ import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./
 import { isEffectivelyOnline, formatLastSeen } from "./presence";
 import { StickerImage, StickerPicker } from "./Stickers";
 import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { useAllUsers } from "./Mentions";
 
 /*
   Chat
@@ -785,7 +786,6 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
-  const [allUsers, setAllUsers] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -823,20 +823,14 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
     return unsub;
   }, [currentUid]);
 
-  // Lista de todos los usuarios registrados en tiempo real (se filtra abajo)
-  useEffect(() => {
-    if (!currentUid) return;
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      const list = [];
-      snap.forEach((d) => {
-        if (d.id !== currentUid) {
-          list.push({ uid: d.id, ...d.data() });
-        }
-      });
-      setAllUsers(list);
-    });
-    return unsub;
-  }, [currentUid]);
+  // Lista de todos los usuarios registrados en tiempo real (se filtra abajo),
+  // del listener único de AllUsersContext (ver Mentions.jsx/AllUsersContext.jsx)
+  // en vez de un onSnapshot propio sobre toda la colección "users".
+  const allUsersRaw = useAllUsers();
+  const allUsers = useMemo(
+    () => allUsersRaw.filter((u) => u.uid !== currentUid),
+    [allUsersRaw, currentUid]
+  );
 
   // Contactos visibles: sin perfiles privados, sin bloqueos en ninguna dirección
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);

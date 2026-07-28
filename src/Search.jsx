@@ -6,6 +6,7 @@ import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
 import { timeAgo } from "./utils";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { useAllUsers } from "./Mentions";
 
 /*
   Search
@@ -116,19 +117,12 @@ const styles = {
 
 export default function Search({ onOpenProfile }) {
   const [currentUid, setCurrentUid] = useState(null);
-  const [users, setUsers] = useState([]);
+  const users = useAllUsers();
   const [posts, setPosts] = useState([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
-    });
     return unsub;
   }, []);
 

@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "./firebase";
 import { normalizeIdentityText } from "./identityStyles";
 import { isBlockedEitherWay } from "./Blocks";
+import { useAllUsersContext } from "./AllUsersContext";
 import Avatar from "./Avatar";
 
 /*
@@ -16,8 +15,8 @@ import Avatar from "./Avatar";
   1. Mientras se escribe (useMentionAutocomplete), al detectar un "@"
      seguido de letras sin espacio hasta el cursor, se arma una lista de
      sugerencias (getMentionSuggestions) buscando en tiempo real contra
-     TODOS los usuarios (useAllUsers, mismo patrón de onSnapshot sobre la
-     colección completa ya usado en Feed.jsx/Search.jsx), filtrando por
+     TODOS los usuarios (useAllUsers, que lee del listener único de
+     AllUsersContext.jsx — ver ese archivo para por qué), filtrando por
      nombre o identidad — mismo criterio de "quién es visible" que ya usa
      Search.jsx (sin bloqueados en ninguna dirección, sin perfiles
      privados).
@@ -39,14 +38,7 @@ import Avatar from "./Avatar";
 */
 
 export function useAllUsers() {
-  const [users, setUsers] = useState([]);
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, []);
-  return users;
+  return useAllUsersContext();
 }
 
 // Candidatos que se OFRECEN en el menú de sugerencias: mismo criterio de

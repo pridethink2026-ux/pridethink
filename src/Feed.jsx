@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -748,7 +748,6 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
-  const [usersMap, setUsersMap] = useState({});
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [text, setText] = useState("");
@@ -756,6 +755,16 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const [feedTab, setFeedTab] = useState("todos"); // "todos" | "siguiendo"
   const [activeHashtag, setActiveHashtag] = useState(null);
   const allUsers = useAllUsers();
+  // Mismos datos de allUsers (AllUsersContext, ver Mentions.jsx), como mapa
+  // por uid para lookup O(1) por autor (antes era su propio onSnapshot
+  // sobre toda la colección "users" — ver auditoría de rendimiento más abajo).
+  const usersMap = useMemo(() => {
+    const map = {};
+    allUsers.forEach((u) => {
+      map[u.uid] = u;
+    });
+    return map;
+  }, [allUsers]);
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const postMention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
 
@@ -775,18 +784,6 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     });
     return unsub;
   }, [currentUid]);
-
-  // Escucha todos los perfiles (solo isPrivate/isWallPrivate) para filtrar el feed en vivo
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      const map = {};
-      snap.forEach((d) => {
-        map[d.id] = d.data();
-      });
-      setUsersMap(map);
-    });
-    return unsub;
-  }, []);
 
   // Escucha el feed completo en tiempo real, más reciente primero
   useEffect(() => {

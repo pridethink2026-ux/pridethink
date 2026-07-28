@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { db } from "./firebase";
-import { collection, doc, setDoc, addDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { collection, doc, setDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { notify } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import { getChatId } from "./Chat";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { useAllUsers } from "./Mentions";
 
 /*
   SharePostModal
@@ -119,20 +120,15 @@ const styles = {
 
 export default function SharePostModal({ post, currentUid, myProfile, onClose }) {
   const { t } = useLanguage();
-  const [allUsers, setAllUsers] = useState([]);
+  // Del listener único de AllUsersContext (ver Mentions.jsx/AllUsersContext.jsx)
+  // en vez de un onSnapshot propio sobre toda la colección "users".
+  const allUsersRaw = useAllUsers();
+  const allUsers = useMemo(
+    () => allUsersRaw.filter((u) => u.uid !== currentUid),
+    [allUsersRaw, currentUid]
+  );
   const [search, setSearch] = useState("");
   const [sentTo, setSentTo] = useState(null);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      const list = [];
-      snap.forEach((d) => {
-        if (d.id !== currentUid) list.push({ uid: d.id, ...d.data() });
-      });
-      setAllUsers(list);
-    });
-    return unsub;
-  }, [currentUid]);
 
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const visibleContacts = allUsers.filter((c) => {
