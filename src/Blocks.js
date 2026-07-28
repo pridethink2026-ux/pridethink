@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { deleteDoc, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
+import { useBlocksContext } from "./BlocksContext";
 
 /*
   Blocks.js
@@ -19,11 +19,16 @@ import { db } from "./firebase";
   (firestore.rules) solo dejan leer un bloqueo puntual a las DOS personas
   involucradas en ESE bloqueo — nadie más puede enumerar bloqueos ajenos.
 
-  useMyBlocks(currentUid) reemplaza a "myProfile.blockedUsers" (a quién
-  bloqueaste) Y a "otroUsuario.blockedUsers.includes(miUid)" (si esa
-  persona te bloqueó a vos) en TODOS los lugares de la app que filtraban
-  contenido por bloqueo — con dos consultas en vivo, acotadas a las
-  relaciones donde vos sos una de las dos partes.
+  useMyBlocks() reemplaza a "myProfile.blockedUsers" (a quién bloqueaste)
+  Y a "otroUsuario.blockedUsers.includes(miUid)" (si esa persona te
+  bloqueó a vos) en TODOS los lugares de la app que filtraban contenido
+  por bloqueo. Los dos listeners en vivo (a quién bloqueaste, quién te
+  bloqueó) ya NO se abren acá: viven una sola vez en BlocksContext.jsx
+  (montado en index.js) para no duplicarlos en cada componente que llama
+  a este hook — ver BlocksContext.jsx para el detalle. La firma se
+  mantiene igual (acepta e ignora un currentUid, por compatibilidad con
+  los ~9 call sites existentes) para no tener que tocar ningún otro
+  archivo.
 */
 
 export function getBlockId(blockerUid, blockedUid) {
@@ -42,36 +47,10 @@ export function unblockUser(blockerUid, blockedUid) {
   return deleteDoc(doc(db, "blocks", getBlockId(blockerUid, blockedUid)));
 }
 
-// { blockedByMe: [uid...], blockedMe: [uid...] } — ambas en tiempo real.
-export function useMyBlocks(currentUid) {
-  const [blockedByMe, setBlockedByMe] = useState([]);
-  const [blockedMe, setBlockedMe] = useState([]);
-
-  useEffect(() => {
-    if (!currentUid) {
-      setBlockedByMe([]);
-      return;
-    }
-    const q = query(collection(db, "blocks"), where("blockerUid", "==", currentUid));
-    const unsub = onSnapshot(q, (snap) => {
-      setBlockedByMe(snap.docs.map((d) => d.data().blockedUid));
-    });
-    return unsub;
-  }, [currentUid]);
-
-  useEffect(() => {
-    if (!currentUid) {
-      setBlockedMe([]);
-      return;
-    }
-    const q = query(collection(db, "blocks"), where("blockedUid", "==", currentUid));
-    const unsub = onSnapshot(q, (snap) => {
-      setBlockedMe(snap.docs.map((d) => d.data().blockerUid));
-    });
-    return unsub;
-  }, [currentUid]);
-
-  return { blockedByMe, blockedMe };
+// { blockedByMe: [uid...], blockedMe: [uid...] } — ambas en tiempo real,
+// leídas del listener único de BlocksContext (ver el comentario de arriba).
+export function useMyBlocks() {
+  return useBlocksContext();
 }
 
 // Bloqueo en CUALQUIER dirección entre vos y otroUid — mismo criterio que
