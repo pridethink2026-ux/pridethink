@@ -679,17 +679,28 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
   );
 }
 
-function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
+function IdentityForm({ onSubmit, loading, initialValues, isEdit, error }) {
   const { t } = useLanguage();
   const [displayName, setDisplayName] = useState(initialValues?.displayName || "");
   const [identity, setIdentity] = useState(initialValues?.identity || "");
   const [bio, setBio] = useState(initialValues?.bio || "");
   const [datingPreference, setDatingPreference] = useState(initialValues?.datingPreference || "");
+  const [validationError, setValidationError] = useState("");
   const suggestions = getIdentitySuggestions(t);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!identity.trim()) return;
+    // Antes este chequeo cortaba en silencio, sin ningún aviso: "identity"
+    // tiene el atributo HTML "required", pero eso solo exige que el campo
+    // no esté vacío, no que tenga contenido real — un valor de solo
+    // espacios pasa la validación nativa del navegador igual, y después
+    // .trim() lo trata como vacío acá. Ahora se avisa en vez de no hacer
+    // nada (bug reportado en producción, 2026-07-28).
+    if (!identity.trim()) {
+      setValidationError(t("identity.emptyIdentity"));
+      return;
+    }
+    setValidationError("");
     onSubmit({
       displayName: displayName.trim() || "Sin nombre",
       identity: identity.trim(),
@@ -707,6 +718,9 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit }) {
       <p style={styles.subtitle}>
         {isEdit ? t("identity.subtitleEdit") : t("identity.subtitleSignup")}
       </p>
+      {(validationError || error) && (
+        <div style={styles.error}>{validationError || error}</div>
+      )}
 
       <label style={styles.label} htmlFor="displayName">
         {t("identity.displayNameLabel")}
@@ -1238,6 +1252,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
             loading={loading}
             initialValues={user}
             isEdit={!!user}
+            error={error}
           />
         )}
         {step === "profile" && user && (
