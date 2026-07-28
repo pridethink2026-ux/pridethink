@@ -74,6 +74,26 @@ service cloud.firestore {
         && (request.time.toMillis() - nacimiento.toMillis()) >= 568036800000;
     }
 
+    // Auditoría de seguridad (2026-07-28, hallazgo H3): antes, cualquier
+    // autenticado podía crear una notificación en la bandeja de OTRA
+    // persona con un "type" inventado y un "fromName"/"fromIdentity"
+    // cualquiera — no necesariamente los suyos reales — permitiendo
+    // suplantar a otra persona en el texto que ve la víctima. Ahora se
+    // exige que el "type" sea uno de los 5 válidos (mismos que usa
+    // notify() en utils.js) y que fromName/fromIdentity coincidan con el
+    // perfil REAL de quien crea la notificación (get() sobre su propio
+    // documento, no confiable desde el cliente) — se acepta también el
+    // valor de reserva que ya manda notify() cuando myProfile todavía no
+    // cargó ("Alguien" / cadena vacía), para no romper ese caso legítimo.
+    function notificacionValida(datos) {
+      let miPerfil = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let miNombre = miPerfil.get('displayName', null);
+      let miIdentidad = miPerfil.get('identity', null);
+      return datos.type in ['like', 'comment', 'message', 'follow', 'mention']
+        && (datos.fromName == miNombre || datos.fromName == 'Alguien')
+        && (datos.fromIdentity == miIdentidad || datos.fromIdentity == '');
+    }
+
     // --------------------------------------------------------------------
     // users/{uid}
     // Perfil de cada persona: nombre, identidad, privacidad, a quién
@@ -225,8 +245,11 @@ service cloud.firestore {
       // OTRA persona (así funcionan los avisos de like/comentario/mensaje/
       // seguidor nuevo) siempre que la firme con su propio uid como
       // remitente (fromUid) — no puedes notificar en nombre de alguien más.
+      // Y (hallazgo H3) que el tipo y el nombre/identidad que se muestran
+      // sean reales, no inventados — ver notificacionValida() arriba.
       allow create: if estaAutenticado()
-        && request.resource.data.fromUid == request.auth.uid;
+        && request.resource.data.fromUid == request.auth.uid
+        && notificacionValida(request.resource.data);
     }
 
     // --------------------------------------------------------------------
