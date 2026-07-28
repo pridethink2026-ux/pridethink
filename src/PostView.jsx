@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, onSnapshot, updateDoc, arrayRemove } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { PostCard } from "./Feed";
 import { useLanguage } from "./LanguageContext";
+import { unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 
 /*
   PostView
@@ -75,7 +76,6 @@ export default function PostView({ postId, onBack, onOpenProfile }) {
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
   const [post, setPost] = useState(undefined); // undefined: cargando | null: no existe
-  const [authorProfile, setAuthorProfile] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
@@ -99,27 +99,12 @@ export default function PostView({ postId, onBack, onOpenProfile }) {
     return unsub;
   }, [postId]);
 
-  const authorId = post?.authorId || null;
-
-  useEffect(() => {
-    if (!authorId) {
-      setAuthorProfile(null);
-      return;
-    }
-    const unsub = onSnapshot(doc(db, "users", authorId), (snap) => {
-      setAuthorProfile(snap.exists() ? snap.data() : null);
-    });
-    return unsub;
-  }, [authorId]);
-
-  const myBlocked = myProfile?.blockedUsers || [];
-  const isBlocked =
-    !!post &&
-    (myBlocked.includes(post.authorId) || (authorProfile?.blockedUsers || []).includes(currentUid));
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
+  const isBlocked = !!post && isBlockedEitherWay(blockedByMe, blockedMe, post.authorId);
 
   const handleUnblock = async () => {
     if (!currentUid || !post) return;
-    await updateDoc(doc(db, "users", currentUid), { blockedUsers: arrayRemove(post.authorId) });
+    await unblockUser(currentUid, post.authorId);
   };
 
   if (post === undefined) {
@@ -149,7 +134,7 @@ export default function PostView({ postId, onBack, onOpenProfile }) {
   }
 
   if (isBlocked) {
-    const iBlockedThem = myBlocked.includes(post.authorId);
+    const iBlockedThem = blockedByMe.includes(post.authorId);
     return (
       <div style={styles.wrapper}>
         <div style={styles.column}>

@@ -5,6 +5,7 @@ import Avatar from "./Avatar";
 import { notify } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import { getChatId } from "./Chat";
+import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 
 /*
   SharePostModal
@@ -133,11 +134,10 @@ export default function SharePostModal({ post, currentUid, myProfile, onClose })
     return unsub;
   }, [currentUid]);
 
-  const myBlocked = myProfile?.blockedUsers || [];
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const visibleContacts = allUsers.filter((c) => {
     if (c.isPrivate) return false;
-    if (myBlocked.includes(c.uid)) return false;
-    if ((c.blockedUsers || []).includes(currentUid)) return false;
+    if (isBlockedEitherWay(blockedByMe, blockedMe, c.uid)) return false;
     return true;
   });
 

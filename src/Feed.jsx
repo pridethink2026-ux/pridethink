@@ -40,6 +40,7 @@ import Groups from "./Groups";
 import Events from "./Events";
 import VerifiedBadge from "./VerifiedBadge";
 import WeatherWidget from "./Weather";
+import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 
 /*
   Feed
@@ -424,9 +425,9 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const { open: pickerOpen, setOpen: setPickerOpen, containerRef: reactionRef, triggerProps: reactionTriggerProps, consumeLongPress } =
     useReactionPicker();
   const allUsers = useAllUsers();
-  const myBlocked = myProfile?.blockedUsers || [];
-  const editMention = useMentionAutocomplete(allUsers, currentUid, myBlocked);
-  const commentMention = useMentionAutocomplete(allUsers, currentUid, myBlocked);
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
+  const editMention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
+  const commentMention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
   // Badge de verificado: el post guarda authorName/authorIdentity como
   // copia del momento en que se publicó, pero isVerified se busca en vivo
   // en allUsers (ya cargado para las menciones) para reflejar el estado
@@ -755,7 +756,8 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const [feedTab, setFeedTab] = useState("todos"); // "todos" | "siguiendo"
   const [activeHashtag, setActiveHashtag] = useState(null);
   const allUsers = useAllUsers();
-  const postMention = useMentionAutocomplete(allUsers, currentUid, myProfile?.blockedUsers || []);
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
+  const postMention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
 
   // Detecta sesión activa y trae tu propio perfil (nombre/identidad para firmar tus posts)
   useEffect(() => {
@@ -774,7 +776,7 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     return unsub;
   }, [currentUid]);
 
-  // Escucha todos los perfiles (solo isPrivate/blockedUsers) para filtrar el feed en vivo
+  // Escucha todos los perfiles (solo isPrivate/isWallPrivate) para filtrar el feed en vivo
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "users"), (snap) => {
       const map = {};
@@ -831,15 +833,13 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     }
   };
 
-  const myBlocked = myProfile?.blockedUsers || [];
   const myFollowing = myProfile?.following || [];
   const visiblePosts = posts.filter((p) => {
     if (p.groupId) return false; // los posts de grupo solo se ven dentro del grupo
     if (p.authorId === currentUid) return true; // siempre ves tus propios posts
     const author = usersMap[p.authorId];
     if (author?.isPrivate) return false;
-    if (myBlocked.includes(p.authorId)) return false;
-    if ((author?.blockedUsers || []).includes(currentUid)) return false;
+    if (isBlockedEitherWay(blockedByMe, blockedMe, p.authorId)) return false;
     return true;
   });
 
@@ -862,8 +862,7 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
           if (p.authorId === currentUid) return false;
           const author = usersMap[p.authorId];
           if (author?.isPrivate || author?.isWallPrivate) return false;
-          if (myBlocked.includes(p.authorId)) return false;
-          if ((author?.blockedUsers || []).includes(currentUid)) return false;
+          if (isBlockedEitherWay(blockedByMe, blockedMe, p.authorId)) return false;
           if (myFollowing.includes(p.authorId)) return false;
           return true;
         })
@@ -898,7 +897,9 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     Object.entries(usersMap).map(([uid, data]) => ({ uid, ...data })),
     currentUid,
     myProfile,
-    authorHashtagMap
+    authorHashtagMap,
+    blockedByMe,
+    blockedMe
   );
 
   if (!currentUid) {

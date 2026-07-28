@@ -19,6 +19,7 @@ import ProfileAbout from "./ProfileAbout";
 import ReportButton from "./ReportButton";
 import VerifiedBadge from "./VerifiedBadge";
 import { isEffectivelyOnline, canSeeOnlineStatus } from "./presence";
+import { unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 
 /*
   UserProfile
@@ -38,9 +39,13 @@ import { isEffectivelyOnline, canSeeOnlineStatus } from "./presence";
     seguimiento MUTUO entre vos y esa persona (`canSeeOnlineStatus`) — a
     quien no te sigue y no seguís, no le mostrás si estás conectado o no.
 
-  "following" vive en users/{uid}.following: [uid...] (mismo patrón que
-  blockedUsers). Los seguidores de un usuario NO se guardan aparte: se
-  derivan en tiempo real con una consulta array-contains sobre following.
+  "following" vive en users/{uid}.following: [uid...]. Los seguidores de
+  un usuario NO se guardan aparte: se derivan en tiempo real con una
+  consulta array-contains sobre following. Los bloqueos, a diferencia de
+  following, viven en su propia colección "blocks/{blockerUid}_{blockedUid}"
+  (ver Blocks.js) — no en un arreglo dentro de users/{uid} — para que
+  nadie más que las dos personas involucradas pueda leer quién bloqueó a
+  quién (ver auditoría de seguridad, 2026-07-28).
 */
 
 const styles = {
@@ -190,9 +195,8 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   }, [uid]);
 
   const isMe = uid === currentUid;
-  const myBlocked = myProfile?.blockedUsers || [];
-  const isBlocked =
-    myBlocked.includes(uid) || (profileUser?.blockedUsers || []).includes(currentUid);
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
+  const isBlocked = isBlockedEitherWay(blockedByMe, blockedMe, uid);
   const isPrivateForMe = !!profileUser?.isPrivate && !isMe;
   // isWallPrivate es independiente de isPrivate: solo oculta la lista de
   // publicaciones (el resto del perfil sigue visible), mientras que
@@ -221,7 +225,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
 
   const handleUnblock = async () => {
     if (!currentUid) return;
-    await updateDoc(doc(db, "users", currentUid), { blockedUsers: arrayRemove(uid) });
+    await unblockUser(currentUid, uid);
   };
 
   const handleToggleFollow = async () => {
@@ -268,7 +272,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   if (isBlocked) {
     // Si el bloqueo lo hiciste tú, te dejamos desbloquear desde aquí mismo.
     // Si te bloquearon a ti, dejamos el mensaje genérico: no revelamos quién bloqueó a quién.
-    const iBlockedThem = myBlocked.includes(uid);
+    const iBlockedThem = blockedByMe.includes(uid);
     return (
       <div style={styles.wrapper}>
         <div style={styles.column}>

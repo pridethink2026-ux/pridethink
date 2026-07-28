@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { db } from "./firebase";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import Avatar from "./Avatar";
+import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 
 /*
   FollowListModal
@@ -93,7 +94,7 @@ const styles = {
   },
 };
 
-export default function FollowListModal({ mode, targetUid, currentUid, myProfile, onClose, onOpenProfile }) {
+export default function FollowListModal({ mode, targetUid, currentUid, onClose, onOpenProfile }) {
   const [rawUids, setRawUids] = useState([]);
   const [uidsReady, setUidsReady] = useState(false);
   const [profiles, setProfiles] = useState({});
@@ -137,7 +138,7 @@ export default function FollowListModal({ mode, targetUid, currentUid, myProfile
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawUids.join(",")]);
 
-  const myBlocked = myProfile?.blockedUsers || [];
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const stillResolving = !uidsReady || rawUids.some((id) => !(id in profiles));
 
   const visible = rawUids
@@ -145,8 +146,7 @@ export default function FollowListModal({ mode, targetUid, currentUid, myProfile
     .filter((p) => {
       if (!p) return false;
       if (p.isPrivate) return false;
-      if (myBlocked.includes(p.uid)) return false;
-      if ((p.blockedUsers || []).includes(currentUid)) return false;
+      if (isBlockedEitherWay(blockedByMe, blockedMe, p.uid)) return false;
       return true;
     });
 

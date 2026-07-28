@@ -12,8 +12,6 @@ import {
   setDoc,
   getDoc,
   onSnapshot,
-  updateDoc,
-  arrayRemove,
   collection,
   query,
   where,
@@ -26,6 +24,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import { useLanguage } from "./LanguageContext";
 import { MIN_SIGNUP_AGE, getCountryOptions, LANGUAGE_OPTIONS, getGenderOptions, calculateAge } from "./profileFields";
 import { markOffline } from "./presence";
+import { unblockUser, useMyBlocks } from "./Blocks";
 
 /*
   AuthProfile
@@ -825,7 +824,7 @@ function ProfileView({
   onOpenSaved,
 }) {
   const { language, setLanguage, t } = useLanguage();
-  const blockedUsers = user.blockedUsers || [];
+  const { blockedByMe: blockedUsers } = useMyBlocks(uid);
   const [followersCount, setFollowersCount] = useState(0);
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
   const followingCount = (user.following || []).length;
@@ -882,7 +881,7 @@ function ProfileView({
       <div style={{ marginBottom: "24px" }}>
         <div style={styles.fieldRow}>
           <span style={styles.fieldLabel}>{t("profile.emailField")}</span>
-          <span style={styles.fieldValue}>{user.email}</span>
+          <span style={styles.fieldValue}>{auth.currentUser?.email}</span>
         </div>
         <div style={styles.fieldRow}>
           <span style={styles.fieldLabel}>{t("profile.identityField")}</span>
@@ -1093,7 +1092,6 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     // están guardados en Firestore (país, fecha de nacimiento, etc.).
     const personalFields = isNewSignup
       ? {
-          email: auth.currentUser?.email || signupDraft.email || "",
           fullName: signupDraft.fullName || "",
           birthDate: signupDraft.birthDate
             ? Timestamp.fromDate(new Date(signupDraft.birthDate))
@@ -1104,7 +1102,6 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
           genderOther: signupDraft.gender === "otro" ? signupDraft.genderOther || "" : "",
           isPrivate: false,
           isWallPrivate: false,
-          blockedUsers: [],
           following: [],
           joinedAt: new Date().toLocaleDateString("es-ES", {
             year: "numeric",
@@ -1168,17 +1165,10 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   const handleUnblock = async (targetUid) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const updated = {
-      ...user,
-      blockedUsers: (user?.blockedUsers || []).filter((u) => u !== targetUid),
-    };
-    setUser(updated);
-    try {
-      // FIREBASE: firestore write (real) - quita al usuario de blockedUsers
-      await updateDoc(doc(db, "users", uid), { blockedUsers: arrayRemove(targetUid) });
-    } catch (err) {
-      setUser(user); // revierte si falla
-    }
+    // FIREBASE: firestore write (real) - borra el documento en blocks/
+    // (ver Blocks.js). La lista de "Usuarios bloqueados" se actualiza sola
+    // vía useMyBlocks (onSnapshot en vivo), no hace falta estado optimista.
+    await unblockUser(uid, targetUid);
   };
 
   const handleLogout = async () => {

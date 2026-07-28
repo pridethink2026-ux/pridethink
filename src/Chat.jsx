@@ -12,8 +12,6 @@ import {
   setDoc,
   updateDoc,
   deleteField,
-  arrayUnion,
-  arrayRemove,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { notify, useIsMobile } from "./utils";
@@ -21,6 +19,7 @@ import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
 import { isEffectivelyOnline, formatLastSeen } from "./presence";
 import { StickerImage, StickerPicker } from "./Stickers";
+import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 
 /*
   Chat
@@ -840,11 +839,10 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
   }, [currentUid]);
 
   // Contactos visibles: sin perfiles privados, sin bloqueos en ninguna dirección
-  const myBlocked = myProfile?.blockedUsers || [];
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const visibleContacts = allUsers.filter((c) => {
     if (c.isPrivate) return false;
-    if (myBlocked.includes(c.uid)) return false;
-    if ((c.blockedUsers || []).includes(currentUid)) return false;
+    if (isBlockedEitherWay(blockedByMe, blockedMe, c.uid)) return false;
     return true;
   });
 
@@ -857,7 +855,7 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
       )
     : visibleContacts;
 
-  const isBlocked = activeContact ? myBlocked.includes(activeContact.uid) : false;
+  const isBlocked = activeContact ? blockedByMe.includes(activeContact.uid) : false;
 
   // Versión más reciente del contacto activo (allUsers se actualiza en
   // vivo) — activeContact es solo una copia tomada al momento del clic,
@@ -868,12 +866,11 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
 
   const handleToggleBlock = async () => {
     if (!activeContact || !currentUid) return;
-    await updateDoc(doc(db, "users", currentUid), {
-      blockedUsers: isBlocked
-        ? arrayRemove(activeContact.uid)
-        : arrayUnion(activeContact.uid),
-    });
-    if (!isBlocked) setActiveContact(null); // al bloquear, sale de la conversación
+    if (isBlocked) {
+      await unblockUser(currentUid, activeContact.uid);
+    } else {
+      await blockUser(currentUid, activeContact.uid);
+    }
   };
 
   // Mensajes en tiempo real de la conversación activa

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
 import { timeAgo } from "./utils";
+import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 
 /*
   Search
@@ -115,7 +116,6 @@ const styles = {
 
 export default function Search({ onOpenProfile }) {
   const [currentUid, setCurrentUid] = useState(null);
-  const [myProfile, setMyProfile] = useState(null);
   const [users, setUsers] = useState([]);
   const [posts, setPosts] = useState([]);
   const [search, setSearch] = useState("");
@@ -124,14 +124,6 @@ export default function Search({ onOpenProfile }) {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
     return unsub;
   }, []);
-
-  useEffect(() => {
-    if (!currentUid) return;
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      if (snap.exists()) setMyProfile(snap.data());
-    });
-    return unsub;
-  }, [currentUid]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "users"), (snap) => {
@@ -148,6 +140,8 @@ export default function Search({ onOpenProfile }) {
     return unsub;
   }, []);
 
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
+
   if (!currentUid) {
     return (
       <div style={styles.wrapper}>
@@ -158,12 +152,10 @@ export default function Search({ onOpenProfile }) {
     );
   }
 
-  const myBlocked = myProfile?.blockedUsers || [];
   const isVisibleAuthor = (authorId, author) => {
     if (authorId === currentUid) return true;
     if (author?.isPrivate) return false;
-    if (myBlocked.includes(authorId)) return false;
-    if ((author?.blockedUsers || []).includes(currentUid)) return false;
+    if (isBlockedEitherWay(blockedByMe, blockedMe, authorId)) return false;
     return true;
   };
 
@@ -179,8 +171,7 @@ export default function Search({ onOpenProfile }) {
     ? users.filter((u) => {
         if (u.uid === currentUid) return false;
         if (u.isPrivate) return false;
-        if (myBlocked.includes(u.uid)) return false;
-        if ((u.blockedUsers || []).includes(currentUid)) return false;
+        if (isBlockedEitherWay(blockedByMe, blockedMe, u.uid)) return false;
         return (u.displayName || "").toLowerCase().includes(q);
       })
     : [];

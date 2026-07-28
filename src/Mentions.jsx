@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import { normalizeIdentityText } from "./identityStyles";
+import { isBlockedEitherWay } from "./Blocks";
 import Avatar from "./Avatar";
 
 /*
@@ -51,19 +52,18 @@ export function useAllUsers() {
 // Candidatos que se OFRECEN en el menú de sugerencias: mismo criterio de
 // visibilidad que Search.jsx (sin ti mismo, sin bloqueados en ninguna
 // dirección, sin perfiles privados).
-function isSuggestable(user, currentUid, myBlocked) {
+function isSuggestable(user, currentUid, blockedByMe, blockedMe) {
   if (!user || user.uid === currentUid) return false;
   if (!(user.displayName || "").trim()) return false;
   if (user.isPrivate) return false;
-  if (myBlocked.includes(user.uid)) return false;
-  if ((user.blockedUsers || []).includes(currentUid)) return false;
+  if (isBlockedEitherWay(blockedByMe, blockedMe, user.uid)) return false;
   return true;
 }
 
-export function getMentionSuggestions(users, currentUid, myBlocked, query) {
+export function getMentionSuggestions(users, currentUid, blockedByMe, blockedMe, query) {
   const q = normalizeIdentityText(query || "");
   return (users || [])
-    .filter((u) => isSuggestable(u, currentUid, myBlocked || []))
+    .filter((u) => isSuggestable(u, currentUid, blockedByMe || [], blockedMe || []))
     .filter((u) => {
       if (!q) return true;
       return (
@@ -195,7 +195,7 @@ export function renderTextWithMentions(text, users, onOpenProfile) {
 // autocompletado de menciones: detecta el "@palabra" en curso (desde el
 // último "@" antes del cursor hasta el cursor, sin espacios de por medio),
 // arma sugerencias, e inserta "@NombreCompleto " al elegir una.
-export function useMentionAutocomplete(users, currentUid, myBlocked) {
+export function useMentionAutocomplete(users, currentUid, blockedByMe, blockedMe) {
   const [state, setState] = useState({ query: null, start: -1 });
   const inputRef = useRef(null);
   const pendingCaret = useRef(null);
@@ -238,7 +238,7 @@ export function useMentionAutocomplete(users, currentUid, myBlocked) {
 
   const mentionOpen = state.query !== null;
   const mentionSuggestions = mentionOpen
-    ? getMentionSuggestions(users, currentUid, myBlocked, state.query)
+    ? getMentionSuggestions(users, currentUid, blockedByMe, blockedMe, state.query)
     : [];
 
   return { inputRef, mentionOpen, mentionSuggestions, handleMentionChange, selectMention, closeMentions };

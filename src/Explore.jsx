@@ -3,6 +3,7 @@ import { collection, doc, updateDoc, arrayUnion, getCountFromServer } from "fire
 import { db } from "./firebase";
 import { notify } from "./utils";
 import { normalizeIdentityText } from "./identityStyles";
+import { isBlockedEitherWay } from "./Blocks";
 import { useLanguage } from "./LanguageContext";
 import Avatar from "./Avatar";
 
@@ -77,8 +78,15 @@ function wordsOf(text) {
     .filter((w) => w.length > 2);
 }
 
-export function getPeopleSuggestions(users, currentUid, myProfile, authorHashtagMap, limitCount = SUGGESTIONS_LIMIT) {
-  const myBlocked = myProfile?.blockedUsers || [];
+export function getPeopleSuggestions(
+  users,
+  currentUid,
+  myProfile,
+  authorHashtagMap,
+  blockedByMe,
+  blockedMe,
+  limitCount = SUGGESTIONS_LIMIT
+) {
   const myFollowing = myProfile?.following || [];
   const myWords = new Set(wordsOf(myProfile?.identity || ""));
   const myHashtags = authorHashtagMap[currentUid] || new Set();
@@ -87,8 +95,7 @@ export function getPeopleSuggestions(users, currentUid, myProfile, authorHashtag
     if (!u || u.uid === currentUid) return false;
     if (u.isPrivate) return false;
     if (myFollowing.includes(u.uid)) return false;
-    if (myBlocked.includes(u.uid)) return false;
-    if ((u.blockedUsers || []).includes(currentUid)) return false;
+    if (isBlockedEitherWay(blockedByMe || [], blockedMe || [], u.uid)) return false;
     return true;
   });
 

@@ -54,6 +54,26 @@ service cloud.firestore {
       return estaAutenticado() && (request.auth.uid in chatId.split('_'));
     }
 
+    // Respaldo del lado del servidor a la verificación de mayoría de edad
+    // que ya hace el cliente (AuthProfile.jsx, calculateAge()). Sin esto,
+    // alguien podía saltarse el paso 2 del registro llamando directamente
+    // al SDK de Firebase desde la consola del navegador (la apiKey es
+    // pública por diseño, no es un secreto) y crear una cuenta sin pasar
+    // por el chequeo de edad del cliente. Compara el "birthDate" que llega
+    // en el documento nuevo contra la hora del servidor (request.time,
+    // no la del reloj del cliente, así que no se puede falsear). Usa un
+    // año promedio de 365.25 días (cuenta años bisiestos) para el cálculo
+    // en milisegundos — puede estar desviado como máximo ~1 día respecto
+    // al cálculo exacto por calendario que hace el cliente, que sigue
+    // siendo el chequeo preciso para la experiencia de usuario; este es
+    // solo un piso de seguridad contra un bypass del cliente.
+    function esMayorDeEdad() {
+      let nacimiento = request.resource.data.get('birthDate', null);
+      return nacimiento != null
+        && nacimiento is timestamp
+        && (request.time.toMillis() - nacimiento.toMillis()) >= 568036800000;
+    }
+
     // --------------------------------------------------------------------
     // users/{uid}
     // Perfil de cada persona: nombre, identidad, privacidad, a quién
@@ -80,7 +100,9 @@ service cloud.firestore {
       // de verdad y no solo "la interfaz no ofrece un botón para esto" —
       // la consola usa el SDK de administrador, que no pasa por estas
       // reglas, así que sigue pudiendo activarlo/desactivarlo sin problema.
-      allow create: if esDueno(uid) && !('isVerified' in request.resource.data);
+      allow create: if esDueno(uid)
+        && !('isVerified' in request.resource.data)
+        && esMayorDeEdad();
       allow update: if esDueno(uid)
         && request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false);
 
@@ -296,6 +318,54 @@ service cloud.firestore {
 
         allow update: if false;
       }
+    }
+
+    // --------------------------------------------------------------------
+    // blocks/{blockerUid}_{blockedUid}
+    // Reemplaza al viejo users/{uid}.blockedUsers (auditoría de seguridad,
+    // 2026-07-28): ese campo vivía dentro de un documento legible por
+    // CUALQUIER autenticado, así que cualquiera podía leer a quién
+    // bloqueaste con un getDoc directo — contradecía el diseño de "no
+    // revelar quién bloqueó a quién" (ver CONTEXTO.md, punto 22). Acá cada
+    // bloqueo es su propio documento, con el mismo patrón de id compuesto
+    // que ya usa chats/{chatId} (dos uids separados por "_", ninguno de
+    // los cuales puede contener "_"), y solo las dos personas involucradas
+    // en ESE bloqueo puntual pueden leerlo — un tercero no puede enumerar
+    // ni consultar bloqueos ajenos.
+    // --------------------------------------------------------------------
+    match /blocks/{blockId} {
+      // Tanto quien bloqueó como quien fue bloqueado pueden leer (o listar
+      // vía consulta con where) el documento — así cada quien puede
+      // chequear "¿yo bloqueé a X?" (mi lista) o "¿X me bloqueó?" (consulta
+      // por blockedUid == mi uid) sin exponer relaciones de terceros.
+      //
+      // Ojo: esta condición tiene que estar en términos de resource.data,
+      // no de blockId (el id del documento). useMyBlocks (Blocks.js) hace
+      // dos QUERIES con where("blockerUid"/"blockedUid", "==", miUid) — y
+      // Firestore valida una query contra la regla ANTES de ejecutarla,
+      // sin mirar los documentos reales. Si la regla depende de blockId
+      // (un valor que la query no filtra), Firestore no puede probar que
+      // el resultado siempre cumple la regla, y rechaza la consulta
+      // ENTERA con permission-denied — aunque cada documento individual sí
+      // la cumpliría. Comparando contra resource.data, en cambio, coincide
+      // exactamente con el where(...) de la query y sí es demostrable.
+      allow read: if estaAutenticado()
+        && (resource.data.blockerUid == request.auth.uid || resource.data.blockedUid == request.auth.uid);
+
+      // Solo podés crear un bloqueo donde VOS seas el bloqueador, y el id
+      // del documento tiene que coincidir exactamente con "miUid_suUid"
+      // (mismo principio que esParticipanteDelChat: el id ES la fuente de
+      // verdad de quién es cada parte).
+      allow create: if estaAutenticado()
+        && request.resource.data.blockerUid == request.auth.uid
+        && blockId == request.resource.data.blockerUid + '_' + request.resource.data.blockedUid;
+
+      // Solo quien bloqueó puede deshacerlo (desbloquear) — la persona
+      // bloqueada no puede borrar el registro de que la bloquearon.
+      allow delete: if estaAutenticado() && request.auth.uid == blockId.split('_')[0];
+
+      // Un bloqueo no se edita, se crea o se borra.
+      allow update: if false;
     }
 
     // --------------------------------------------------------------------

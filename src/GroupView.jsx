@@ -20,6 +20,7 @@ import { PostCard } from "./Feed";
 import { notify, extractHashtags } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import { useAllUsers, useMentionAutocomplete, MentionSuggestions, extractMentionedUids } from "./Mentions";
+import { useMyBlocks } from "./Blocks";
 
 /*
   GroupView
@@ -200,7 +201,8 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const allUsers = useAllUsers();
-  const mention = useMentionAutocomplete(allUsers, currentUid, myProfile?.blockedUsers || []);
+  const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
+  const mention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
