@@ -39,6 +39,7 @@ import {
 import Groups from "./Groups";
 import Events from "./Events";
 import VerifiedBadge from "./VerifiedBadge";
+import WeatherWidget from "./Weather";
 
 /*
   Feed
@@ -138,6 +139,11 @@ const styles = {
   column: {
     width: "100%",
     maxWidth: "560px",
+  },
+  weatherRow: {
+    display: "flex",
+    justifyContent: "flex-end",
+    marginBottom: "12px",
   },
   composer: {
     background: "var(--surface)",
@@ -917,6 +923,10 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.column}>
+        <div style={styles.weatherRow}>
+          <WeatherWidget />
+        </div>
+
         {feedTab !== "explorar" && !isSpecialTab && (
           <form style={styles.composer} onSubmit={handlePost}>
             <div style={{ position: "relative" }}>
