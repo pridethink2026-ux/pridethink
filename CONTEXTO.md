@@ -288,6 +288,25 @@ categorías fijas. Prototipo funcional en fase de prueba con un socio.
 ## Seguridad de Firestore
 
 - El archivo `firestore.rules` (raíz del proyecto) contiene las reglas de seguridad que reemplazan el modo de prueba. **Hay que pegarlas manualmente en Firebase console** (Firestore Database → Reglas → pegar todo el archivo → Publicar); esto no se sube solo con `git push`, es un paso aparte en la consola de Firebase.
+- **Validación de tipo y tamaño en campos de texto (auditoría de seguridad, 2026-07-28, hallazgo M1)**: hasta acá, la ÚNICA validación de tipo en todo el archivo era la fecha de nacimiento (`esMayorDeEdad()`) — ningún campo de texto exigía ser `string` ni tenía límite de tamaño. Consecuencias reales que motivaron el fix: (a) si `displayName` se escribía como número o array (saltándose el formulario, ej. llamando al SDK directo desde la consola del navegador), código como `(c.displayName || "").toLowerCase()` en `Chat.jsx`/`Search.jsx`/`SharePostModal.jsx` revienta con `TypeError` — y como la app no tiene ningún Error Boundary, es pantalla blanca completa para CUALQUIERA que cargue ese perfil (no un error aislado de quien lo escribió mal); (b) nada impedía escribir un `audioData` gigante (cerca del límite de 1MB por documento) en un mensaje de chat, repetidamente. `textoValido(valor, maxLen)` es el chequeo genérico (`valor is string && valor.size() <= maxLen`) que se reutiliza en cada colección de abajo. Límites elegidos (con margen sobre lo que la interfaz ya permite hoy, donde existe un límite del lado del cliente):
+  | Campo | Colección | Límite | Por qué |
+  |---|---|---|---|
+  | `displayName` | `users/{uid}` | 50 | sin límite en el formulario hoy |
+  | `identity` | `users/{uid}` | 100 | frase libre corta |
+  | `bio` | `users/{uid}` | 200 | la interfaz ya limita a 150 (`maxLength` del `<textarea>`), esto da margen |
+  | `datingPreference` | `users/{uid}` | 150 | frase libre corta, mismo criterio que `identity` |
+  | `text` (post) | `posts/{postId}` | 5000 | contenido largo permitido, pero acotado |
+  | `text` (comentario) | `posts/{postId}/comments` | 2000 | más corto que un post |
+  | `text` (mensaje) | `chats/.../messages` | 2000 | mismo criterio que comentarios |
+  | `audioData` (nota de voz) | `chats/.../messages` | 500 000 (~500KB) | ver cálculo abajo |
+  | `name` (grupo) | `groups/{groupId}` | 60 | nombre corto |
+  | `description` (grupo) | `groups/{groupId}` | 500 | descripción libre |
+  | `title` (evento) | `events/{eventId}` | 60 | nombre corto |
+  | `description` (evento) | `events/{eventId}` | 1000 | descripción libre |
+
+  **Cálculo del límite de `audioData`** (el más sensible, para no rechazar notas de voz legítimas): `audioBitsPerSecond: 32000` (32kbps, exacto en `Chat.jsx`) × `MAX_RECORD_SECONDS = 60` = 240 000 bytes de audio real; codificado en base64 (×4/3 aprox.) ≈ 320 000 caracteres como peor caso legítimo. El límite de 500 000 da ~56% de margen sobre eso (cubre variación del encoder, el segundo extra que puede pasar entre que se cumple el límite de 60s y el `MediaRecorder` efectivamente para, y el prefijo del data URL), y sigue muy por debajo del límite de 1MB por documento de Firestore.
+
+  **Compatibilidad hacia atrás, a propósito**: el límite de `text` en `posts/{postId}` solo se exige en el camino de `allow update` donde EDITA el autor — nunca en el camino de reacciones (que ya está acotado a tocar solo el campo `reactions`), así que reaccionar a un post viejo (de antes de este límite, con texto potencialmente más largo) nunca se rompe por un campo que nadie está tocando. Los campos opcionales (`bio`, `datingPreference`, `text`/`audioData` en mensajes que pueden ser de sticker o post compartido) se validan solo SI ESTÁN PRESENTES en la escritura, nunca se exigen obligatorios donde no lo eran. `groups`/`events` no tienen `allow update` para estos campos (no se pueden editar hoy), así que no hay riesgo de romper nada existente ahí.
 - Principio general: nada es público, todo requiere sesión iniciada. Cada colección se limita a lo mínimo que la app necesita:
   - `users/{uid}`: cualquier autenticado lee cualquier perfil (lo necesitan el chat, el muro, los perfiles públicos y la búsqueda); solo el dueño crea/edita el suyo; nadie borra.
     - **Excepción, punto 40**: dentro de "el dueño edita el suyo", `isVerified` queda afuera a propósito. `allow create` exige que el documento nuevo NO incluya ese campo (`!('isVerified' in request.resource.data)`), y `allow update` exige que su valor no cambie entre el documento de antes y el de después (`request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false)`, mismo patrón que ya usaba `posts/{postId}` para que nadie pueda cambiar quién es el autor al editar). Ni creando la cuenta ni editando el perfil hay forma de que el propio usuario ponga o saque su verificación — solo se puede desde la consola de Firebase (SDK de administrador, no pasa por estas reglas).

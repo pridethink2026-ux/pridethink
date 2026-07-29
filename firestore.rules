@@ -74,6 +74,37 @@ service cloud.firestore {
         && (request.time.toMillis() - nacimiento.toMillis()) >= 568036800000;
     }
 
+    // Auditoría de seguridad (2026-07-28, hallazgo M1): antes, la ÚNICA
+    // validación de tipo en todo este archivo era la fecha de nacimiento
+    // de arriba — ningún campo de texto exigía ser string ni tenía límite
+    // de tamaño. Consecuencias reales: (a) si "displayName" se escribía
+    // como número o array (saltándose el formulario), código como
+    // `(c.displayName || "").toLowerCase()` en Chat.jsx/Search.jsx/etc.
+    // revienta con TypeError — y como no hay Error Boundary en la app, es
+    // pantalla blanca completa para todo el que cargue ese perfil, no un
+    // error aislado; (b) nada impedía escribir un "audioData" gigante
+    // (cerca del límite de 1MB por documento) en un mensaje de chat,
+    // repetidamente. textoValido() es el chequeo genérico que se reusa en
+    // cada colección de abajo, con un límite distinto según el campo (ver
+    // CONTEXTO.md para la tabla completa y de dónde sale cada número).
+    function textoValido(valor, maxLen) {
+      return valor is string && valor.size() <= maxLen;
+    }
+
+    // Campos de texto de users/{uid} (hallazgo M1) — "si está presente"
+    // en vez de obligatorio, porque la app actualiza subconjuntos
+    // distintos de campos con merge:true (por ejemplo, togglear "perfil
+    // privado" solo toca isPrivate, sin reenviar displayName/identity).
+    // Límites: displayName 50, identity 100 (frase libre corta), bio 200
+    // (la interfaz ya limita a 150 con maxLength, esto da margen),
+    // datingPreference 150 (frase libre corta, mismo criterio que identity).
+    function camposDePerfilValidos(datos) {
+      return (!('displayName' in datos) || textoValido(datos.displayName, 50))
+        && (!('identity' in datos) || textoValido(datos.identity, 100))
+        && (!('bio' in datos) || textoValido(datos.bio, 200))
+        && (!('datingPreference' in datos) || textoValido(datos.datingPreference, 150));
+    }
+
     // Auditoría de seguridad (2026-07-28, hallazgo H3): antes, cualquier
     // autenticado podía crear una notificación en la bandeja de OTRA
     // persona con un "type" inventado y un "fromName"/"fromIdentity"
@@ -122,9 +153,11 @@ service cloud.firestore {
       // reglas, así que sigue pudiendo activarlo/desactivarlo sin problema.
       allow create: if esDueno(uid)
         && !('isVerified' in request.resource.data)
-        && esMayorDeEdad();
+        && esMayorDeEdad()
+        && camposDePerfilValidos(request.resource.data);
       allow update: if esDueno(uid)
-        && request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false);
+        && request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false)
+        && camposDePerfilValidos(request.resource.data);
 
       // Nadie borra perfiles desde la app.
       allow delete: if false;
@@ -142,6 +175,7 @@ service cloud.firestore {
       // solo si sos miembro de ese grupo (Groups.jsx/GroupView.jsx).
       allow create: if estaAutenticado()
         && request.resource.data.authorId == request.auth.uid
+        && textoValido(request.resource.data.text, 5000)
         && (
           !('groupId' in request.resource.data)
           || request.resource.data.groupId == null
@@ -159,10 +193,15 @@ service cloud.firestore {
         && (
           // 1) El autor puede editar cualquier campo suyo (texto, hashtags),
           //    pero no puede mover el post a otro grupo ni sacarlo del suyo
-          //    editándolo después de creado ("groupId" queda fijo).
+          //    editándolo después de creado ("groupId" queda fijo). El
+          //    límite de tamaño de "text" (hallazgo M1) SOLO se exige acá,
+          //    nunca en el camino de reacciones de abajo — así reaccionar a
+          //    un post viejo (de antes de este límite) nunca se rompe por
+          //    un texto que ya tenía, sin que nadie lo esté tocando.
           (
             resource.data.authorId == request.auth.uid
             && request.resource.data.get('groupId', null) == resource.data.get('groupId', null)
+            && textoValido(request.resource.data.text, 5000)
           )
           ||
           // 2) Cualquier OTRA persona autenticada puede reaccionar: solo se
@@ -183,7 +222,8 @@ service cloud.firestore {
 
         // Solo puedes crear un comentario firmado con tu propio uid.
         allow create: if estaAutenticado()
-          && request.resource.data.authorId == request.auth.uid;
+          && request.resource.data.authorId == request.auth.uid
+          && textoValido(request.resource.data.text, 2000);
 
         // Solo el autor del comentario puede borrarlo.
         allow delete: if estaAutenticado()
@@ -210,8 +250,18 @@ service cloud.firestore {
         // Solo puedes enviar un mensaje si eres participante del chat Y
         // el mensaje queda firmado con tu propio uid como remitente (no
         // puedes mandar un mensaje haciéndote pasar por la otra persona).
+        // "text" (mensaje de texto) y "audioData" (nota de voz) se validan
+        // solo SI ESTÁN presentes (hallazgo M1) — un mensaje de sticker o
+        // de post compartido no trae ninguno de los dos. El límite de
+        // audioData (500 000 caracteres ≈ 500KB) tiene margen de sobra
+        // sobre el peor caso real: 32kbps × 60s de grabación ≈ 240KB de
+        // audio, que en base64 pesa ≈ 320KB (ver CONTEXTO.md para el
+        // cálculo completo) — sigue muy por debajo del límite de 1MB por
+        // documento de Firestore.
         allow create: if esParticipanteDelChat(chatId)
-          && request.resource.data.senderId == request.auth.uid;
+          && request.resource.data.senderId == request.auth.uid
+          && (!('text' in request.resource.data) || textoValido(request.resource.data.text, 2000))
+          && (!('audioData' in request.resource.data) || textoValido(request.resource.data.audioData, 500000));
 
         // No se puede editar el contenido de un mensaje ya enviado (texto,
         // audio, remitente), pero cualquiera de los dos participantes
@@ -279,8 +329,11 @@ service cloud.firestore {
 
       // Cualquier autenticado puede crear un grupo, firmado como su propio
       // creador (Groups.jsx también lo suma como primer miembro aparte).
+      // Límites de tamaño (hallazgo M1): name 60, description 500.
       allow create: if estaAutenticado()
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && textoValido(request.resource.data.name, 60)
+        && textoValido(request.resource.data.description, 500);
 
       // Todavía no hay forma de editar nombre/descripción una vez creado.
       allow update: if false;
@@ -321,9 +374,11 @@ service cloud.firestore {
       allow read: if estaAutenticado();
 
       // Cualquier autenticado puede crear un evento, firmado como su propio
-      // creador.
+      // creador. Límites de tamaño (hallazgo M1): title 60, description 1000.
       allow create: if estaAutenticado()
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && textoValido(request.resource.data.title, 60)
+        && textoValido(request.resource.data.description, 1000);
 
       // Todavía no hay forma de editar ni borrar un evento una vez creado.
       allow update, delete: if false;
