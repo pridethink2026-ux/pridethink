@@ -23,6 +23,7 @@ import {
   saveThemePreference,
   initTheme,
 } from "./themes";
+import { playThemeSound } from "./themeSounds";
 
 /*
   App
@@ -173,6 +174,7 @@ const themeStyles = {
     cursor: "pointer",
     marginBottom: "2px",
   }),
+  animatedIcon: { display: "inline-block" },
 };
 
 const bannerStyles = {
@@ -316,6 +318,21 @@ const SPLASH_DOTS = [
 ];
 const SPLASH_DURATION_MS = 450;
 
+// Clase de animación en reposo por cada ícono de tema dentro del menú
+// (mientras el menú está abierto, no requiere hover) — ver los
+// @keyframes correspondientes en index.css. Todas son MUY sutiles y en
+// loop, usando filter/transform (no "color": los emojis a color ignoran
+// esa propiedad, mismo aprendizaje que el fix del ícono de guardar en
+// Feed.jsx). El brillo de Noche/Atardecer usa un color fijo propio de
+// CADA tema (no el tema activo) — representan una opción concreta del
+// menú, no el estado actual, misma excepción que PaintDropIcon.
+const THEME_ICON_ANIM_CLASS = {
+  noche: "pt-theme-icon-noche",
+  arcoiris: "pt-theme-icon-arcoiris",
+  oceano: "pt-theme-icon-oceano",
+  atardecer: "pt-theme-icon-atardecer",
+};
+
 function ThemeMenu() {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -341,6 +358,10 @@ function ThemeMenu() {
     setSelected(key);
     saveThemePreference(key);
     applyTheme(key);
+    // Suena UNA sola vez al confirmar (nunca en hover ni en loop) — si key
+    // es ROTATIVO_KEY, playThemeSound reconoce el tick neutro por su
+    // propia clave ("rotativo"), sin importar qué tema resuelva ese día.
+    playThemeSound(key);
     setOpen(false);
   };
 
@@ -381,7 +402,9 @@ function ThemeMenu() {
               style={themeStyles.option(selected === key)}
               onClick={() => handleSelect(key)}
             >
-              <span>{theme.emoji}</span>
+              <span className={THEME_ICON_ANIM_CLASS[key]} style={themeStyles.animatedIcon}>
+                {theme.emoji}
+              </span>
               <span>{theme.label}</span>
             </div>
           ))}
@@ -389,7 +412,10 @@ function ThemeMenu() {
             style={themeStyles.option(selected === ROTATIVO_KEY)}
             onClick={() => handleSelect(ROTATIVO_KEY)}
           >
-            🔄 {t("nav.themeRotating")}
+            <span className="pt-theme-icon-rotativo" style={themeStyles.animatedIcon}>
+              🔄
+            </span>{" "}
+            {t("nav.themeRotating")}
           </div>
         </div>
       )}

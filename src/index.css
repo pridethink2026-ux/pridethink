@@ -96,6 +96,89 @@ code {
   }
 }
 
+/* Transición global de tema (crossfade): applyTheme() (themes.js) solo
+   pisa las variables CSS en :root — el fundido en sí lo hace el navegador
+   solo, con una propiedad transicionable (background-color, color, etc.)
+   que recalcula su valor computado al cambiar la variable que usa. */
+*,
+*::before,
+*::after {
+  transition: background-color 0.35s ease, color 0.35s ease,
+    border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+/* Animaciones en reposo de los íconos del selector de temas (menú
+   desplegable de App.js, ThemeMenu) — sutiles, en loop, mientras el menú
+   está abierto. Usan filter/transform, nunca "color" (un emoji a color
+   ignora esa propiedad). */
+.pt-theme-icon-noche {
+  animation: pt-theme-glow-noche 2.8s ease-in-out infinite;
+}
+
+@keyframes pt-theme-glow-noche {
+  0%, 100% {
+    filter: drop-shadow(0 0 1px rgba(155, 107, 255, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(155, 107, 255, 0.9));
+  }
+}
+
+.pt-theme-icon-arcoiris {
+  animation: pt-theme-hue-arcoiris 4s linear infinite;
+}
+
+@keyframes pt-theme-hue-arcoiris {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+.pt-theme-icon-oceano {
+  animation: pt-theme-wave-oceano 2.4s ease-in-out infinite;
+}
+
+@keyframes pt-theme-wave-oceano {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-2px);
+  }
+  75% {
+    transform: translateY(2px);
+  }
+}
+
+.pt-theme-icon-atardecer {
+  animation: pt-theme-glow-atardecer 3s ease-in-out infinite;
+}
+
+@keyframes pt-theme-glow-atardecer {
+  0%, 100% {
+    filter: drop-shadow(0 0 1px rgba(255, 151, 66, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(255, 151, 66, 0.85));
+  }
+}
+
+.pt-theme-icon-rotativo {
+  animation: pt-theme-spin-rotativo 6s linear infinite;
+}
+
+@keyframes pt-theme-spin-rotativo {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .pt-paint-splash-dot {
   position: absolute;
   top: 50%;
