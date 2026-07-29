@@ -342,6 +342,18 @@ export const translations = {
     "report.error": "No se pudo enviar el reporte. Intenta de nuevo.",
     "report.close": "Cerrar",
     "report.cancel": "Cancelar",
+
+    // Clima (Weather.jsx) - precisar ubicación con OpenStreetMap
+    "weather.preciseLocationLink": "Precisar mi ubicación",
+    "weather.consentTitle": "Precisar tu ubicación",
+    "weather.consentBody1":
+      "Para mostrar el nombre exacto de tu ciudad, vamos a enviar tus coordenadas GPS exactas a OpenStreetMap, un servicio externo a Pridethink.",
+    "weather.consentBody2":
+      "Pridethink no guarda ni comparte tu ubicación con nadie: sigue siendo visible solo para vos.",
+    "weather.consentBody3": "Podés seguir usando la app normalmente sin activar esto.",
+    "weather.consentAccept": "Sí, precisar mi ubicación",
+    "weather.consentAccepting": "Buscando...",
+    "weather.consentCancel": "Cancelar",
   },
   en: {
     // Generic, used across more than one screen
@@ -650,6 +662,18 @@ export const translations = {
     "report.error": "Couldn't send the report. Try again.",
     "report.close": "Close",
     "report.cancel": "Cancel",
+
+    // Weather (Weather.jsx) - refine location with OpenStreetMap
+    "weather.preciseLocationLink": "Refine my location",
+    "weather.consentTitle": "Refine your location",
+    "weather.consentBody1":
+      "To show your exact city name, we'll send your precise GPS coordinates to OpenStreetMap, a service external to Pridethink.",
+    "weather.consentBody2":
+      "Pridethink doesn't store or share your location with anyone: it stays visible only to you.",
+    "weather.consentBody3": "You can keep using the app normally without turning this on.",
+    "weather.consentAccept": "Yes, refine my location",
+    "weather.consentAccepting": "Looking up...",
+    "weather.consentCancel": "Cancel",
   },
 };
 

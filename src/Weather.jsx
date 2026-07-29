@@ -25,18 +25,23 @@ import { useLanguage } from "./LanguageContext";
   --text-muted, --accent) — nada hardcodeado, para que combine con
   cualquiera de los 4 temas o el modo Rotativo.
 
-  Sin nombre de ciudad "real" (geocodificación inversa): Open-Meteo NO
-  ofrece esa API en su plan gratuito (se verificó contra su documentación
-  antes de escribir esto: el único endpoint de Geocoding es una búsqueda
-  por NOMBRE, `/v1/search`, no hay `/v1/reverse`). En vez de sumar un
-  proveedor externo nuevo que reciba las coordenadas exactas del usuario
-  (más superficie de privacidad para resolver, a propósito, sin decidirlo
-  a solas), el nombre que se muestra se deriva del campo "timezone" (zona
+  Ciudad aproximada por defecto, precisa solo con consentimiento
+  explícito: Open-Meteo NO ofrece geocodificación inversa en su plan
+  gratuito (se verificó contra su documentación: el único endpoint de
+  Geocoding es una búsqueda por NOMBRE, `/v1/search`, no hay `/v1/reverse`).
+  Por defecto el nombre que se muestra se deriva del campo "timezone" (zona
   horaria IANA, ej. "America/Argentina/Buenos_Aires") que YA devuelve la
   misma llamada al clima — cityNameFromTimezone() se queda con el último
-  segmento y cambia "_" por espacios. Es aproximado (una zona horaria
-  puede cubrir más de una ciudad, ej. "America/New_York"), pero no agrega
-  ninguna llamada ni ningún tercero nuevo.
+  segmento y cambia "_" por espacios. Es aproximado y en la práctica puede
+  ser bastante impreciso (una zona horaria cubre un área enorme: alguien en
+  Ohio ve "New York" porque comparte "America/New_York"). Quien quiera el
+  nombre real puede tocar "Precisar mi ubicación" — recién AHÍ, y con un
+  aviso explícito que hay que aceptar, se manda la coordenada exacta a
+  OpenStreetMap Nominatim (https://nominatim.openstreetmap.org, gratuito,
+  sin API key, mantenido por la comunidad — por eso solo se llama bajo
+  consentimiento y una sola vez por sesión/ubicación, nunca automático,
+  para no abusar de un servicio comunitario). Ver `handleConfirmPrecise`
+  y el docstring de `fetchPreciseCity` más abajo para el detalle completo.
 */
 
 // 20 minutos: adentro del rango de 15-30 pedido, para no golpear la API
@@ -72,6 +77,56 @@ function cityNameFromTimezone(timezone) {
   return lastSegment.replace(/_/g, " ");
 }
 
+// Ciudad PRECISA, solo bajo consentimiento explícito del usuario (ver
+// handleConfirmPrecise en WeatherWidget) — nunca se llama sola. Guardada
+// en sessionStorage (no localStorage): "recordar durante la sesión", no
+// para siempre, y se pierde sola al cerrar la pestaña — mismo criterio
+// de "no guardar de más" que ya sigue el resto del dato de ubicación
+// (nunca Firestore, ver docstring de arriba).
+const PRECISE_LOCATION_CACHE_KEY = "pridethink-precise-location";
+
+function readPreciseLocationCache() {
+  try {
+    const raw = sessionStorage.getItem(PRECISE_LOCATION_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePreciseLocationCache(entry) {
+  try {
+    sessionStorage.setItem(PRECISE_LOCATION_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // sessionStorage puede fallar (modo privado, cuota llena) — no es
+    // crítico, simplemente se pierde el caché y listo.
+  }
+}
+
+// Nominatim (OpenStreetMap) devuelve un objeto "address" cuya forma
+// cambia según el tipo de lugar (ciudad, pueblo, municipio rural...) — se
+// prueba en orden de más a menos específico, y si no hay ninguno, se cae
+// al nombre genérico del lugar ("name") antes de rendirse.
+function extractCityFromNominatim(json) {
+  const addr = json?.address || {};
+  return addr.city || addr.town || addr.village || addr.municipality || addr.county || json?.name || null;
+}
+
+// Solo se llama después de que el usuario acepta explícitamente el aviso
+// de privacidad (ver ConsentModal). zoom=10 le pide a Nominatim nivel de
+// detalle "ciudad" (ni un país entero ni una calle puntual). No se puede
+// mandar un User-Agent personalizado desde fetch() del navegador (los
+// navegadores lo bloquean por seguridad) — Nominatim acepta igual
+// identificar la app por el header "Referer", que el navegador ya manda
+// solo con la URL de la página.
+async function fetchPreciseCity(lat, lon) {
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10&addressdetails=1`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("nominatim request failed");
+  const json = await res.json();
+  return extractCityFromNominatim(json);
+}
+
 async function fetchWeather(lat, lon) {
   const now = Date.now();
   if (
@@ -90,6 +145,8 @@ async function fetchWeather(lat, lon) {
   if (!res.ok) throw new Error("weather request failed");
   const json = await res.json();
   const data = {
+    lat,
+    lon,
     temp: Math.round(json.current_weather.temperature),
     code: json.current_weather.weathercode,
     tMin: Math.round(json.daily.temperature_2m_min[0]),
@@ -299,6 +356,20 @@ const styles = {
     fontWeight: 700,
     color: "var(--text)",
     margin: 0,
+    display: "flex",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    gap: "6px",
+  },
+  preciseLink: {
+    background: "none",
+    border: "none",
+    padding: 0,
+    color: "var(--accent)",
+    fontSize: "11px",
+    fontWeight: 600,
+    textDecoration: "underline",
+    cursor: "pointer",
   },
   dateTime: {
     fontSize: "12px",
@@ -333,6 +404,64 @@ const styles = {
   },
   forecastMax: { color: "var(--text)" },
   forecastMin: { color: "var(--text-muted)" },
+  consentOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "20px",
+    zIndex: 60,
+    boxSizing: "border-box",
+  },
+  consentPanel: {
+    width: "100%",
+    maxWidth: "380px",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: "22px",
+    boxShadow: "0 20px 50px rgba(0,0,0,0.45)",
+    padding: "22px 20px",
+    boxSizing: "border-box",
+  },
+  consentTitle: {
+    fontFamily: "var(--font-display)",
+    fontSize: "16px",
+    fontWeight: 700,
+    color: "var(--text)",
+    margin: "0 0 12px",
+  },
+  consentBody: {
+    fontSize: "13px",
+    lineHeight: 1.5,
+    color: "var(--text)",
+    margin: "0 0 10px",
+  },
+  consentAccept: {
+    width: "100%",
+    padding: "12px",
+    borderRadius: "12px",
+    border: "none",
+    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    color: "var(--bg)",
+    fontSize: "14px",
+    fontWeight: 600,
+    cursor: "pointer",
+    marginTop: "8px",
+  },
+  consentCancel: {
+    width: "100%",
+    padding: "11px",
+    borderRadius: "12px",
+    border: "1px solid var(--border)",
+    background: "transparent",
+    color: "var(--text)",
+    fontSize: "14px",
+    fontWeight: 500,
+    cursor: "pointer",
+    marginTop: "10px",
+  },
 };
 
 function formatDateTime(date, timezone, locale) {
@@ -350,11 +479,37 @@ function formatDateTime(date, timezone, locale) {
   return `${dateText} · ${timeText}`;
 }
 
+// Aviso de privacidad antes de precisar la ubicación (hallazgo del
+// pedido: tiene que ser un modal claro, no un texto chico que se pueda
+// pasar por alto). Mismo patrón visual que ya usa ReportButton.jsx
+// (overlay + panel centrado).
+function ConsentModal({ onAccept, onCancel, loading, t }) {
+  return (
+    <div style={styles.consentOverlay} onClick={onCancel}>
+      <div style={styles.consentPanel} onClick={(e) => e.stopPropagation()}>
+        <h2 style={styles.consentTitle}>{t("weather.consentTitle")}</h2>
+        <p style={styles.consentBody}>{t("weather.consentBody1")}</p>
+        <p style={styles.consentBody}>{t("weather.consentBody2")}</p>
+        <p style={styles.consentBody}>{t("weather.consentBody3")}</p>
+        <button type="button" style={styles.consentAccept} onClick={onAccept} disabled={loading}>
+          {loading ? t("weather.consentAccepting") : t("weather.consentAccept")}
+        </button>
+        <button type="button" style={styles.consentCancel} onClick={onCancel} disabled={loading}>
+          {t("weather.consentCancel")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function WeatherWidget() {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const locale = language === "en" ? "en-US" : "es-ES";
   const weather = useWeather();
   const [expanded, setExpanded] = useState(false);
+  const [preciseCityName, setPreciseCityName] = useState(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [preciseLoading, setPreciseLoading] = useState(false);
   const now = useLocalClock(weather?.timezone, expanded);
   const panelRef = useRef(null);
 
@@ -368,8 +523,41 @@ export default function WeatherWidget() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [expanded]);
 
+  // Si ya se precisó la ubicación antes en esta misma sesión (y sigue
+  // siendo la misma zona, ~5km de tolerancia), usa ese resultado en vez
+  // de volver a preguntar o volver a llamar a Nominatim.
+  useEffect(() => {
+    if (!weather) return;
+    const cached = readPreciseLocationCache();
+    if (
+      cached &&
+      Math.abs(cached.lat - weather.lat) < 0.05 &&
+      Math.abs(cached.lon - weather.lon) < 0.05
+    ) {
+      setPreciseCityName(cached.cityName);
+    }
+  }, [weather]);
+
+  const handleConfirmPrecise = async () => {
+    setPreciseLoading(true);
+    try {
+      const cityName = await fetchPreciseCity(weather.lat, weather.lon);
+      if (cityName) {
+        setPreciseCityName(cityName);
+        writePreciseLocationCache({ lat: weather.lat, lon: weather.lon, cityName });
+      }
+    } catch {
+      // Nominatim falló: se sigue mostrando el nombre aproximado, sin
+      // ningún error visible (mismo criterio que el resto del widget).
+    } finally {
+      setPreciseLoading(false);
+      setConsentOpen(false);
+    }
+  };
+
   if (!weather) return null;
   const Icon = ICONS_BY_GROUP[getWeatherIconGroup(weather.code)];
+  const displayCityName = preciseCityName || weather.cityName;
 
   return (
     <div style={styles.wrapper} ref={panelRef}>
@@ -385,7 +573,20 @@ export default function WeatherWidget() {
 
       {expanded && (
         <div style={styles.panel}>
-          {weather.cityName && <p style={styles.place}>{weather.cityName}</p>}
+          {displayCityName && (
+            <p style={styles.place}>
+              {displayCityName}
+              {!preciseCityName && (
+                <button
+                  type="button"
+                  style={styles.preciseLink}
+                  onClick={() => setConsentOpen(true)}
+                >
+                  {t("weather.preciseLocationLink")}
+                </button>
+              )}
+            </p>
+          )}
           {weather.timezone && (
             <p style={styles.dateTime}>{formatDateTime(now, weather.timezone, locale)}</p>
           )}
@@ -409,6 +610,15 @@ export default function WeatherWidget() {
             })}
           </div>
         </div>
+      )}
+
+      {consentOpen && (
+        <ConsentModal
+          onAccept={handleConfirmPrecise}
+          onCancel={() => setConsentOpen(false)}
+          loading={preciseLoading}
+          t={t}
+        />
       )}
     </div>
   );
