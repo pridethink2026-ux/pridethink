@@ -20,6 +20,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
+import { PostCard } from "./Feed";
 import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import VerifiedBadge from "./VerifiedBadge";
@@ -288,6 +289,22 @@ const styles = {
     gap: "14px",
     marginBottom: "18px",
   },
+  tabsRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    marginBottom: "18px",
+  },
+  tabBtn: (active) => ({
+    padding: "7px 16px",
+    borderRadius: "999px",
+    border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
+    background: active ? "var(--accent2-soft)" : "transparent",
+    color: active ? "var(--accent2)" : "var(--text-muted)",
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
+  }),
   bioText: {
     fontSize: "13px",
     color: "var(--text)",
@@ -863,6 +880,8 @@ function ProfileView({
   const { blockedByMe: blockedUsers } = useMyBlocks(uid);
   const [followersCount, setFollowersCount] = useState(0);
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
+  const [profileTab, setProfileTab] = useState("info"); // "info" | "posts"
+  const [myPosts, setMyPosts] = useState([]);
   const followingCount = (user.following || []).length;
 
   // Seguidores = usuarios cuyo campo "following" contiene tu uid (en tiempo real)
@@ -873,139 +892,186 @@ function ProfileView({
     return unsub;
   }, [uid]);
 
+  // Pestaña "Posts": TODOS tus propios posts, sin filtrar por
+  // authorIsPrivate/authorIsWallPrivate (sos el dueño, siempre te ves a vos
+  // mismo — mismo criterio que usa la regla de posts/{postId} en
+  // firestore.rules y que UserProfile.jsx usa cuando isMe). Sin orderBy()
+  // en la consulta a propósito (evita un índice compuesto); se ordena acá.
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(collection(db, "posts"), where("authorId", "==", uid));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setMyPosts(list);
+    });
+    return unsub;
+  }, [uid]);
+
   return (
     <div>
-      <div style={styles.profileHeader}>
-        <Avatar
-          uid={uid}
-          name={user.displayName || user.identity}
-          identity={user.identity}
-          size="lg"
-        />
-        <div>
-          <h1 style={{ ...styles.title, fontSize: "20px", margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
-            {user.displayName}
-            {user.isVerified && <VerifiedBadge size="md" />}
-          </h1>
-          <p style={{ ...styles.subtitle, margin: 0 }}>{user.identity}</p>
-          {user.bio && <p style={styles.bioText}>{user.bio}</p>}
-        </div>
+      <div style={styles.tabsRow}>
+        <button style={styles.tabBtn(profileTab === "info")} onClick={() => setProfileTab("info")}>
+          {t("profile.tabInfo")}
+        </button>
+        <button style={styles.tabBtn(profileTab === "posts")} onClick={() => setProfileTab("posts")}>
+          {t("profile.tabPosts")}
+        </button>
       </div>
 
-      <div style={styles.countsRow}>
-        <div style={styles.countItem} onClick={() => setFollowModal("followers")}>
-          <p style={styles.countNumber}>{followersCount}</p>
-          <p style={styles.countLabel}>{t("profile.followers")}</p>
-        </div>
-        <div style={styles.countItem} onClick={() => setFollowModal("following")}>
-          <p style={styles.countNumber}>{followingCount}</p>
-          <p style={styles.countLabel}>{t("profile.following")}</p>
-        </div>
-      </div>
+      {profileTab === "info" && (
+        <>
+          <div style={styles.profileHeader}>
+            <Avatar
+              uid={uid}
+              name={user.displayName || user.identity}
+              identity={user.identity}
+              size="lg"
+            />
+            <div>
+              <h1 style={{ ...styles.title, fontSize: "20px", margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                {user.displayName}
+                {user.isVerified && <VerifiedBadge size="md" />}
+              </h1>
+              <p style={{ ...styles.subtitle, margin: 0 }}>{user.identity}</p>
+              {user.bio && <p style={styles.bioText}>{user.bio}</p>}
+            </div>
+          </div>
 
-      {followModal && (
-        <FollowListModal
-          mode={followModal}
-          targetUid={uid}
-          currentUid={uid}
-          myProfile={user}
-          onClose={() => setFollowModal(null)}
-          onOpenProfile={onOpenProfile}
-        />
+          <div style={styles.countsRow}>
+            <div style={styles.countItem} onClick={() => setFollowModal("followers")}>
+              <p style={styles.countNumber}>{followersCount}</p>
+              <p style={styles.countLabel}>{t("profile.followers")}</p>
+            </div>
+            <div style={styles.countItem} onClick={() => setFollowModal("following")}>
+              <p style={styles.countNumber}>{followingCount}</p>
+              <p style={styles.countLabel}>{t("profile.following")}</p>
+            </div>
+          </div>
+
+          {followModal && (
+            <FollowListModal
+              mode={followModal}
+              targetUid={uid}
+              currentUid={uid}
+              myProfile={user}
+              onClose={() => setFollowModal(null)}
+              onOpenProfile={onOpenProfile}
+            />
+          )}
+
+          <div style={{ marginBottom: "24px" }}>
+            <div style={styles.fieldRow}>
+              <span style={styles.fieldLabel}>{t("profile.emailField")}</span>
+              <span style={styles.fieldValue}>{auth.currentUser?.email}</span>
+            </div>
+            <div style={styles.fieldRow}>
+              <span style={styles.fieldLabel}>{t("profile.identityField")}</span>
+              <span style={styles.fieldValue}>{user.identity}</span>
+            </div>
+            {user.identityUpdatedAt && (
+              <div style={styles.fieldRow}>
+                <span style={styles.fieldLabel}>{t("profile.lastUpdated")}</span>
+                <span style={styles.fieldValue}>{user.identityUpdatedAt}</span>
+              </div>
+            )}
+            {user.joinedAt && (
+              <div style={styles.fieldRow}>
+                <span style={styles.fieldLabel}>{t("profile.memberSince")}</span>
+                <span style={styles.fieldValue}>{user.joinedAt}</span>
+              </div>
+            )}
+
+            <div style={styles.privacyRow}>
+              <div>
+                <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
+                  {t("profile.privateProfile")}
+                </p>
+                <p style={styles.privacyHint}>
+                  {user.isPrivate ? t("profile.privateOn") : t("profile.privateOff")}
+                </p>
+              </div>
+              <div
+                style={styles.toggle(!!user.isPrivate)}
+                onClick={() => onTogglePrivacy(!user.isPrivate)}
+              >
+                <div style={styles.toggleDot(!!user.isPrivate)} />
+              </div>
+            </div>
+
+            <div style={styles.privacyRow}>
+              <div>
+                <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
+                  {t("profile.privateWall")}
+                </p>
+                <p style={styles.privacyHint}>{t("profile.privateWallHint")}</p>
+              </div>
+              <div
+                style={styles.toggle(!!user.isWallPrivate)}
+                onClick={() => onToggleWallPrivacy(!user.isWallPrivate)}
+              >
+                <div style={styles.toggleDot(!!user.isWallPrivate)} />
+              </div>
+            </div>
+
+            <div style={styles.privacyRow}>
+              <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
+                {t("profile.language")}
+              </p>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <span style={styles.chip(language === "es")} onClick={() => setLanguage("es")}>
+                  ES
+                </span>
+                <span style={styles.chip(language === "en")} onClick={() => setLanguage("en")}>
+                  EN
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <ProfileAbout profileUser={user} />
+
+          <p style={styles.sectionTitle}>{t("profile.blockedUsers")}</p>
+          {blockedUsers.length === 0 ? (
+            <p style={styles.blockedEmpty}>{t("profile.blockedEmpty")}</p>
+          ) : (
+            blockedUsers.map((buid) => (
+              <BlockedUserRow key={buid} uid={buid} onUnblock={onUnblock} />
+            ))
+          )}
+
+          <button style={{ ...styles.buttonGhost, marginTop: "20px" }} onClick={onOpenSaved}>
+            {t("saved.openButton")}
+          </button>
+          <button style={{ ...styles.buttonGhost, marginTop: "10px" }} onClick={onEdit}>
+            {t("profile.changeIdentity")}
+          </button>
+          <button
+            style={{ ...styles.buttonGhost, marginTop: "10px" }}
+            onClick={onLogout}
+          >
+            {t("profile.logout")}
+          </button>
+        </>
       )}
 
-      <div style={{ marginBottom: "24px" }}>
-        <div style={styles.fieldRow}>
-          <span style={styles.fieldLabel}>{t("profile.emailField")}</span>
-          <span style={styles.fieldValue}>{auth.currentUser?.email}</span>
-        </div>
-        <div style={styles.fieldRow}>
-          <span style={styles.fieldLabel}>{t("profile.identityField")}</span>
-          <span style={styles.fieldValue}>{user.identity}</span>
-        </div>
-        {user.identityUpdatedAt && (
-          <div style={styles.fieldRow}>
-            <span style={styles.fieldLabel}>{t("profile.lastUpdated")}</span>
-            <span style={styles.fieldValue}>{user.identityUpdatedAt}</span>
-          </div>
-        )}
-        {user.joinedAt && (
-          <div style={styles.fieldRow}>
-            <span style={styles.fieldLabel}>{t("profile.memberSince")}</span>
-            <span style={styles.fieldValue}>{user.joinedAt}</span>
-          </div>
-        )}
-
-        <div style={styles.privacyRow}>
-          <div>
-            <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
-              {t("profile.privateProfile")}
-            </p>
-            <p style={styles.privacyHint}>
-              {user.isPrivate ? t("profile.privateOn") : t("profile.privateOff")}
-            </p>
-          </div>
-          <div
-            style={styles.toggle(!!user.isPrivate)}
-            onClick={() => onTogglePrivacy(!user.isPrivate)}
-          >
-            <div style={styles.toggleDot(!!user.isPrivate)} />
-          </div>
-        </div>
-
-        <div style={styles.privacyRow}>
-          <div>
-            <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
-              {t("profile.privateWall")}
-            </p>
-            <p style={styles.privacyHint}>{t("profile.privateWallHint")}</p>
-          </div>
-          <div
-            style={styles.toggle(!!user.isWallPrivate)}
-            onClick={() => onToggleWallPrivacy(!user.isWallPrivate)}
-          >
-            <div style={styles.toggleDot(!!user.isWallPrivate)} />
-          </div>
-        </div>
-
-        <div style={styles.privacyRow}>
-          <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
-            {t("profile.language")}
-          </p>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <span style={styles.chip(language === "es")} onClick={() => setLanguage("es")}>
-              ES
-            </span>
-            <span style={styles.chip(language === "en")} onClick={() => setLanguage("en")}>
-              EN
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <ProfileAbout profileUser={user} />
-
-      <p style={styles.sectionTitle}>{t("profile.blockedUsers")}</p>
-      {blockedUsers.length === 0 ? (
-        <p style={styles.blockedEmpty}>{t("profile.blockedEmpty")}</p>
-      ) : (
-        blockedUsers.map((buid) => (
-          <BlockedUserRow key={buid} uid={buid} onUnblock={onUnblock} />
-        ))
+      {profileTab === "posts" && (
+        <>
+          {myPosts.length === 0 ? (
+            <p style={styles.blockedEmpty}>{t("profile.noPostsYet")}</p>
+          ) : (
+            myPosts.map((p) => (
+              <PostCard
+                key={p.id}
+                post={p}
+                currentUid={uid}
+                myProfile={user}
+                onOpenProfile={onOpenProfile}
+              />
+            ))
+          )}
+        </>
       )}
-
-      <button style={{ ...styles.buttonGhost, marginTop: "20px" }} onClick={onOpenSaved}>
-        {t("saved.openButton")}
-      </button>
-      <button style={{ ...styles.buttonGhost, marginTop: "10px" }} onClick={onEdit}>
-        {t("profile.changeIdentity")}
-      </button>
-      <button
-        style={{ ...styles.buttonGhost, marginTop: "10px" }}
-        onClick={onLogout}
-      >
-        {t("profile.logout")}
-      </button>
     </div>
   );
 }

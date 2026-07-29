@@ -135,6 +135,9 @@ export const translations = {
     "identity.suggestion.phoenix": "Fenix",
 
     // Perfil (ProfileView / BlockedUserRow, dentro de AuthProfile.jsx)
+    "profile.tabInfo": "Info",
+    "profile.tabPosts": "Posts",
+    "profile.noPostsYet": "No has publicado nada todavía.",
     "profile.followers": "Seguidores",
     "profile.following": "Siguiendo",
     "profile.emailField": "Correo",
@@ -462,6 +465,9 @@ export const translations = {
     "identity.suggestion.phoenix": "Phoenix",
 
     // Profile (ProfileView / BlockedUserRow, inside AuthProfile.jsx)
+    "profile.tabInfo": "Info",
+    "profile.tabPosts": "Posts",
+    "profile.noPostsYet": "You haven't posted anything yet.",
     "profile.followers": "Followers",
     "profile.following": "Following",
     "profile.emailField": "Email",
