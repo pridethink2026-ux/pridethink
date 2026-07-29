@@ -340,6 +340,25 @@ const styles = {
     lineHeight: 1.4,
   },
   commentAuthor: { fontWeight: 600, marginRight: "6px", cursor: "pointer" },
+  commentBody: { flex: 1, minWidth: 0 },
+  commentReactionRow: {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    marginTop: "4px",
+  },
+  commentReactionBtn: (active) => ({
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontWeight: 600,
+    color: active ? "var(--accent2)" : "var(--text-muted)",
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: 0,
+  }),
   commentForm: {
     display: "flex",
     gap: "8px",
@@ -423,6 +442,82 @@ function PostSkeleton() {
       </div>
       <div className="pt-skeleton" style={styles.skeletonLine("100%", "12px")} />
       <div className="pt-skeleton" style={styles.skeletonLine("70%", "12px")} />
+    </div>
+  );
+}
+
+// Cada comentario es su propio componente (no un simple .map() inline)
+// por la misma razón exacta por la que Chat.jsx extrae MessageBubble:
+// useReactionPicker() es un hook y cada comentario necesita su propia
+// instancia de estado (si abrís el selector de uno no debe abrirse el de
+// todos). Mismo sistema de 5 emojis que posts/mensajes (Reactions.jsx):
+// reacciones guardadas como reactions:{[uid]:tipo} directo en el propio
+// documento del comentario (posts/{postId}/comments/{commentId}), nunca un
+// contador aparte — el resumen por emoji se deriva en vivo con
+// getReactionSummary, igual que en PostCard.
+function CommentRow({ comment, postId, currentUid, myProfile, allUsers, onOpenProfile }) {
+  const { open: pickerOpen, setOpen: setPickerOpen, containerRef: reactionRef, triggerProps: reactionTriggerProps, consumeLongPress } =
+    useReactionPicker();
+  const myReaction = (comment.reactions || {})[currentUid] || null;
+  const reactionSummary = getReactionSummary(comment.reactions);
+
+  const setMyReaction = async (type) => {
+    const commentRef = doc(db, "posts", postId, "comments", comment.id);
+    const hadReaction = !!myReaction;
+    if (type) {
+      await updateDoc(commentRef, { [`reactions.${currentUid}`]: type });
+      if (!hadReaction) {
+        await notify(comment.authorId, {
+          type: "like",
+          fromUid: currentUid,
+          fromName: myProfile?.displayName || "Alguien",
+          fromIdentity: myProfile?.identity || "",
+        });
+      }
+    } else {
+      await updateDoc(commentRef, { [`reactions.${currentUid}`]: deleteField() });
+    }
+  };
+
+  const handleQuickReact = () => {
+    if (consumeLongPress()) return;
+    setMyReaction(myReaction ? null : "like");
+  };
+
+  return (
+    <div style={styles.comment}>
+      <Avatar
+        uid={comment.authorId}
+        name={comment.authorName || comment.authorIdentity}
+        identity={comment.authorIdentity}
+        size="sm"
+        onClick={() => onOpenProfile(comment.authorId)}
+      />
+      <div style={styles.commentBody}>
+        <div style={styles.commentBubble}>
+          <span style={styles.commentAuthor} onClick={() => onOpenProfile(comment.authorId)}>
+            {comment.authorName}
+          </span>
+          {renderTextWithMentions(comment.text, allUsers, onOpenProfile)}
+        </div>
+        <div ref={reactionRef} style={styles.commentReactionRow} {...reactionTriggerProps}>
+          <button style={styles.commentReactionBtn(!!myReaction)} onClick={handleQuickReact}>
+            {myReaction ? getReactionEmoji(myReaction) : "🤍"}
+            {reactionSummary.length > 0 &&
+              reactionSummary.map((r) => `${r.emoji} ${r.count}`).join(" · ")}
+          </button>
+          {pickerOpen && (
+            <ReactionPicker
+              myReaction={myReaction}
+              onSelect={(type) => {
+                setMyReaction(type);
+                setPickerOpen(false);
+              }}
+              style={{ bottom: "100%", left: 0 }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -712,24 +807,15 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
       {commentsOpen && (
         <div style={styles.commentsBox}>
           {comments.map((c) => (
-            <div key={c.id} style={styles.comment}>
-              <Avatar
-                uid={c.authorId}
-                name={c.authorName || c.authorIdentity}
-                identity={c.authorIdentity}
-                size="sm"
-                onClick={() => onOpenProfile(c.authorId)}
-              />
-              <div style={styles.commentBubble}>
-                <span
-                  style={styles.commentAuthor}
-                  onClick={() => onOpenProfile(c.authorId)}
-                >
-                  {c.authorName}
-                </span>
-                {renderTextWithMentions(c.text, allUsers, onOpenProfile)}
-              </div>
-            </div>
+            <CommentRow
+              key={c.id}
+              comment={c}
+              postId={post.id}
+              currentUid={currentUid}
+              myProfile={myProfile}
+              allUsers={allUsers}
+              onOpenProfile={onOpenProfile}
+            />
           ))}
 
           <form style={styles.commentForm} onSubmit={handleComment}>

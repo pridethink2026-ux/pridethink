@@ -254,8 +254,16 @@ service cloud.firestore {
         allow delete: if estaAutenticado()
           && resource.data.authorId == request.auth.uid;
 
-        // Hoy la app no permite editar comentarios.
-        allow update: if false;
+        // No se puede editar el texto de un comentario ya publicado, pero
+        // cualquier autenticado puede reaccionar: mismo patrón que
+        // posts/{postId} y chats/{chatId}/messages/{messageId} de arriba,
+        // solo se permite tocar "reactions" y solo la propia entrada del mapa.
+        allow update: if estaAutenticado()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+          && soloTocaMiReaccion(
+               resource.data.get('reactions', {}),
+               request.resource.data.get('reactions', {})
+             );
       }
     }
 
