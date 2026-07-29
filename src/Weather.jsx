@@ -51,6 +51,19 @@ import { useLanguage } from "./LanguageContext";
   activada, la próxima sesión resuelve la ciudad precisa en silencio (sin
   reabrir el modal, ya se consintió una vez); si el usuario la desactivó,
   se queda en el nombre aproximado hasta que la reactive a propósito.
+
+  Celsius/Fahrenheit: Open-Meteo solo puede devolver UNA unidad por
+  pedido (con el parámetro temperature_unit) — pedir las dos habría sido
+  una segunda llamada a la API por cada actualización. En vez de eso, se
+  sigue pidiendo Celsius nada más (como siempre) y Fahrenheit se calcula
+  en el cliente (celsiusToFahrenheit) — conversión pura, sin red. El pill
+  cerrado muestra UNA sola unidad (la elegida, °C por defecto); el panel
+  expandido agrega la temperatura actual en AMBAS unidades juntas, pero
+  el pronóstico de 5 días se queda en una sola (la elegida) para no
+  saturar esas columnas ya angostas — mismo criterio de "priorizar
+  legibilidad" que ya se usó para el resto del panel. La elección de
+  unidad persiste en localStorage (TEMP_UNIT_KEY), mismo mecanismo que el
+  resto de las preferencias de este archivo/proyecto.
 */
 
 // 20 minutos: adentro del rango de 15-30 pedido, para no golpear la API
@@ -65,6 +78,34 @@ const FORECAST_DAYS_AHEAD = 5;
 // En memoria (no Firestore, no localStorage): alcanza para el pedido, y
 // se limpia solo al recargar la página.
 let weatherCache = null; // { lat, lon, data, fetchedAt }
+
+// Conversión pura, sin red — ver docstring de arriba para el porqué
+// (Open-Meteo solo devuelve una unidad por pedido).
+function celsiusToFahrenheit(celsius) {
+  return Math.round((celsius * 9) / 5 + 32);
+}
+
+// Preferencia de unidad ("C"/"F"), persistida en localStorage — mismo
+// mecanismo que el tema (themes.js) y el idioma (LanguageContext.jsx).
+// NUNCA en Firestore: es una preferencia del dispositivo, no de la cuenta.
+const TEMP_UNIT_KEY = "pridethink-temp-unit";
+
+function readTempUnit() {
+  try {
+    return localStorage.getItem(TEMP_UNIT_KEY) === "F" ? "F" : "C";
+  } catch {
+    return "C";
+  }
+}
+
+function writeTempUnit(unit) {
+  try {
+    localStorage.setItem(TEMP_UNIT_KEY, unit);
+  } catch {
+    // localStorage puede fallar (modo privado, cuota llena) — no es
+    // crítico: en la próxima sesión simplemente vuelve a Celsius.
+  }
+}
 
 // Códigos WMO que devuelve Open-Meteo, agrupados en 6 familias de ícono.
 function getWeatherIconGroup(code) {
@@ -434,9 +475,34 @@ const styles = {
   dateTime: {
     fontSize: "12px",
     color: "var(--text-muted)",
-    margin: "2px 0 12px",
+    margin: "2px 0 6px",
     textTransform: "capitalize",
   },
+  unitRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    margin: "0 0 12px",
+  },
+  currentBothUnits: {
+    fontSize: "12px",
+    fontWeight: 600,
+    color: "var(--text-muted)",
+  },
+  unitChips: {
+    display: "flex",
+    gap: "4px",
+  },
+  unitChip: (active) => ({
+    padding: "2px 8px",
+    borderRadius: "999px",
+    fontSize: "10px",
+    fontWeight: 700,
+    cursor: "pointer",
+    background: active ? "var(--accent2-soft)" : "transparent",
+    color: active ? "var(--accent2)" : "var(--text-muted)",
+    border: `1px solid ${active ? "var(--accent2-soft-border)" : "var(--border)"}`,
+  }),
   forecastRow: {
     display: "flex",
     justifyContent: "space-between",
@@ -570,6 +636,7 @@ export default function WeatherWidget() {
   const [preciseCityName, setPreciseCityName] = useState(null);
   const [consentOpen, setConsentOpen] = useState(false);
   const [preciseLoading, setPreciseLoading] = useState(false);
+  const [unit, setUnit] = useState(readTempUnit);
   const now = useLocalClock(weather?.timezone, expanded);
   const panelRef = useRef(null);
 
@@ -651,18 +718,29 @@ export default function WeatherWidget() {
     setPreciseCityName(null);
   };
 
+  const handleSelectUnit = (newUnit) => {
+    setUnit(newUnit);
+    writeTempUnit(newUnit);
+  };
+
   if (!weather) return null;
   const Icon = ICONS_BY_GROUP[getWeatherIconGroup(weather.code)];
   const displayCityName = preciseCityName || weather.cityName;
+  // Solo el pill cerrado y el pronóstico de 5 días usan esto (una sola
+  // unidad, la elegida) — la temperatura actual del panel expandido
+  // siempre muestra las dos juntas, ver más abajo.
+  const displayTemp = (celsius) => (unit === "F" ? celsiusToFahrenheit(celsius) : celsius);
 
   return (
     <div style={styles.wrapper} ref={panelRef}>
       <div style={styles.wrap} onClick={() => setExpanded((v) => !v)}>
         <Icon />
-        <span style={styles.temp}>{weather.temp}°</span>
+        <span style={styles.temp}>
+          {displayTemp(weather.temp)}°{unit}
+        </span>
         <span style={styles.range}>
-          <span>↓{weather.tMin}°</span>
-          <span>↑{weather.tMax}°</span>
+          <span>↓{displayTemp(weather.tMin)}°</span>
+          <span>↑{displayTemp(weather.tMax)}°</span>
         </span>
         <ChevronIcon style={styles.chevron(expanded)} />
       </div>
@@ -694,6 +772,19 @@ export default function WeatherWidget() {
           {weather.timezone && (
             <p style={styles.dateTime}>{formatDateTime(now, weather.timezone, locale)}</p>
           )}
+          <div style={styles.unitRow}>
+            <span style={styles.currentBothUnits}>
+              {weather.temp}°C · {celsiusToFahrenheit(weather.temp)}°F
+            </span>
+            <div style={styles.unitChips}>
+              <span style={styles.unitChip(unit === "C")} onClick={() => handleSelectUnit("C")}>
+                °C
+              </span>
+              <span style={styles.unitChip(unit === "F")} onClick={() => handleSelectUnit("F")}>
+                °F
+              </span>
+            </div>
+          </div>
           <div style={styles.forecastRow}>
             {weather.forecast.map((day) => {
               const DayIcon = ICONS_BY_GROUP[getWeatherIconGroup(day.code)];
@@ -706,8 +797,8 @@ export default function WeatherWidget() {
                   <span style={styles.forecastLabel}>{dayLabel}</span>
                   <DayIcon width={18} height={18} />
                   <span style={styles.forecastRange}>
-                    <span style={styles.forecastMax}>{day.tMax}°</span>
-                    <span style={styles.forecastMin}>{day.tMin}°</span>
+                    <span style={styles.forecastMax}>{displayTemp(day.tMax)}°</span>
+                    <span style={styles.forecastMin}>{displayTemp(day.tMin)}°</span>
                   </span>
                 </div>
               );

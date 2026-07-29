@@ -212,26 +212,48 @@ const bottomNavStyles = {
 };
 
 // Ícono del tema "Arcoíris" en el selector: una gota de pintura
-// salpicando, en vez del emoji 🌈 que usaba antes. Colores FIJOS a
-// propósito (excepción al resto de la app, mismo criterio que las
-// banderas pride de identityStyles.js): son los colores del propio tema
-// Arcoíris (THEMES.arcoiris.vars — accent #ffc93c, accent2 #ff5c76, más
-// un naranja intermedio derivado de esos dos para que se vean "muchos
-// colores esparciéndose") — si usara var(--accent) del tema ACTIVO, la
-// fila de "Arcoíris" en la lista cambiaría de color según qué otro tema
-// esté seleccionado en ese momento, en vez de mostrar siempre cómo se ve
-// Arcoíris. Plano, sin degradados, pensado para verse bien chico (16px,
-// el tamaño de fila del selector de temas).
+// salpicando, en vez del emoji 🌈. Rediseñado (2026-07-28) con colores de
+// arcoíris DE VERDAD (rojo/naranja/amarillo/verde/azul/violeta) en vez de
+// solo los 2 acentos del tema — necesarios para que se lea como "arcoíris"
+// de un vistazo, y por eso mismo TIENEN que ser fijos: los 6 tonos no se
+// pueden derivar de las 2 variables --accent/--accent2 que define el
+// sistema de temas, así que esto no puede adaptarse al tema activo aunque
+// quisiera (misma excepción que las banderas pride de identityStyles.js).
+//
+// Diseño: una gota dividida en 6 franjas de color (en vez de 6 puntitos
+// sueltos) + solo 3 salpicaduras grandes afuera. Se probó primero una
+// versión con 6 círculos chicos alrededor de la gota (ver el commit
+// anterior) y se descartó a propósito siguiendo la propia advertencia del
+// pedido ("si las salpicaduras se ven como manchas indistinguibles,
+// simplificá: menos salpicaduras, más grandes") — 6 puntos de ~1.5px de
+// radio corren más riesgo de verse como ruido a 16px que unas pocas
+// franjas más grandes dentro de una sola forma contigua (los bordes entre
+// franjas quedan nítidos sin importar el anti-aliasing, a diferencia de
+// puntos sueltos que se pueden fundir con el fondo). No se pudo confirmar
+// con una captura real: la extensión de automatización del navegador
+// falló también sobre una página de prueba estática en esta sesión (no
+// solo en el sitio en producción), así que el diseño se basa en este
+// razonamiento en vez de una verificación visual — revisarlo a ojo en la
+// app si hay dudas.
 function ArcoirisIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <path d="M12 3c3 4 6 7.5 6 10.5A6 6 0 1 1 6 13.5C6 10.5 9 7 12 3z" fill="#ff5c76" />
-      <circle cx="4" cy="6" r="1.6" fill="#ffc93c" />
-      <circle cx="20" cy="5" r="1.3" fill="#ff8a5c" />
-      <circle cx="21" cy="12" r="1.8" fill="#ffc93c" />
-      <circle cx="3" cy="15" r="1.4" fill="#ff8a5c" />
-      <circle cx="17" cy="20" r="1.5" fill="#ffc93c" />
-      <circle cx="6" cy="21" r="1.2" fill="#ff5c76" />
+    <svg width="16" height="16" viewBox="0 0 24 24">
+      <defs>
+        <clipPath id="arcoiris-drop-clip">
+          <path d="M12 2.5c3.2 4.2 6.2 7.8 6.2 10.8A6.2 6.2 0 1 1 5.8 13.3C5.8 10.3 8.8 6.7 12 2.5z" />
+        </clipPath>
+      </defs>
+      <g clipPath="url(#arcoiris-drop-clip)">
+        <rect x="4" y="2" width="16" height="3.6" fill="#ff4d5e" />
+        <rect x="4" y="5.6" width="16" height="3.6" fill="#ff9a3c" />
+        <rect x="4" y="9.2" width="16" height="3.6" fill="#ffd93c" />
+        <rect x="4" y="12.8" width="16" height="3.6" fill="#3ddc84" />
+        <rect x="4" y="16.4" width="16" height="3.6" fill="#3ca7ff" />
+        <rect x="4" y="20" width="16" height="3" fill="#a25bff" />
+      </g>
+      <circle cx="4" cy="6" r="2" fill="#ffd93c" />
+      <circle cx="20.5" cy="8" r="1.7" fill="#3ca7ff" />
+      <circle cx="19" cy="19" r="1.8" fill="#ff4d5e" />
     </svg>
   );
 }
