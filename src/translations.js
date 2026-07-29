@@ -41,6 +41,8 @@ export const translations = {
     "nav.profile": "Perfil",
     "nav.alerts": "Avisos",
     "nav.themeRotating": "Rotativo",
+    "nav.motivationalBanner": "Pridethink: tú puedes ser lo que quieras ser",
+    "nav.closeBanner": "Cerrar",
 
     // Login (LoginForm, dentro de AuthProfile.jsx)
     "login.eyebrowBack": "Bienvenido de vuelta",
@@ -182,8 +184,6 @@ export const translations = {
     "stickers.thumbsUp": "Pulgar arriba",
 
     // Muro (Feed.jsx)
-    "feed.motivationalBanner": "Pridethink: tú puedes ser lo que quieras ser",
-    "feed.closeBanner": "Cerrar",
     "feed.composerPlaceholder": "¿Qué estás pensando o sintiendo? Usa #hashtags si quieres",
     "feed.posting": "Publicando...",
     "feed.postButton": "Publicar",
@@ -370,6 +370,8 @@ export const translations = {
     "nav.profile": "Profile",
     "nav.alerts": "Alerts",
     "nav.themeRotating": "Rotating",
+    "nav.motivationalBanner": "Pridethink: you can be whoever you want to be",
+    "nav.closeBanner": "Close",
 
     // Login (LoginForm, inside AuthProfile.jsx)
     "login.eyebrowBack": "Welcome back",
@@ -508,8 +510,6 @@ export const translations = {
     "stickers.thumbsUp": "Thumbs up",
 
     // Wall (Feed.jsx)
-    "feed.motivationalBanner": "Pridethink: you can be whoever you want to be",
-    "feed.closeBanner": "Close",
     "feed.composerPlaceholder": "What are you thinking or feeling? Use #hashtags if you want",
     "feed.posting": "Posting...",
     "feed.postButton": "Post",

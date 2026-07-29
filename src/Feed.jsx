@@ -156,40 +156,6 @@ const styles = {
     width: "100%",
     maxWidth: "560px",
   },
-  motivationalBanner: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    padding: "16px 18px",
-    borderRadius: "18px",
-    marginBottom: "16px",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-  },
-  motivationalText: {
-    margin: 0,
-    fontFamily: "var(--font-display)",
-    fontSize: "15px",
-    fontWeight: 700,
-    color: "var(--bg)",
-    lineHeight: 1.3,
-  },
-  motivationalCloseBtn: {
-    flexShrink: 0,
-    width: "26px",
-    height: "26px",
-    borderRadius: "999px",
-    border: "none",
-    background: "rgba(0,0,0,0.15)",
-    color: "var(--bg)",
-    fontSize: "15px",
-    lineHeight: 1,
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   weatherRow: {
     display: "flex",
     justifyContent: "flex-end",
@@ -793,26 +759,6 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   );
 }
 
-// Banner motivacional arriba del muro. Se cierra con la X y queda oculto
-// solo por esta sesión (estado de React en el componente padre, sin
-// localStorage) — al recargar la página o volver a entrar más tarde,
-// vuelve a aparecer, a propósito.
-function MotivationalBanner({ onClose, t }) {
-  return (
-    <div style={styles.motivationalBanner}>
-      <p style={styles.motivationalText}>{t("feed.motivationalBanner")}</p>
-      <button
-        type="button"
-        style={styles.motivationalCloseBtn}
-        onClick={onClose}
-        aria-label={t("feed.closeBanner")}
-      >
-        ×
-      </button>
-    </div>
-  );
-}
-
 export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -826,7 +772,6 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const [posting, setPosting] = useState(false);
   const [feedTab, setFeedTab] = useState("todos"); // "todos" | "siguiendo"
   const [activeHashtag, setActiveHashtag] = useState(null);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
   const allUsers = useAllUsers();
   // Mismos datos de allUsers (AllUsersContext, ver Mentions.jsx), como mapa
   // por uid para lookup O(1) por autor (antes era su propio onSnapshot
@@ -1033,9 +978,6 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.column}>
-        {!bannerDismissed && (
-          <MotivationalBanner onClose={() => setBannerDismissed(true)} t={t} />
-        )}
         <div style={styles.weatherRow}>
           <WeatherWidget />
         </div>

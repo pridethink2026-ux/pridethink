@@ -174,6 +174,49 @@ const themeStyles = {
   }),
 };
 
+const bannerStyles = {
+  wrap: {
+    padding: "0 20px",
+    boxSizing: "border-box",
+  },
+  banner: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    maxWidth: "900px",
+    margin: "16px auto 0",
+    padding: "16px 18px",
+    borderRadius: "18px",
+    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+    boxSizing: "border-box",
+  },
+  text: {
+    margin: 0,
+    fontFamily: "var(--font-display)",
+    fontSize: "15px",
+    fontWeight: 700,
+    color: "var(--bg)",
+    lineHeight: 1.3,
+  },
+  closeBtn: {
+    flexShrink: 0,
+    width: "26px",
+    height: "26px",
+    borderRadius: "999px",
+    border: "none",
+    background: "rgba(0,0,0,0.15)",
+    color: "var(--bg)",
+    fontSize: "15px",
+    lineHeight: 1,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+};
+
 const bottomNavStyles = {
   bar: {
     position: "fixed",
@@ -344,6 +387,31 @@ function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
   );
 }
 
+// Banner motivacional, compartido por TODAS las pantallas principales
+// (Muro, Perfil, Chat, Buscar, y las vistas superpuestas) — antes vivía
+// solo dentro de Feed.jsx (2026-07-28), se subió acá para que el estado
+// de "cerrado" sea uno solo para toda la app, no repetido por pantalla:
+// cerrarlo en cualquier lado lo cierra en todos lados durante la misma
+// sesión (bannerDismissed, estado de React de App(), sin localStorage a
+// propósito — al recargar o volver a entrar más tarde, vuelve a aparecer).
+function MotivationalBanner({ onClose, t }) {
+  return (
+    <div style={bannerStyles.wrap}>
+      <div style={bannerStyles.banner}>
+        <p style={bannerStyles.text}>{t("nav.motivationalBanner")}</p>
+        <button
+          type="button"
+          style={bannerStyles.closeBtn}
+          onClick={onClose}
+          aria-label={t("nav.closeBanner")}
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const isMobile = useIsMobile();
   const { t } = useLanguage();
@@ -355,6 +423,7 @@ function App() {
   const [viewingPostId, setViewingPostId] = useState(null);
   const [viewingGroupId, setViewingGroupId] = useState(null);
   const [viewingEventId, setViewingEventId] = useState(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const { unreadCount } = useNotifications(currentUid);
 
   useEffect(() => {
@@ -502,6 +571,10 @@ function App() {
           {!isMobile && <Notifications onOpenProfile={openProfile} onOpenPost={openPost} />}
         </div>
       </div>
+
+      {currentUid && !bannerDismissed && (
+        <MotivationalBanner onClose={() => setBannerDismissed(true)} t={t} />
+      )}
 
       <div
         key={
