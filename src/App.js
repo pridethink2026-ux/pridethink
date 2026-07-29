@@ -180,9 +180,11 @@ const bannerStyles = {
     boxSizing: "border-box",
   },
   banner: {
-    display: "flex",
+    position: "relative",
+    overflow: "hidden",
+    display: "grid",
+    gridTemplateColumns: "26px 1fr 26px",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: "12px",
     maxWidth: "900px",
     margin: "16px auto 0",
@@ -192,15 +194,32 @@ const bannerStyles = {
     boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
     boxSizing: "border-box",
   },
+  // Overlay del shimmer: cubre toda la tarjeta (position absolute, no
+  // participa del grid) por DEBAJO del texto/botón en el orden del DOM, así
+  // el brillo pasa "detrás" del contenido sin taparlo. La animación en sí
+  // (@keyframes pt-banner-shine) vive en index.css porque un keyframe no se
+  // puede expresar como inline style.
+  shine: {
+    position: "absolute",
+    inset: 0,
+    pointerEvents: "none",
+  },
+  spacer: {
+    width: "26px",
+    height: "1px",
+  },
   text: {
+    position: "relative",
     margin: 0,
     fontFamily: "var(--font-display)",
     fontSize: "15px",
     fontWeight: 700,
     color: "var(--bg)",
     lineHeight: 1.3,
+    textAlign: "center",
   },
   closeBtn: {
+    position: "relative",
     flexShrink: 0,
     width: "26px",
     height: "26px",
@@ -398,6 +417,8 @@ function MotivationalBanner({ onClose, t }) {
   return (
     <div style={bannerStyles.wrap}>
       <div style={bannerStyles.banner}>
+        <span className="pt-banner-shine" style={bannerStyles.shine} aria-hidden="true" />
+        <span aria-hidden="true" style={bannerStyles.spacer} />
         <p style={bannerStyles.text}>{t("nav.motivationalBanner")}</p>
         <button
           type="button"

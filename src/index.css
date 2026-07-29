@@ -76,6 +76,26 @@ code {
   }
 }
 
+.pt-banner-shine {
+  background-image: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 35%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 65%
+  );
+  background-size: 250% 100%;
+  animation: pt-banner-shine 3.5s ease-in-out infinite;
+}
+
+@keyframes pt-banner-shine {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 .pt-view-fade {
   animation: pt-view-fade 0.25s ease;
 }
