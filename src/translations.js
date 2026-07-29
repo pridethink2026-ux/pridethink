@@ -152,6 +152,10 @@ export const translations = {
     "profile.privateWall": "Muro privado",
     "profile.privateWallHint":
       "Solo oculta tus publicaciones cuando alguien visita tu perfil; el resto de tu información sigue visible.",
+    "profile.muteSounds": "Silenciar sonidos",
+    "profile.muteSoundsOn":
+      "No vas a escuchar ningún sonido de la app (temas, reacciones, comentarios).",
+    "profile.muteSoundsOff": "Escuchás los sonidos de temas, reacciones y comentarios.",
     "profile.blockedUsers": "Usuarios bloqueados",
     "profile.blockedEmpty": "No has bloqueado a nadie.",
     "profile.unblock": "Desbloquear",
@@ -481,6 +485,9 @@ export const translations = {
     "profile.privateWall": "Private wall",
     "profile.privateWallHint":
       "Only hides your posts when someone visits your profile; the rest of your info stays visible.",
+    "profile.muteSounds": "Mute sounds",
+    "profile.muteSoundsOn": "You won't hear any app sounds (themes, reactions, comments).",
+    "profile.muteSoundsOff": "You hear theme, reaction, and comment sounds.",
     "profile.blockedUsers": "Blocked users",
     "profile.blockedEmpty": "You haven't blocked anyone.",
     "profile.unblock": "Unblock",

@@ -2,65 +2,16 @@
   themeSounds.js
   --------------
   Un sonido corto (< 0,5s) y distinto por cada tema visual, sintetizado con
-  Web Audio API (osciladores + envolventes de ganancia) — sin archivos de
-  audio externos, para no depender de licencias ni subir assets nuevos.
-  Suena UNA sola vez al confirmar el cambio de tema (ThemeMenu, App.js),
-  nunca en hover ni en loop.
+  Web Audio API. La infraestructura compartida (AudioContext único,
+  playTone, y el interruptor general de "Silenciar sonidos") vive en
+  sound.js — ver ese archivo para el detalle completo y para las
+  funciones de sonido de reacciones/comentarios, que reusan lo mismo.
 
-  playThemeSound(themeKey) es la única función que se usa desde afuera.
-  Volumen bajo a propósito (ganancia pico <= 0.09) para no sobresaltar; no
-  hay botón de silenciar todavía, pero al estar todo detrás de esta única
-  función es fácil agregar ese chequeo después sin tocar el resto del
-  código (por ejemplo, leyendo una preferencia antes del try/catch).
+  playThemeSound(themeKey) suena UNA sola vez al confirmar el cambio de
+  tema (ThemeMenu, App.js), nunca en hover ni en loop.
 */
 
-// AudioContext único, creado recién al primer uso (nunca al cargar la
-// página): los navegadores bloquean el audio hasta el primer gesto real
-// del usuario, y el clic de elegir un tema ya es ese gesto.
-let audioCtx = null;
-
-function getAudioContext() {
-  const Ctor = window.AudioContext || window.webkitAudioContext;
-  if (!Ctor) return null;
-  if (!audioCtx) audioCtx = new Ctor();
-  if (audioCtx.state === "suspended") audioCtx.resume();
-  return audioCtx;
-}
-
-// Un tono = un oscilador + su propia envolvente de ganancia (ataque rápido,
-// decaimiento exponencial), programado en el tiempo absoluto del contexto
-// (ctx.currentTime + start) para poder encadenar varias notas o capas sin
-// setTimeout. freqRampTo desliza el tono (para el "goteo" de Océano);
-// filterFreq (opcional) pasa el oscilador por un lowpass antes de la
-// ganancia, para suavizar el brillo agudo (la "campana lejana" de Noche).
-function playTone(ctx, { freq, type = "sine", start = 0, duration = 0.3, peakGain = 0.08, attack = 0.008, freqRampTo = null, filterFreq = null }) {
-  const startTime = ctx.currentTime + start;
-  const osc = ctx.createOscillator();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, startTime);
-  if (freqRampTo != null) {
-    osc.frequency.exponentialRampToValueAtTime(freqRampTo, startTime + duration);
-  }
-
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.exponentialRampToValueAtTime(peakGain, startTime + attack);
-  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-
-  if (filterFreq) {
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = filterFreq;
-    osc.connect(filter);
-    filter.connect(gain);
-  } else {
-    osc.connect(gain);
-  }
-  gain.connect(ctx.destination);
-
-  osc.start(startTime);
-  osc.stop(startTime + duration + 0.05);
-}
+import { getAudioContext, playTone, isSoundMuted } from "./sound";
 
 // Campana lejana, grave y suave: fundamental grave (220Hz, A3) + un
 // parcial más agudo e inarmónico (528Hz, típico de un timbre de campana)
@@ -108,6 +59,7 @@ const SOUND_BUILDERS = {
 };
 
 export function playThemeSound(themeKey) {
+  if (isSoundMuted()) return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;

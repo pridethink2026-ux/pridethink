@@ -5,6 +5,7 @@ import App from './App';
 import { LanguageProvider } from './LanguageContext';
 import { BlocksProvider } from './BlocksContext';
 import { AllUsersProvider } from './AllUsersContext';
+import { SoundProvider } from './SoundContext';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -13,7 +14,9 @@ root.render(
     <LanguageProvider>
       <AllUsersProvider>
         <BlocksProvider>
-          <App />
+          <SoundProvider>
+            <App />
+          </SoundProvider>
         </BlocksProvider>
       </AllUsersProvider>
     </LanguageProvider>

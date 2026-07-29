@@ -42,6 +42,7 @@ import Events from "./Events";
 import VerifiedBadge from "./VerifiedBadge";
 import WeatherWidget from "./Weather";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { playReactionSound, playCommentSound } from "./sound";
 
 /*
   Feed
@@ -488,6 +489,7 @@ function CommentRow({ comment, postId, currentUid, myProfile, allUsers, onOpenPr
   const setMyReaction = async (type) => {
     const commentRef = doc(db, "posts", postId, "comments", comment.id);
     const hadReaction = !!myReaction;
+    playReactionSound(!!type);
     if (type) {
       await updateDoc(commentRef, { [`reactions.${currentUid}`]: type });
       if (!hadReaction) {
@@ -609,6 +611,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const setMyReaction = async (type) => {
     const postRef = doc(db, "posts", post.id);
     const hadReaction = !!myReaction;
+    playReactionSound(!!type);
     if (type) {
       if (!hadReaction) {
         setLikePop(true);
@@ -648,6 +651,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
       mentionedUids,
       createdAt: serverTimestamp(),
     });
+    playCommentSound();
     await notify(post.authorId, {
       type: "comment",
       fromUid: currentUid,

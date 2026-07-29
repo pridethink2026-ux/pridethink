@@ -21,6 +21,7 @@ import { isEffectivelyOnline, formatLastSeen } from "./presence";
 import { StickerImage, StickerPicker } from "./Stickers";
 import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
+import { playReactionSound } from "./sound";
 
 /*
   Chat
@@ -724,6 +725,7 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost }) {
 
   const setMyReaction = async (type) => {
     const msgRef = doc(db, "chats", chatId, "messages", message.id);
+    playReactionSound(!!type);
     await updateDoc(msgRef, {
       [`reactions.${currentUid}`]: type || deleteField(),
     });

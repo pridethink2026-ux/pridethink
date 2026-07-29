@@ -872,6 +872,7 @@ function ProfileView({
   onEdit,
   onTogglePrivacy,
   onToggleWallPrivacy,
+  onToggleSoundMuted,
   onUnblock,
   onOpenProfile,
   onOpenSaved,
@@ -1011,6 +1012,23 @@ function ProfileView({
                 onClick={() => onToggleWallPrivacy(!user.isWallPrivate)}
               >
                 <div style={styles.toggleDot(!!user.isWallPrivate)} />
+              </div>
+            </div>
+
+            <div style={styles.privacyRow}>
+              <div>
+                <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
+                  {t("profile.muteSounds")}
+                </p>
+                <p style={styles.privacyHint}>
+                  {user.soundMuted ? t("profile.muteSoundsOn") : t("profile.muteSoundsOff")}
+                </p>
+              </div>
+              <div
+                style={styles.toggle(!!user.soundMuted)}
+                onClick={() => onToggleSoundMuted(!user.soundMuted)}
+              >
+                <div style={styles.toggleDot(!!user.soundMuted)} />
               </div>
             </div>
 
@@ -1282,6 +1300,22 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     }
   };
 
+  // Interruptor general de sonidos (2026-07-29): a diferencia de
+  // isPrivate/isWallPrivate, no hay ningún otro documento que sincronizar
+  // — SoundContext.jsx ya escucha users/{uid} en vivo y actualiza el flag
+  // interno de sound.js apenas cambia este campo.
+  const handleToggleSoundMuted = async (newValue) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const updated = { ...user, soundMuted: newValue };
+    setUser(updated);
+    try {
+      await setDoc(doc(db, "users", uid), updated, { merge: true });
+    } catch (err) {
+      setUser(user); // revierte si falla
+    }
+  };
+
   const handleUnblock = async (targetUid) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -1369,6 +1403,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
             onEdit={() => setStep("identity")}
             onTogglePrivacy={handleTogglePrivacy}
             onToggleWallPrivacy={handleToggleWallPrivacy}
+            onToggleSoundMuted={handleToggleSoundMuted}
             onUnblock={handleUnblock}
             onOpenProfile={onOpenProfile}
             onOpenSaved={onOpenSaved}
