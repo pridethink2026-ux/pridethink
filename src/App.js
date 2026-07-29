@@ -160,6 +160,9 @@ const themeStyles = {
     boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
   },
   option: (active) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
     padding: "10px 12px",
     borderRadius: "10px",
     background: active ? "var(--accent2-soft)" : "transparent",
@@ -208,6 +211,31 @@ const bottomNavStyles = {
   label: { fontSize: "10px", fontWeight: 600 },
 };
 
+// Ícono del tema "Arcoíris" en el selector: una gota de pintura
+// salpicando, en vez del emoji 🌈 que usaba antes. Colores FIJOS a
+// propósito (excepción al resto de la app, mismo criterio que las
+// banderas pride de identityStyles.js): son los colores del propio tema
+// Arcoíris (THEMES.arcoiris.vars — accent #ffc93c, accent2 #ff5c76, más
+// un naranja intermedio derivado de esos dos para que se vean "muchos
+// colores esparciéndose") — si usara var(--accent) del tema ACTIVO, la
+// fila de "Arcoíris" en la lista cambiaría de color según qué otro tema
+// esté seleccionado en ese momento, en vez de mostrar siempre cómo se ve
+// Arcoíris. Plano, sin degradados, pensado para verse bien chico (16px,
+// el tamaño de fila del selector de temas).
+function ArcoirisIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3c3 4 6 7.5 6 10.5A6 6 0 1 1 6 13.5C6 10.5 9 7 12 3z" fill="#ff5c76" />
+      <circle cx="4" cy="6" r="1.6" fill="#ffc93c" />
+      <circle cx="20" cy="5" r="1.3" fill="#ff8a5c" />
+      <circle cx="21" cy="12" r="1.8" fill="#ffc93c" />
+      <circle cx="3" cy="15" r="1.4" fill="#ff8a5c" />
+      <circle cx="17" cy="20" r="1.5" fill="#ffc93c" />
+      <circle cx="6" cy="21" r="1.2" fill="#ff5c76" />
+    </svg>
+  );
+}
+
 function ThemeMenu() {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -248,7 +276,8 @@ function ThemeMenu() {
               style={themeStyles.option(selected === key)}
               onClick={() => handleSelect(key)}
             >
-              {theme.emoji} {theme.label}
+              {key === "arcoiris" ? <ArcoirisIcon /> : <span>{theme.emoji}</span>}
+              <span>{theme.label}</span>
             </div>
           ))}
           <div

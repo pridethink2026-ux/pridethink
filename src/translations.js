@@ -345,6 +345,7 @@ export const translations = {
 
     // Clima (Weather.jsx) - precisar ubicación con OpenStreetMap
     "weather.preciseLocationLink": "Precisar mi ubicación",
+    "weather.approximateLocationLink": "Usar ubicación aproximada",
     "weather.consentTitle": "Precisar tu ubicación",
     "weather.consentBody1":
       "Para mostrar el nombre exacto de tu ciudad, vamos a enviar tus coordenadas GPS exactas a OpenStreetMap, un servicio externo a Pridethink.",
@@ -665,6 +666,7 @@ export const translations = {
 
     // Weather (Weather.jsx) - refine location with OpenStreetMap
     "weather.preciseLocationLink": "Refine my location",
+    "weather.approximateLocationLink": "Use approximate location",
     "weather.consentTitle": "Refine your location",
     "weather.consentBody1":
       "To show your exact city name, we'll send your precise GPS coordinates to OpenStreetMap, a service external to Pridethink.",

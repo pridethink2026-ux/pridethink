@@ -42,6 +42,15 @@ import { useLanguage } from "./LanguageContext";
   consentimiento y una sola vez por sesión/ubicación, nunca automático,
   para no abusar de un servicio comunitario). Ver `handleConfirmPrecise`
   y el docstring de `fetchPreciseCity` más abajo para el detalle completo.
+
+  Activar/desactivar, con memoria entre sesiones: una vez precisada, "Usar
+  ubicación aproximada" vuelve al nombre por zona horaria y borra el
+  resultado cacheado de Nominatim. La ELECCIÓN (activado o desactivado)
+  persiste en localStorage (PRECISE_LOCATION_ENABLED_KEY, nunca
+  Firestore) para no volver a preguntar en sesiones futuras — si estaba
+  activada, la próxima sesión resuelve la ciudad precisa en silencio (sin
+  reabrir el modal, ya se consintió una vez); si el usuario la desactivó,
+  se queda en el nombre aproximado hasta que la reactive a propósito.
 */
 
 // 20 minutos: adentro del rango de 15-30 pedido, para no golpear la API
@@ -78,11 +87,16 @@ function cityNameFromTimezone(timezone) {
 }
 
 // Ciudad PRECISA, solo bajo consentimiento explícito del usuario (ver
-// handleConfirmPrecise en WeatherWidget) — nunca se llama sola. Guardada
-// en sessionStorage (no localStorage): "recordar durante la sesión", no
-// para siempre, y se pierde sola al cerrar la pestaña — mismo criterio
-// de "no guardar de más" que ya sigue el resto del dato de ubicación
-// (nunca Firestore, ver docstring de arriba).
+// handleConfirmPrecise en WeatherWidget) — nunca se llama sola. El
+// RESULTADO (la ciudad ya resuelta) se guarda en sessionStorage, no para
+// siempre: se pierde solo al cerrar la pestaña, así que como mucho hay
+// una llamada a Nominatim por sesión/ubicación (uso responsable de un
+// servicio gratuito y comunitario). La PREFERENCIA de si el usuario
+// quiere ubicación precisa o no, en cambio, es aparte (ver
+// PRECISE_LOCATION_ENABLED_KEY más abajo) y esa sí persiste entre
+// sesiones en localStorage — son dos cosas distintas: "¿está permitido
+// preguntarle a Nominatim por esta ubicación puntual, ya en esta
+// pestaña?" vs "¿esta persona quiere ubicación precisa en general?".
 const PRECISE_LOCATION_CACHE_KEY = "pridethink-precise-location";
 
 function readPreciseLocationCache() {
@@ -100,6 +114,42 @@ function writePreciseLocationCache(entry) {
   } catch {
     // sessionStorage puede fallar (modo privado, cuota llena) — no es
     // crítico, simplemente se pierde el caché y listo.
+  }
+}
+
+function clearPreciseLocationCache() {
+  try {
+    sessionStorage.removeItem(PRECISE_LOCATION_CACHE_KEY);
+  } catch {
+    // ver arriba — no crítico.
+  }
+}
+
+// La PREFERENCIA (activado/desactivado), a diferencia del resultado de
+// arriba, sí se guarda en localStorage — mismo mecanismo que ya usa el
+// proyecto para preferencias del dispositivo que no son datos de cuenta
+// (STORAGE_KEY en themes.js para el tema, LANGUAGE_STORAGE_KEY en
+// LanguageContext.jsx para el idioma sin sesión) — para que, si el
+// usuario activó o desactivó la ubicación precisa, esa elección se
+// respete en sesiones futuras sin volver a preguntar. NUNCA en
+// Firestore: es información de ubicación, se queda en el dispositivo
+// (mismo criterio de privacidad del resto de este archivo).
+const PRECISE_LOCATION_ENABLED_KEY = "pridethink-precise-location-enabled";
+
+function readPreciseLocationEnabled() {
+  try {
+    return localStorage.getItem(PRECISE_LOCATION_ENABLED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writePreciseLocationEnabled(enabled) {
+  try {
+    localStorage.setItem(PRECISE_LOCATION_ENABLED_KEY, enabled ? "true" : "false");
+  } catch {
+    // localStorage puede fallar (modo privado, cuota llena) — no es
+    // crítico: en la próxima sesión simplemente vuelve a preguntar.
   }
 }
 
@@ -371,6 +421,16 @@ const styles = {
     textDecoration: "underline",
     cursor: "pointer",
   },
+  approximateLink: {
+    background: "none",
+    border: "none",
+    padding: 0,
+    color: "var(--text-muted)",
+    fontSize: "11px",
+    fontWeight: 600,
+    textDecoration: "underline",
+    cursor: "pointer",
+  },
   dateTime: {
     fontSize: "12px",
     color: "var(--text-muted)",
@@ -525,17 +585,42 @@ export default function WeatherWidget() {
 
   // Si ya se precisó la ubicación antes en esta misma sesión (y sigue
   // siendo la misma zona, ~5km de tolerancia), usa ese resultado en vez
-  // de volver a preguntar o volver a llamar a Nominatim.
+  // de volver a preguntar o volver a llamar a Nominatim. Si no hay caché
+  // para esta ubicación pero el usuario ya había ACTIVADO la ubicación
+  // precisa en una sesión anterior (preferencia persistida, ver
+  // PRECISE_LOCATION_ENABLED_KEY), la resuelve de nuevo automáticamente
+  // y en silencio — ya dio su consentimiento una vez, no hace falta
+  // volver a mostrarle el aviso cada sesión.
   useEffect(() => {
     if (!weather) return;
     const cached = readPreciseLocationCache();
-    if (
+    const cacheMatches =
       cached &&
       Math.abs(cached.lat - weather.lat) < 0.05 &&
-      Math.abs(cached.lon - weather.lon) < 0.05
-    ) {
+      Math.abs(cached.lon - weather.lon) < 0.05;
+    if (cacheMatches) {
       setPreciseCityName(cached.cityName);
+      return;
     }
+    if (!readPreciseLocationEnabled()) return;
+    let cancelled = false;
+    setPreciseLoading(true);
+    fetchPreciseCity(weather.lat, weather.lon)
+      .then((cityName) => {
+        if (cancelled || !cityName) return;
+        setPreciseCityName(cityName);
+        writePreciseLocationCache({ lat: weather.lat, lon: weather.lon, cityName });
+      })
+      .catch(() => {
+        // Nominatim falló: se sigue mostrando el nombre aproximado, sin
+        // ningún error visible (mismo criterio que el resto del widget).
+      })
+      .finally(() => {
+        if (!cancelled) setPreciseLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [weather]);
 
   const handleConfirmPrecise = async () => {
@@ -545,6 +630,7 @@ export default function WeatherWidget() {
       if (cityName) {
         setPreciseCityName(cityName);
         writePreciseLocationCache({ lat: weather.lat, lon: weather.lon, cityName });
+        writePreciseLocationEnabled(true);
       }
     } catch {
       // Nominatim falló: se sigue mostrando el nombre aproximado, sin
@@ -553,6 +639,16 @@ export default function WeatherWidget() {
       setPreciseLoading(false);
       setConsentOpen(false);
     }
+  };
+
+  // "Usar ubicación aproximada": apaga la preferencia (no se le vuelve a
+  // preguntar a Nominatim en sesiones futuras hasta que la reactive a
+  // propósito, tocando "Precisar mi ubicación" de nuevo) y borra
+  // cualquier resultado ya cacheado.
+  const handleDisablePrecise = () => {
+    writePreciseLocationEnabled(false);
+    clearPreciseLocationCache();
+    setPreciseCityName(null);
   };
 
   if (!weather) return null;
@@ -576,7 +672,15 @@ export default function WeatherWidget() {
           {displayCityName && (
             <p style={styles.place}>
               {displayCityName}
-              {!preciseCityName && (
+              {preciseCityName ? (
+                <button
+                  type="button"
+                  style={styles.approximateLink}
+                  onClick={handleDisablePrecise}
+                >
+                  {t("weather.approximateLocationLink")}
+                </button>
+              ) : (
                 <button
                   type="button"
                   style={styles.preciseLink}
