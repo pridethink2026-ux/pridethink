@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
 import { timeAgo } from "./utils";
@@ -118,7 +118,12 @@ const styles = {
 export default function Search({ onOpenProfile }) {
   const [currentUid, setCurrentUid] = useState(null);
   const users = useAllUsers();
-  const [posts, setPosts] = useState([]);
+  // Separado en dos consultas (auditoría de seguridad, 2026-07-28,
+  // hallazgo H2) — mismo motivo y mismo patrón que Feed.jsx: firestore.rules
+  // ahora exige authorIsPrivate == false O ser el autor para poder leer un
+  // post, así que una consulta sin where() se rechazaría entera.
+  const [publicPosts, setPublicPosts] = useState([]);
+  const [myPosts, setMyPosts] = useState([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -127,12 +132,36 @@ export default function Search({ onOpenProfile }) {
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "posts"), where("authorIsPrivate", "==", false));
     const unsub = onSnapshot(q, (snap) => {
-      setPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setPublicPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!currentUid) {
+      setMyPosts([]);
+      return;
+    }
+    const q = query(collection(db, "posts"), where("authorId", "==", currentUid));
+    const unsub = onSnapshot(q, (snap) => {
+      setMyPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [currentUid]);
+
+  // Junta las dos consultas de arriba, ordenadas por fecha (orderBy() no
+  // se usa en las consultas a propósito, para no necesitar un índice
+  // compuesto — ver el mismo comentario en Feed.jsx).
+  const posts = useMemo(() => {
+    const merged = new Map();
+    publicPosts.forEach((p) => merged.set(p.id, p));
+    myPosts.forEach((p) => merged.set(p.id, p));
+    return Array.from(merged.values()).sort(
+      (a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
+    );
+  }, [publicPosts, myPosts]);
 
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
 

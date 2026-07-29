@@ -11,10 +11,12 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
   onSnapshot,
   collection,
   query,
   where,
+  writeBatch,
   Timestamp,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
@@ -39,6 +41,26 @@ import { unblockUser, useMyBlocks } from "./Blocks";
   Ahora los datos SÍ persisten al recargar la página, y dos personas
   distintas (tú y tu socio) ven la misma base de datos real.
 */
+
+// Auditoría de seguridad (2026-07-28, hallazgo H2): los posts guardan una
+// COPIA de isPrivate/isWallPrivate en el momento de publicarse
+// (authorIsPrivate/authorIsWallPrivate, ver el docstring de Feed.jsx) para
+// que firestore.rules pueda validar la privacidad directo sobre el post,
+// sin tener que leer el perfil del autor aparte. Esta copia queda
+// desactualizada si no se sincroniza cuando el usuario cambia el toggle
+// más tarde — este helper actualiza TODOS los posts existentes de ese
+// usuario en lotes de hasta 500 (el máximo de un writeBatch), llamado
+// desde handleTogglePrivacy/handleToggleWallPrivacy más abajo.
+async function syncPostsPrivacyField(uid, fieldName, newValue) {
+  const snap = await getDocs(query(collection(db, "posts"), where("authorId", "==", uid)));
+  const allDocs = snap.docs;
+  for (let i = 0; i < allDocs.length; i += 500) {
+    const chunk = allDocs.slice(i, i + 500);
+    const batch = writeBatch(db);
+    chunk.forEach((d) => batch.update(d.ref, { [fieldName]: newValue }));
+    await batch.commit();
+  }
+}
 
 // Sugerencias de identidad: se muestran traducidas (son solo ideas para
 // inspirar, parte de la interfaz), pero una vez que alguien toca una, ESE
@@ -1160,6 +1182,17 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       await setDoc(doc(db, "users", uid), updated, { merge: true });
     } catch (err) {
       setUser(user); // revierte si falla
+      return;
+    }
+    try {
+      // Hallazgo H2: sincroniza la copia guardada en cada post existente
+      // (ver syncPostsPrivacyField arriba). Si esto falla, la preferencia
+      // ya quedó guardada igual — los posts viejos pueden quedar
+      // desincronizados temporalmente hasta el próximo toggle, no hace
+      // falta revertir el cambio que el usuario sí pidió.
+      await syncPostsPrivacyField(uid, "authorIsPrivate", newValue);
+    } catch (err) {
+      // silencioso a propósito, ver comentario de arriba.
     }
   };
 
@@ -1173,6 +1206,13 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       await setDoc(doc(db, "users", uid), updated, { merge: true });
     } catch (err) {
       setUser(user); // revierte si falla
+      return;
+    }
+    try {
+      // Hallazgo H2 — ver el comentario en handleTogglePrivacy de arriba.
+      await syncPostsPrivacyField(uid, "authorIsWallPrivate", newValue);
+    } catch (err) {
+      // silencioso a propósito, ver comentario de arriba.
     }
   };
 

@@ -9,9 +9,9 @@ import {
   setDoc,
   getDocs,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
@@ -33,10 +33,16 @@ import { useMyBlocks } from "./Blocks";
   publicaciones del grupo (reutiliza PostCard de Feed.jsx tal cual).
 
   Los posts del grupo viven en la colección "posts" de siempre (con un
-  campo "groupId" nuevo) — se escucha TODA la colección (mismo patrón que
-  Feed.jsx/Search.jsx) y se filtra por groupId en el cliente, para no
-  necesitar un índice compuesto nuevo en Firestore (habría hecho falta uno
-  para combinar where("groupId","==",...) con orderBy("createdAt")).
+  campo "groupId" nuevo) — se escucha la colección filtrando SOLO por
+  authorIsPrivate == false (auditoría de seguridad, 2026-07-28, hallazgo
+  H2 — ver el docstring de Feed.jsx) y se filtra por groupId en el
+  cliente, para no necesitar un índice compuesto nuevo en Firestore
+  (habría hecho falta uno para combinar where("groupId","==",...) con
+  where("authorIsPrivate","==",...)/orderBy("createdAt")). Los posts de
+  grupo SIEMPRE tienen authorIsPrivate/authorIsWallPrivate en false sin
+  importar la privacidad real del autor (ver handlePost más abajo): los
+  grupos son públicos por diseño, la privacidad personal de perfil no se
+  extiende al contenido de un grupo.
 
   Solo miembros pueden publicar (se oculta el composer si no sos
   miembro); las reglas de Firestore también lo exigen del lado del
@@ -234,14 +240,19 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
     return unsub;
   }, [groupId]);
 
-  // Se escucha TODA la colección "posts" (mismo patrón que Feed.jsx) y se
-  // filtra por groupId en el cliente — ver docstring de arriba.
+  // Se escucha la colección filtrando por authorIsPrivate == false (ver
+  // docstring de arriba, hallazgo H2) y se filtra por groupId en el
+  // cliente.
   useEffect(() => {
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "posts"), where("authorIsPrivate", "==", false));
     const unsub = onSnapshot(q, (snap) => {
-      setPosts(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((p) => p.groupId === groupId)
-      );
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((p) => p.groupId === groupId);
+      // orderBy() ya no viene de la consulta (ver comentario de arriba) —
+      // el orden por fecha se arma acá.
+      list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setPosts(list);
       setPostsLoading(false);
     });
     return unsub;
@@ -280,6 +291,18 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
         groupId,
         createdAt: serverTimestamp(),
         reactions: {},
+        // A diferencia de Feed.jsx, acá SIEMPRE van en false, sin importar
+        // la privacidad real del autor (auditoría de seguridad,
+        // 2026-07-28, hallazgo H2): los grupos son públicos por diseño —
+        // GroupView.jsx nunca filtró posts de grupo por isPrivate/
+        // isWallPrivate del autor, la privacidad personal no se extiende
+        // al contenido de un grupo. Si acá copiáramos myProfile.isPrivate
+        // real, la regla nueva de firestore.rules (que exige
+        // authorIsPrivate == false para que cualquiera pueda leer un
+        // post) ocultaría los posts de grupo de cualquier miembro con
+        // perfil privado, rompiendo algo que hoy funciona.
+        authorIsPrivate: false,
+        authorIsWallPrivate: false,
       });
       await Promise.all(
         mentionedUids.map((uid) =>

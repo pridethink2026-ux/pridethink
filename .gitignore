@@ -21,3 +21,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Credencial de cuenta de servicio para scripts de administración (Admin
+# SDK) — da acceso TOTAL al proyecto de Firebase, nunca se sube al repo.
+# El patrón cubre variantes de nombre (ej. el .json quedó duplicado al
+# descargarla del navegador en un caso real: serviceAccountKey.json.json).
+scripts/serviceAccountKey*

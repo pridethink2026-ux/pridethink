@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
@@ -52,7 +53,21 @@ import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 
   Estructura en Firestore:
   - "posts/{postId}"
-      -> { authorId, authorName, authorIdentity, text, createdAt, reactions: { [uid]: tipo }, hashtags: ["..."] }
+      -> { authorId, authorName, authorIdentity, text, createdAt, reactions: { [uid]: tipo }, hashtags: ["..."], authorIsPrivate, authorIsWallPrivate }
+      "authorIsPrivate"/"authorIsWallPrivate" son nuevos (auditoría de
+      seguridad, 2026-07-28, hallazgo H2): copia del isPrivate/
+      isWallPrivate del autor en el momento de publicar. Antes, la
+      privacidad de "no mostrar mis posts" era una decisión SOLO del
+      cliente (este archivo filtraba `usersMap[p.authorId]?.isPrivate`
+      antes de renderizar) — pero `firestore.rules` dejaba leer
+      cualquier post a cualquier autenticado igual, así que el payload
+      crudo ya traía los posts "privados" antes de que React decidiera
+      esconderlos. Con la copia acá adentro, `firestore.rules` puede
+      exigir `authorIsPrivate == false` directo sobre el documento, sin
+      tener que mirar el perfil del autor aparte. Se mantiene
+      sincronizado cuando cambia la privacidad del autor — ver
+      `handleTogglePrivacy`/`handleToggleWallPrivacy` en
+      `AuthProfile.jsx`.
   - "posts/{postId}/comments/{commentId}"
       -> { authorId, authorName, authorIdentity, text, createdAt }
   - "notifications/{uid}/items/{itemId}"
@@ -748,7 +763,10 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
-  const [posts, setPosts] = useState([]);
+  // Se separa en dos (auditoría de seguridad, 2026-07-28, hallazgo H2):
+  // ver el comentario junto al useEffect que las llena, más abajo.
+  const [publicPosts, setPublicPosts] = useState([]);
+  const [myPosts, setMyPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
@@ -785,15 +803,51 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     return unsub;
   }, [currentUid]);
 
-  // Escucha el feed completo en tiempo real, más reciente primero
+  // Escucha el feed en tiempo real, en DOS consultas separadas (auditoría
+  // de seguridad, 2026-07-28, hallazgo H2): antes era una sola consulta
+  // sin filtro (traía TODOS los posts, incluidos los de perfiles
+  // privados, y React los escondía después) — ahora firestore.rules exige
+  // que un post sea legible solo si authorIsPrivate == false O sos el
+  // autor (ver el bloque de posts/{postId} en firestore.rules), así que
+  // una consulta sin where() quedaría sin poder demostrarse ante
+  // Firestore y se rechazaría entera. "Siempre ves tus propios posts"
+  // (línea de abajo, en visiblePosts) necesita la segunda consulta
+  // porque tus propios posts pueden tener authorIsPrivate == true y no
+  // aparecerían en la primera. orderBy() no se usa en ninguna de las dos
+  // a propósito (evita tener que crear un índice compuesto en Firestore)
+  // — el orden por fecha se arma en el cliente, en visiblePosts.
   useEffect(() => {
-    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "posts"), where("authorIsPrivate", "==", false));
     const unsub = onSnapshot(q, (snap) => {
-      setPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setPublicPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setPostsLoading(false);
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!currentUid) {
+      setMyPosts([]);
+      return;
+    }
+    const q = query(collection(db, "posts"), where("authorId", "==", currentUid));
+    const unsub = onSnapshot(q, (snap) => {
+      setMyPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [currentUid]);
+
+  // Junta las dos consultas de arriba (sin duplicar los propios posts
+  // públicos, que ya vienen en publicPosts) y los ordena por fecha, más
+  // reciente primero — mismo orden que antes daba orderBy() en la consulta.
+  const posts = useMemo(() => {
+    const merged = new Map();
+    publicPosts.forEach((p) => merged.set(p.id, p));
+    myPosts.forEach((p) => merged.set(p.id, p));
+    return Array.from(merged.values()).sort(
+      (a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
+    );
+  }, [publicPosts, myPosts]);
 
   const handlePost = async (e) => {
     e.preventDefault();
@@ -811,6 +865,9 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
         mentionedUids,
         createdAt: serverTimestamp(),
         reactions: {},
+        // Copia del momento de publicar — ver docstring de arriba (hallazgo H2).
+        authorIsPrivate: myProfile.isPrivate || false,
+        authorIsWallPrivate: myProfile.isWallPrivate || false,
       });
       await Promise.all(
         mentionedUids.map((uid) =>

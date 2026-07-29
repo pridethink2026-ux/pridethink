@@ -210,14 +210,30 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
       setPosts([]);
       return;
     }
-    const q = query(collection(db, "posts"), where("authorId", "==", uid));
+    // Auditoría de seguridad (2026-07-28, hallazgo H2): firestore.rules
+    // ahora exige authorIsPrivate == false O ser el autor para leer un
+    // post. Viendo tu PROPIO perfil (isMe), "authorId == uid" ya equivale
+    // a "authorId == request.auth.uid" y esa consulta sola alcanza — pero
+    // viendo el perfil de OTRA persona hace falta agregar
+    // where("authorIsPrivate","==",false) para que la consulta sea
+    // demostrable ante Firestore (si no, se rechazaría entera). Como acá
+    // arriba ya se cortó temprano si el perfil ajeno es privado
+    // (isWallHidden), este filtro nunca esconde nada que antes se
+    // mostrara — solo hace la MISMA restricción real del lado del servidor.
+    const q = isMe
+      ? query(collection(db, "posts"), where("authorId", "==", uid))
+      : query(
+          collection(db, "posts"),
+          where("authorId", "==", uid),
+          where("authorIsPrivate", "==", false)
+        );
     const unsub = onSnapshot(q, (snap) => {
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setPosts(list);
     });
     return unsub;
-  }, [uid, isBlocked, isWallHidden]);
+  }, [uid, isBlocked, isWallHidden, isMe]);
 
   const isFollowing = (myProfile?.following || []).includes(uid);
   const followingCount = (profileUser?.following || []).length;

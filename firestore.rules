@@ -167,8 +167,33 @@ service cloud.firestore {
     // posts/{postId}  y  posts/{postId}/comments/{commentId}
     // --------------------------------------------------------------------
     match /posts/{postId} {
-      // El muro, la búsqueda y los perfiles públicos leen publicaciones.
-      allow read: if estaAutenticado();
+      // Auditoría de seguridad (2026-07-28, hallazgo H2): antes,
+      // cualquier autenticado podía leer CUALQUIER post — un perfil
+      // "privado" (isPrivate/isWallPrivate) solo ocultaba sus posts del
+      // lado del cliente (Feed.jsx/Search.jsx/UserProfile.jsx filtraban
+      // después de recibir el post), así que el payload crudo ya
+      // llegaba al navegador de cualquiera antes de que React decidiera
+      // esconderlo. Ahora exige que el post tenga "authorIsPrivate ==
+      // false" (copia de users/{uid}.isPrivate en el momento de
+      // publicar, sincronizada cuando cambia — ver
+      // authorIsPrivate/authorIsWallPrivate en el docstring de Feed.jsx
+      // y syncPostsPrivacyField en AuthProfile.jsx) O que seas el propio
+      // autor (siempre ves tus propios posts, sean privados o no).
+      //
+      // Ojo con esta regla: tiene que estar en términos de resource.data
+      // (no de un get() al perfil del autor), exactamente por el mismo
+      // motivo documentado en blocks/{blockId} más abajo — Feed.jsx/
+      // Search.jsx/GroupView.jsx/UserProfile.jsx hacen QUERIES con
+      // where("authorIsPrivate","==",false) y where("authorId","==",...),
+      // y Firestore valida una query contra la regla ANTES de
+      // ejecutarla, mirando solo la definición de la query. Comparando
+      // contra resource.data (no contra un perfil externo), coincide
+      // exactamente con esos where(...) y es demostrable.
+      allow read: if estaAutenticado()
+        && (
+          resource.data.get('authorIsPrivate', false) == false
+          || resource.data.authorId == request.auth.uid
+        );
 
       // Solo puedes crear una publicación firmada con tu propio uid — y si
       // tiene "groupId" (post de un grupo, ver groups/{groupId} más abajo),
