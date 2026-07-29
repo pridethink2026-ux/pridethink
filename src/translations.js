@@ -182,6 +182,8 @@ export const translations = {
     "stickers.thumbsUp": "Pulgar arriba",
 
     // Muro (Feed.jsx)
+    "feed.motivationalBanner": "Pridethink: tú puedes ser lo que quieras ser",
+    "feed.closeBanner": "Cerrar",
     "feed.composerPlaceholder": "¿Qué estás pensando o sintiendo? Usa #hashtags si quieres",
     "feed.posting": "Publicando...",
     "feed.postButton": "Publicar",
@@ -506,6 +508,8 @@ export const translations = {
     "stickers.thumbsUp": "Thumbs up",
 
     // Wall (Feed.jsx)
+    "feed.motivationalBanner": "Pridethink: you can be whoever you want to be",
+    "feed.closeBanner": "Close",
     "feed.composerPlaceholder": "What are you thinking or feeling? Use #hashtags if you want",
     "feed.posting": "Posting...",
     "feed.postButton": "Post",
