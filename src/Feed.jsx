@@ -95,7 +95,8 @@ import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
   "❤️" (el comportamiento de "Me gusta" de siempre); mantener presionado
   (mobile) o pasar el mouse (desktop) abre el selector con los 5 tipos.
 
-  GUARDAR: el botón 🔖 en cada post crea/borra un documento en
+  GUARDAR: el botón con el ícono de marcapáginas (BookmarkIcon, contorno/
+  relleno según el estado) en cada post crea/borra un documento en
   savedPosts/{miUid}/items/{postId} — SOLO una referencia (el id del post
   ya es el propio id del documento; no se copia texto ni autor), igual que
   el botón "Guardados" del perfil (SavedPosts.jsx) resuelve esa lista de
@@ -446,6 +447,29 @@ function PostSkeleton() {
   );
 }
 
+// Ícono de "guardar" con 2 estados reales (contorno / relleno). Antes era
+// directo el emoji 🔖: como los emojis a color ignoran el CSS `color` (a
+// diferencia de un ícono vectorial con `fill`/`stroke: currentColor`),
+// `styles.actionBtn(saved)` cambiaba el color del botón "por dentro" pero
+// nada se veía distinto al guardar un post — bug reportado en producción,
+// 2026-07-29. Mismo patrón que ya usan `MicIcon`/`StopIcon` en `Chat.jsx`.
+function BookmarkIcon({ filled }) {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+    </svg>
+  );
+}
+
 // Cada comentario es su propio componente (no un simple .map() inline)
 // por la misma razón exacta por la que Chat.jsx extrae MessageBubble:
 // useReactionPicker() es un hook y cada comentario necesita su propia
@@ -791,7 +815,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           onClick={toggleSave}
           title={t(saved ? "feed.unsavePost" : "feed.savePost")}
         >
-          🔖
+          <BookmarkIcon filled={saved} />
         </button>
       </div>
 

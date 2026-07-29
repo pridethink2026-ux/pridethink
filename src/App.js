@@ -135,6 +135,7 @@ const navStyles = {
 const themeStyles = {
   wrapper: { position: "relative" },
   themeBtn: {
+    position: "relative",
     background: "none",
     border: "1px solid var(--border)",
     borderRadius: "999px",
@@ -273,57 +274,53 @@ const bottomNavStyles = {
   label: { fontSize: "10px", fontWeight: 600 },
 };
 
-// Ícono del tema "Arcoíris" en el selector: una gota de pintura
-// salpicando, en vez del emoji 🌈. Rediseñado (2026-07-28) con colores de
-// arcoíris DE VERDAD (rojo/naranja/amarillo/verde/azul/violeta) en vez de
-// solo los 2 acentos del tema — necesarios para que se lea como "arcoíris"
-// de un vistazo, y por eso mismo TIENEN que ser fijos: los 6 tonos no se
-// pueden derivar de las 2 variables --accent/--accent2 que define el
-// sistema de temas, así que esto no puede adaptarse al tema activo aunque
-// quisiera (misma excepción que las banderas pride de identityStyles.js).
-//
-// Diseño: una gota dividida en 6 franjas de color (en vez de 6 puntitos
-// sueltos) + solo 3 salpicaduras grandes afuera. Se probó primero una
-// versión con 6 círculos chicos alrededor de la gota (ver el commit
-// anterior) y se descartó a propósito siguiendo la propia advertencia del
-// pedido ("si las salpicaduras se ven como manchas indistinguibles,
-// simplificá: menos salpicaduras, más grandes") — 6 puntos de ~1.5px de
-// radio corren más riesgo de verse como ruido a 16px que unas pocas
-// franjas más grandes dentro de una sola forma contigua (los bordes entre
-// franjas quedan nítidos sin importar el anti-aliasing, a diferencia de
-// puntos sueltos que se pueden fundir con el fondo). No se pudo confirmar
-// con una captura real: la extensión de automatización del navegador
-// falló también sobre una página de prueba estática en esta sesión (no
-// solo en el sitio en producción), así que el diseño se basa en este
-// razonamiento en vez de una verificación visual — revisarlo a ojo en la
-// app si hay dudas.
-function ArcoirisIcon() {
+// Ícono del botón que abre el selector de temas: una gota de pintura con 3
+// franjas diagonales de colores fijos (rosa/amarillo/celeste). Reemplaza al
+// emoji 🎨 (2026-07-29). A propósito son solo 3 franjas grandes, no 6 como
+// el ícono descartado del tema "Arcoíris" (que a 16px se leía como "sol o
+// flor" en vez de arcoíris) — acá no hace falta leerse como un arcoíris
+// real, solo como una gota de pintura multicolor, así que menos franjas más
+// grandes se ven más claras a este tamaño. Colores fijos a propósito (misma
+// excepción que las banderas pride/el ícono de Arcoíris): no se pueden
+// derivar de las 2 variables --accent/--accent2 del tema activo.
+function PaintDropIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24">
+    <svg width="20" height="20" viewBox="0 0 24 24">
       <defs>
-        <clipPath id="arcoiris-drop-clip">
-          <path d="M12 2.5c3.2 4.2 6.2 7.8 6.2 10.8A6.2 6.2 0 1 1 5.8 13.3C5.8 10.3 8.8 6.7 12 2.5z" />
-        </clipPath>
+        <linearGradient id="paint-drop-gradient" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ff4d9e" />
+          <stop offset="33%" stopColor="#ff4d9e" />
+          <stop offset="33%" stopColor="#ffd93c" />
+          <stop offset="66%" stopColor="#ffd93c" />
+          <stop offset="66%" stopColor="#3ca7ff" />
+          <stop offset="100%" stopColor="#3ca7ff" />
+        </linearGradient>
       </defs>
-      <g clipPath="url(#arcoiris-drop-clip)">
-        <rect x="4" y="2" width="16" height="3.6" fill="#ff4d5e" />
-        <rect x="4" y="5.6" width="16" height="3.6" fill="#ff9a3c" />
-        <rect x="4" y="9.2" width="16" height="3.6" fill="#ffd93c" />
-        <rect x="4" y="12.8" width="16" height="3.6" fill="#3ddc84" />
-        <rect x="4" y="16.4" width="16" height="3.6" fill="#3ca7ff" />
-        <rect x="4" y="20" width="16" height="3" fill="#a25bff" />
-      </g>
-      <circle cx="4" cy="6" r="2" fill="#ffd93c" />
-      <circle cx="20.5" cy="8" r="1.7" fill="#3ca7ff" />
-      <circle cx="19" cy="19" r="1.8" fill="#ff4d5e" />
+      <path
+        d="M12 2.5c3.2 4.2 6.2 7.8 6.2 10.8A6.2 6.2 0 1 1 5.8 13.3C5.8 10.3 8.8 6.7 12 2.5z"
+        fill="url(#paint-drop-gradient)"
+      />
     </svg>
   );
 }
+
+// Puntitos del efecto "splash" al abrir el menú de temas: cada uno explota
+// en una dirección distinta (--tx/--ty, ver @keyframes pt-paint-splash en
+// index.css) — mismos colores fijos que PaintDropIcon, por el mismo motivo.
+const SPLASH_DOTS = [
+  { tx: "-16px", ty: "-14px", color: "#ff4d9e" },
+  { tx: "16px", ty: "-14px", color: "#ffd93c" },
+  { tx: "-18px", ty: "10px", color: "#3ca7ff" },
+  { tx: "18px", ty: "10px", color: "#3ddc84" },
+  { tx: "0px", ty: "-20px", color: "#a25bff" },
+];
+const SPLASH_DURATION_MS = 450;
 
 function ThemeMenu() {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState("noche");
+  const [splashing, setSplashing] = useState(false);
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -349,8 +346,32 @@ function ThemeMenu() {
 
   return (
     <div style={themeStyles.wrapper} ref={panelRef}>
-      <button style={themeStyles.themeBtn} onClick={() => setOpen((v) => !v)}>
-        🎨
+      <button
+        style={themeStyles.themeBtn}
+        onClick={() => {
+          setOpen((v) => {
+            const willOpen = !v;
+            // El splash solo se dispara al ABRIR (no al cerrar ni al
+            // seleccionar un tema) — mismo patrón que "likePop" en
+            // PostCard (Feed.jsx): un estado corto que se apaga solo con
+            // setTimeout, sin dejar nada animando de fondo.
+            if (willOpen) {
+              setSplashing(true);
+              setTimeout(() => setSplashing(false), SPLASH_DURATION_MS);
+            }
+            return willOpen;
+          });
+        }}
+      >
+        <PaintDropIcon />
+        {splashing &&
+          SPLASH_DOTS.map((d, i) => (
+            <span
+              key={i}
+              className="pt-paint-splash-dot"
+              style={{ background: d.color, "--tx": d.tx, "--ty": d.ty }}
+            />
+          ))}
       </button>
       {open && (
         <div style={themeStyles.panel}>
@@ -360,7 +381,7 @@ function ThemeMenu() {
               style={themeStyles.option(selected === key)}
               onClick={() => handleSelect(key)}
             >
-              {key === "arcoiris" ? <ArcoirisIcon /> : <span>{theme.emoji}</span>}
+              <span>{theme.emoji}</span>
               <span>{theme.label}</span>
             </div>
           ))}

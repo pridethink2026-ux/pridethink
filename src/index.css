@@ -96,6 +96,28 @@ code {
   }
 }
 
+.pt-paint-splash-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: pt-paint-splash 0.45s ease-out forwards;
+}
+
+@keyframes pt-paint-splash {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1);
+    opacity: 0;
+  }
+}
+
 .pt-view-fade {
   animation: pt-view-fade 0.25s ease;
 }
