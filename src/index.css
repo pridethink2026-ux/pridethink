@@ -179,6 +179,19 @@ code {
   }
 }
 
+.pt-theme-icon-elegante {
+  animation: pt-theme-glow-elegante 3.2s ease-in-out infinite;
+}
+
+@keyframes pt-theme-glow-elegante {
+  0%, 100% {
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9));
+  }
+}
+
 .pt-paint-splash-dot {
   position: absolute;
   top: 50%;

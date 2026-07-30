@@ -331,6 +331,7 @@ const THEME_ICON_ANIM_CLASS = {
   arcoiris: "pt-theme-icon-arcoiris",
   oceano: "pt-theme-icon-oceano",
   atardecer: "pt-theme-icon-atardecer",
+  elegante: "pt-theme-icon-elegante",
 };
 
 function ThemeMenu() {

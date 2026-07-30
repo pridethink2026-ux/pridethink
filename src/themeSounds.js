@@ -50,12 +50,22 @@ function playRotativoSound(ctx) {
   playTone(ctx, { freq: 1046.5, type: "sine", duration: 0.11, peakGain: 0.07, attack: 0.003 });
 }
 
+// Copa de cristal brindando: un tono agudo (1568Hz, G6) con ataque casi
+// instantáneo + un armónico una octava arriba (3136Hz) más bajito que se
+// apaga antes — mismo patrón de capas que Noche Violeta, pero sin fundamental
+// grave ni campana, para sonar cristalino en vez de a campana.
+function playEleganteSound(ctx) {
+  playTone(ctx, { freq: 1568, type: "sine", duration: 0.35, peakGain: 0.07, attack: 0.004, filterFreq: 6000 });
+  playTone(ctx, { freq: 3136, type: "sine", duration: 0.18, peakGain: 0.025, attack: 0.003, filterFreq: 7000 });
+}
+
 const SOUND_BUILDERS = {
   noche: playNocheSound,
   arcoiris: playArcoirisSound,
   oceano: playOceanoSound,
   atardecer: playAtardecerSound,
   rotativo: playRotativoSound,
+  elegante: playEleganteSound,
 };
 
 export function playThemeSound(themeKey) {

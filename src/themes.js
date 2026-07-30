@@ -99,6 +99,37 @@ export const THEMES = {
       "--accent-soft-border": "rgba(255, 151, 66, 0.4)",
     },
   },
+  // "--bg"/"--surface" se mantienen sólidos a propósito (no el degradado
+  // tipo laca 0a0a0a→1c1c1c que se pidió originalmente): varios componentes
+  // compartidos los usan como "color" de texto (color: var(--bg), p.ej. el
+  // banner motivacional en App.js) o como "border: Npx solid var(--surface)"
+  // (el punto verde de "en línea" en Avatar.jsx) — un degradado ahí es CSS
+  // inválido y rompería esos elementos en TODOS los temas, no solo este. El
+  // brillo nacarado sí se logra: "--accent"/"--accent2" alimentan el mismo
+  // linear-gradient(135deg, var(--accent), var(--accent2)) que ya usan el
+  // anillo del avatar (Avatar.jsx) y los botones/badges principales
+  // (App.js), así que con blanco marfil → plata ese degradado compartido ya
+  // sale con sheen de perla, sin tocar ningún componente.
+  elegante: {
+    label: "Elegante",
+    emoji: "🤵",
+    vars: {
+      "--bg": "#121212",
+      "--surface": "#1c1c1c",
+      "--surface-alt": "#242424",
+      "--accent": "#f5f3ec",
+      "--accent2": "#c9c6bc",
+      "--text": "#f5f3ec",
+      "--text-muted": "#a9a69c",
+      "--border": "rgba(255, 255, 255, 0.15)",
+      "--accent2-soft": "rgba(201, 198, 188, 0.15)",
+      "--accent2-softer": "rgba(201, 198, 188, 0.12)",
+      "--accent2-soft-border": "rgba(201, 198, 188, 0.4)",
+      "--accent-soft": "rgba(245, 243, 236, 0.15)",
+      "--accent-softer": "rgba(245, 243, 236, 0.12)",
+      "--accent-soft-border": "rgba(245, 243, 236, 0.4)",
+    },
+  },
 };
 
 export const ROTATIVO_KEY = "rotativo";
