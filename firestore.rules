@@ -105,6 +105,34 @@ service cloud.firestore {
         && (!('datingPreference' in datos) || textoValido(datos.datingPreference, 150));
     }
 
+    // Categorías fijas de la Tienda (Marketplace, Fase 1) — mismo arreglo
+    // que CATEGORIES en storeData.js, duplicado acá porque las reglas no
+    // pueden importar el archivo del cliente.
+    function categoriaDeProductoValida(cat) {
+      return cat in [
+        'Ropa y Moda', 'Accesorios', 'Arte y Diseño', 'Joyería',
+        'Belleza y Cuidado', 'Hogar y Decoración', 'Tecnología',
+        'Libros y Medios', 'Artesanías', 'Otros'
+      ];
+    }
+
+    // Campos de products/{productId} (ver el bloque más abajo). Se exige
+    // un documento completo y bien tipado en cada create/edición del
+    // vendedor (nunca en los caminos de "sumar una vista"/"sumar un
+    // regalo", que solo tocan su propio contador — ver más abajo), mismo
+    // criterio de "hallazgo M1" que ya se aplica al resto de la app.
+    function camposDeProductoValidos(datos) {
+      return textoValido(datos.title, 100)
+        && textoValido(datos.description, 2000)
+        && categoriaDeProductoValida(datos.category)
+        && datos.quantity is int && datos.quantity >= 0
+        && datos.condition in ['new', 'used']
+        && textoValido(datos.manufacturer, 100)
+        && datos.isPersonalDesign is bool
+        && datos.price is number && datos.price >= 0
+        && datos.tier in ['standard', 'prime'];
+    }
+
     // Auditoría de seguridad (2026-07-28, hallazgo H3): antes, cualquier
     // autenticado podía crear una notificación en la bandeja de OTRA
     // persona con un "type" inventado y un "fromName"/"fromIdentity"
@@ -346,6 +374,127 @@ service cloud.firestore {
       // Es una lista privada: solo el dueño la lee, agrega o quita
       // referencias. Nadie más puede ver qué guardó otra persona.
       allow read, create, update, delete: if esDueno(ownerUid);
+    }
+
+    // --------------------------------------------------------------------
+    // products/{productId}
+    // Artículos de la Tienda (Marketplace, Fase 1). "imageUrl" siempre
+    // llega vacío por ahora (subida de imágenes pendiente, requiere el
+    // plan Blaze — mismo motivo que los grupos/eventos sin portada). El
+    // tier (comisión 10%/12%) y "Comprar" son solo informativos en esta
+    // fase, todavía no hay cobro real (Stripe pendiente).
+    // --------------------------------------------------------------------
+    match /products/{productId} {
+      // Cualquier autenticado ve productos publicados; el vendedor
+      // siempre ve los propios (incluidos los borradores). En términos de
+      // resource.data (no de un get() al perfil), mismo motivo que
+      // authorIsPrivate en posts/{postId}: StoreScreen.jsx/MyStoreScreen.jsx
+      // hacen queries con where("isPublished","==",...)/where("sellerId",
+      // "==",...) y Firestore valida la query contra la regla ANTES de
+      // ejecutarla.
+      allow read: if estaAutenticado()
+        && (resource.data.isPublished == true || resource.data.sellerId == request.auth.uid);
+
+      // Solo podés crear un producto firmado con tu propio uid.
+      // "isOfficialBrand" no se puede autodeclarar en true (mismo patrón
+      // que "isVerified" en users/{uid}: se activa a mano desde la
+      // consola de Firebase) y los contadores arrancan en 0.
+      allow create: if estaAutenticado()
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.get('isOfficialBrand', false) == false
+        && request.resource.data.get('giftCount', 0) == 0
+        && request.resource.data.get('viewCount', 0) == 0
+        && camposDeProductoValidos(request.resource.data);
+
+      // Solo el vendedor puede borrar su propio producto.
+      allow delete: if estaAutenticado() && resource.data.sellerId == request.auth.uid;
+
+      // Editar un producto tiene tres caminos válidos, y en los tres el
+      // vendedor del producto no puede cambiar (ni siquiera al sumar una
+      // vista o un regalo, que los dispara alguien MÁS).
+      allow update: if estaAutenticado()
+        && resource.data.sellerId == request.resource.data.sellerId
+        && (
+          // 1) El vendedor edita su propio producto (título, precio,
+          //    publicar/despublicar, etc.), pero nunca "isOfficialBrand"
+          //    ni los contadores directamente (eso solo por los caminos
+          //    2 y 3, disparados por otra persona).
+          (
+            resource.data.sellerId == request.auth.uid
+            && request.resource.data.get('isOfficialBrand', false) == resource.data.get('isOfficialBrand', false)
+            && request.resource.data.get('giftCount', 0) == resource.data.get('giftCount', 0)
+            && request.resource.data.get('viewCount', 0) == resource.data.get('viewCount', 0)
+            && camposDeProductoValidos(request.resource.data)
+          )
+          // 2) Cualquier autenticado puede sumar una vista al ver el
+          //    detalle del producto: solo se le permite tocar "viewCount".
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount'])
+          // 3) Cualquier autenticado puede sumar un regalo enviado (ver
+          //    giftShares/{giftId} más abajo): solo se le permite tocar
+          //    "giftCount".
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['giftCount'])
+        );
+    }
+
+    // --------------------------------------------------------------------
+    // catalogs/{catalogId}
+    // Catálogos del vendedor (agrupan sus productos). A diferencia de
+    // products/{productId}, son TOTALMENTE privados: nada en la Tienda
+    // necesita leer el catálogo de otra persona (ProductDetailScreen no
+    // lo muestra; CreateProductScreen/MyStoreScreen siempre trabajan
+    // sobre los catálogos PROPIOS).
+    // --------------------------------------------------------------------
+    match /catalogs/{catalogId} {
+      allow read: if estaAutenticado() && resource.data.sellerId == request.auth.uid;
+
+      allow create: if estaAutenticado()
+        && request.resource.data.sellerId == request.auth.uid
+        && textoValido(request.resource.data.name, 60)
+        && textoValido(request.resource.data.description, 500)
+        && request.resource.data.get('productCount', 0) == 0;
+
+      // El dueño puede renombrar/editar su catálogo o actualizar
+      // "productCount" al agregar/quitar productos de él — nunca puede
+      // cambiar de dueño.
+      allow update: if estaAutenticado()
+        && resource.data.sellerId == request.auth.uid
+        && request.resource.data.sellerId == resource.data.sellerId
+        && textoValido(request.resource.data.name, 60)
+        && textoValido(request.resource.data.description, 500);
+
+      allow delete: if estaAutenticado() && resource.data.sellerId == request.auth.uid;
+    }
+
+    // --------------------------------------------------------------------
+    // giftShares/{giftId}
+    // Registro de un producto regalado por chat (GiftFriendModal.jsx). Es
+    // un historial: se crea una vez y como mucho se pisa "status" cuando
+    // el destinatario lo ve — nunca se borra ni se reescribe su contenido.
+    // --------------------------------------------------------------------
+    match /giftShares/{giftId} {
+      // Solo las dos personas involucradas en ESE regalo puntual pueden
+      // verlo (mismo criterio de "ambas partes" que ya usan
+      // blocks/{blockId} y chats/{chatId}).
+      allow read: if estaAutenticado()
+        && (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+
+      // Solo podés crear un regalo firmado como tu propio remitente,
+      // siempre en estado "sent" (nadie crea uno ya "viewed").
+      allow create: if estaAutenticado()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.status == 'sent'
+        && textoValido(request.resource.data.productTitle, 100)
+        && request.resource.data.productPrice is number
+        && textoValido(request.resource.data.message, 500);
+
+      // Solo quien lo recibió puede marcarlo como visto, y solo puede
+      // tocar "status" — nunca reescribir de quién era o qué decía.
+      allow update: if estaAutenticado()
+        && resource.data.recipientId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status == 'viewed';
+
+      allow delete: if false;
     }
 
     // --------------------------------------------------------------------

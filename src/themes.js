@@ -38,6 +38,10 @@ export const THEMES = {
       "--accent-softer": "rgba(155, 107, 255, 0.12)",
       "--accent-soft-border": "rgba(155, 107, 255, 0.4)",
     },
+    gradientPrimary: "linear-gradient(135deg, #8d57ff, #ff4ba4)",
+    glowColor: "rgba(155, 107, 255, 0.35)",
+    glassBg: "rgba(42, 26, 92, 0.55)",
+    borderGlow: "rgba(255, 95, 174, 0.4)",
   },
   arcoiris: {
     label: "Arcoíris",
@@ -58,6 +62,10 @@ export const THEMES = {
       "--accent-softer": "rgba(255, 201, 60, 0.12)",
       "--accent-soft-border": "rgba(255, 201, 60, 0.4)",
     },
+    gradientPrimary: "linear-gradient(135deg, #ffc328, #ff4865)",
+    glowColor: "rgba(255, 201, 60, 0.35)",
+    glassBg: "rgba(39, 24, 73, 0.55)",
+    borderGlow: "rgba(255, 92, 118, 0.4)",
   },
   oceano: {
     label: "Océano",
@@ -78,6 +86,10 @@ export const THEMES = {
       "--accent-softer": "rgba(19, 236, 209, 0.12)",
       "--accent-soft-border": "rgba(19, 236, 209, 0.4)",
     },
+    gradientPrimary: "linear-gradient(135deg, #03e7cb, #1fbcff)",
+    glowColor: "rgba(19, 236, 209, 0.35)",
+    glassBg: "rgba(11, 44, 76, 0.55)",
+    borderGlow: "rgba(51, 194, 255, 0.4)",
   },
   atardecer: {
     label: "Atardecer",
@@ -98,6 +110,10 @@ export const THEMES = {
       "--accent-softer": "rgba(255, 151, 66, 0.12)",
       "--accent-soft-border": "rgba(255, 151, 66, 0.4)",
     },
+    gradientPrimary: "linear-gradient(135deg, #ff8c2e, #ff1f44)",
+    glowColor: "rgba(255, 151, 66, 0.35)",
+    glassBg: "rgba(67, 27, 20, 0.55)",
+    borderGlow: "rgba(255, 51, 85, 0.4)",
   },
   // "--bg"/"--surface" se mantienen sólidos a propósito (no el degradado
   // tipo laca 0a0a0a→1c1c1c que se pidió originalmente): varios componentes
@@ -129,6 +145,10 @@ export const THEMES = {
       "--accent-softer": "rgba(245, 243, 236, 0.12)",
       "--accent-soft-border": "rgba(245, 243, 236, 0.4)",
     },
+    gradientPrimary: "linear-gradient(135deg, #f1ecdc, #c8c1a8)",
+    glowColor: "rgba(245, 243, 236, 0.35)",
+    glassBg: "rgba(28, 28, 28, 0.55)",
+    borderGlow: "rgba(201, 198, 188, 0.4)",
   },
 };
 

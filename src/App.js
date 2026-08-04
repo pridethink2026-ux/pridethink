@@ -12,6 +12,7 @@ import PostView from "./PostView";
 import GroupView from "./GroupView";
 import EventView from "./EventView";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
+import StoreScreen from "./StoreScreen";
 import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
 import { useOnlinePresence } from "./presence";
@@ -56,6 +57,7 @@ function getDesktopTabs(t) {
     { key: "feed", label: t("nav.wall") },
     { key: "chat", label: t("nav.chat") },
     { key: "buscar", label: t("nav.search") },
+    { key: "tienda", label: t("nav.store") },
   ];
 }
 
@@ -65,8 +67,34 @@ function getBottomTabs(t) {
     { key: "buscar", label: t("nav.search"), icon: "🔍" },
     { key: "chat", label: t("nav.chat"), icon: "💬" },
     { key: "notificaciones", label: t("nav.alerts"), icon: "🔔" },
+    { key: "tienda", label: t("nav.store"), icon: "🛍️" },
     { key: "perfil", label: t("nav.profile"), icon: "👤" },
   ];
+}
+
+// Ícono de la pestaña "Tienda": una bolsa de compras trazada (SVG, no
+// emoji — a diferencia de "buscar"/"chat"/"notificaciones"/"perfil", que
+// todavía usan el emoji fijo de getBottomTabs de arriba, este ícono nuevo
+// se pidió explícitamente en SVG). currentColor hereda el color
+// activo/inactivo que ya calcula el botón que lo contiene (mismo truco
+// que MicIcon/StickerIcon en Chat.jsx), así que no necesita su propia
+// prop "active".
+function StoreIcon({ size = 18 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 8h12l1 12.5a2 2 0 0 1-2 1.5H7a2 2 0 0 1-2-1.5L6 8z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </svg>
+  );
 }
 
 const navStyles = {
@@ -439,6 +467,8 @@ function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
             <span style={bottomNavStyles.iconWrap}>
               {tab.key === "feed" ? (
                 <HomeIcon identityText={myIdentity} active={isActive} size={19} />
+              ) : tab.key === "tienda" ? (
+                <StoreIcon size={19} />
               ) : (
                 tab.icon
               )}
@@ -492,6 +522,15 @@ function App() {
   const [viewingPostId, setViewingPostId] = useState(null);
   const [viewingGroupId, setViewingGroupId] = useState(null);
   const [viewingEventId, setViewingEventId] = useState(null);
+  // Producto pendiente de abrir dentro de la Tienda al llegar desde un
+  // regalo en el chat (GiftNotification.jsx -> onOpenProduct). La Tienda
+  // no es un overlay de App.js (StoreScreen.jsx maneja su propia
+  // navegación interna a ProductDetailScreen — ver su docstring), así
+  // que cruzar de "chat" a "un producto puntual de la tienda" necesita
+  // este puente: se cambia de pestaña Y se le pasa el id a StoreScreen,
+  // que lo consume una vez (onConsumeStoreProduct) para no reabrir el
+  // mismo producto si el usuario vuelve a la lista y sale de nuevo.
+  const [storeProductId, setStoreProductId] = useState(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const { unreadCount } = useNotifications(currentUid);
 
@@ -576,6 +615,20 @@ function App() {
     setViewingPostId(null);
     setViewingGroupId(null);
     setViewingEventId(null);
+    setStoreProductId(null);
+  };
+
+  // Desde un mensaje de regalo en el chat (GiftNotification.jsx): cambia
+  // a la pestaña Tienda y le pide a StoreScreen que abra ESE producto
+  // directamente, sin pasar por su lista principal.
+  const openStoreProduct = (productId) => {
+    setView("tienda");
+    closeProfile();
+    setViewingSaved(false);
+    setViewingPostId(null);
+    setViewingGroupId(null);
+    setViewingEventId(null);
+    setStoreProductId(productId);
   };
 
   let content;
@@ -594,9 +647,17 @@ function App() {
   } else if (view === "feed") {
     content = <Feed onOpenProfile={openProfile} onOpenGroup={openGroup} onOpenEvent={openEvent} />;
   } else if (view === "chat") {
-    content = <Chat onOpenProfile={openProfile} onOpenPost={openPost} />;
+    content = <Chat onOpenProfile={openProfile} onOpenPost={openPost} onOpenProduct={openStoreProduct} />;
   } else if (view === "buscar") {
     content = <Search onOpenProfile={openProfile} />;
+  } else if (view === "tienda") {
+    content = (
+      <StoreScreen
+        onOpenProfile={openProfile}
+        initialProductId={storeProductId}
+        onConsumeInitialProductId={() => setStoreProductId(null)}
+      />
+    );
   } else if (view === "notificaciones") {
     content = <NotificationsScreen onOpenProfile={openProfile} onOpenPost={openPost} />;
   } else {
@@ -629,6 +690,7 @@ function App() {
                   {tab.key === "feed" && (
                     <HomeIcon identityText={myIdentity} active={active} size={17} />
                   )}
+                  {tab.key === "tienda" && <StoreIcon size={17} />}
                   {tab.label}
                 </button>
               );

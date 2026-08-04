@@ -22,6 +22,7 @@ import { StickerImage, StickerPicker } from "./Stickers";
 import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
 import { playReactionSound } from "./sound";
+import GiftNotification from "./GiftNotification";
 
 /*
   Chat
@@ -718,7 +719,7 @@ function SharedPostPreview({ postId, mine, onOpenPost }) {
 // inline) porque useReactionPicker() es un hook y cada mensaje necesita su
 // propia instancia de estado (si abriste el selector no debe abrirse en
 // todos).
-function MessageBubble({ message, mine, currentUid, chatId, onOpenPost }) {
+function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenProduct, senderName }) {
   const { open, setOpen, containerRef, triggerProps } = useReactionPicker();
   const myReaction = (message.reactions || {})[currentUid] || null;
   const reactionEmojis = getDistinctReactionEmojis(message.reactions);
@@ -738,6 +739,13 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost }) {
           <div style={styles.stickerBubble}>
             <StickerImage stickerId={message.stickerId} size={96} />
           </div>
+        ) : message.type === "gift" ? (
+          <GiftNotification
+            message={message}
+            mine={mine}
+            senderName={senderName}
+            onOpenProduct={onOpenProduct}
+          />
         ) : (
           <div style={styles.bubble(mine)}>
             {message.type === "audio" ? (
@@ -783,7 +791,7 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost }) {
   );
 }
 
-export default function Chat({ onOpenProfile, onOpenPost }) {
+export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
@@ -1215,6 +1223,10 @@ export default function Chat({ onOpenProfile, onOpenPost }) {
                       currentUid={currentUid}
                       chatId={getChatId(currentUid, activeContact.uid)}
                       onOpenPost={onOpenPost}
+                      onOpenProduct={onOpenProduct}
+                      senderName={
+                        m.senderId === currentUid ? myProfile?.displayName : activeContact.displayName
+                      }
                     />
                   ))}
                   <div ref={messagesEndRef} />
