@@ -144,9 +144,20 @@ const styles = {
     fontSize: "13px",
     padding: "30px 20px",
   },
+  findPeopleBtn: {
+    marginTop: "14px",
+    padding: "9px 20px",
+    borderRadius: "999px",
+    border: "none",
+    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    color: "var(--bg)",
+    fontSize: "13px",
+    fontWeight: 700,
+    cursor: "pointer",
+  },
 };
 
-export default function GiftFriendModal({ product, currentUid, myProfile, onClose }) {
+export default function GiftFriendModal({ product, currentUid, myProfile, onClose, onGoToSearch }) {
   const { t } = useLanguage();
   const allUsersRaw = useAllUsers();
   const allUsers = useMemo(
@@ -158,8 +169,19 @@ export default function GiftFriendModal({ product, currentUid, myProfile, onClos
   const [sentTo, setSentTo] = useState(null);
 
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
+  // Contactos para regalar = follow MUTUO (yo sigo a esa persona Y esa
+  // persona me sigue a mí). No hay una colección "follows" aparte en esta
+  // app — "following" ya vive como campo en users/{uid} (ver
+  // UserProfile.jsx) — así que se calcula 100% en el cliente a partir de
+  // datos que ya están cargados: myProfile.following (a quién sigo) y el
+  // "following" de cada usuario en allUsers (quién me sigue a mí), sin
+  // ninguna consulta nueva a Firestore. useAllUsers() ya es un listener
+  // único compartido por toda la app (AllUsersContext.jsx), así que este
+  // cálculo tampoco agrega ninguna lectura extra ni se repite por render.
+  const myFollowing = myProfile?.following || [];
   const visibleContacts = allUsers.filter((c) => {
-    if (c.isPrivate) return false;
+    if (!myFollowing.includes(c.uid)) return false;
+    if (!(c.following || []).includes(currentUid)) return false;
     if (isBlockedEitherWay(blockedByMe, blockedMe, c.uid)) return false;
     return true;
   });
@@ -248,9 +270,22 @@ export default function GiftFriendModal({ product, currentUid, myProfile, onClos
         </div>
         <div style={styles.list}>
           {contacts.length === 0 && (
-            <p style={styles.empty}>
-              {search ? t("store.gift.noSearchResults") : t("store.gift.noContacts")}
-            </p>
+            <div style={styles.empty}>
+              <p style={{ margin: 0 }}>
+                {search ? t("store.gift.noSearchResults") : t("store.gift.noContacts")}
+              </p>
+              {!search && onGoToSearch && (
+                <button
+                  style={styles.findPeopleBtn}
+                  onClick={() => {
+                    onClose();
+                    onGoToSearch();
+                  }}
+                >
+                  {t("store.gift.findPeopleButton")}
+                </button>
+              )}
+            </div>
           )}
           {contacts.map((c) => (
             <div key={c.uid} style={styles.row} onClick={() => handleGift(c)}>

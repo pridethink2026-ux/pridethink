@@ -209,7 +209,7 @@ function NotificationItem({ n, onOpenProfile, onOpenPost, dropdown }) {
         <p style={styles.itemText}>
           {LABELS[n.type] ? LABELS[n.type](n, t) : t("notifications.generic")}
         </p>
-        <p style={styles.itemTime}>{timeAgo(n.createdAt)}</p>
+        <p style={styles.itemTime}>{timeAgo(n.createdAt, t)}</p>
       </div>
     </div>
   );

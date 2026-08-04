@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import { doc, onSnapshot, deleteDoc, updateDoc, increment } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { useLanguage } from "./LanguageContext";
-import { getCategoryEmoji } from "./storeData";
+import { getCategoryEmoji, getCategoryLabelKey } from "./storeData";
 import GiftFriendModal from "./GiftFriendModal";
 
 /*
@@ -91,7 +91,7 @@ const styles = {
     background: isNew ? "rgba(34,197,94,0.15)" : "rgba(255,151,66,0.18)",
     color: isNew ? "#22c55e" : "#ff9742",
   }),
-  primeBadge: {
+  pridePlusBadge: {
     fontSize: "12px",
     fontWeight: 700,
     padding: "5px 12px",
@@ -189,7 +189,7 @@ function CameraIcon() {
   );
 }
 
-export default function ProductDetailScreen({ productId, currentUid, myProfile, onBack, onOpenProfile, onEdit }) {
+export default function ProductDetailScreen({ productId, currentUid, myProfile, onBack, onOpenProfile, onEdit, onGoToSearch }) {
   const { t } = useLanguage();
   const [product, setProduct] = useState(undefined); // undefined: cargando | null: no existe
   const [giftOpen, setGiftOpen] = useState(false);
@@ -253,11 +253,16 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
         <p style={styles.price}>${product.price}</p>
 
         <div style={styles.badgeRow}>
-          <span style={styles.badge}>{getCategoryEmoji(product.category)} {product.category}</span>
+          <span style={styles.badge}>
+            {getCategoryEmoji(product.category)}{" "}
+            {getCategoryLabelKey(product.category) ? t(getCategoryLabelKey(product.category)) : product.category}
+          </span>
           <span style={styles.conditionBadge(product.condition === "new")}>
             {product.condition === "new" ? t("store.conditionNew") : t("store.conditionUsed")}
           </span>
-          {product.tier === "prime" && <span style={styles.primeBadge}>{t("store.primeBadge")}</span>}
+          {product.tier === "prime" && (
+            <span style={styles.pridePlusBadge}>{t("store.pridePlusBadge")}</span>
+          )}
           {product.isPersonalDesign && (
             <span style={styles.designBadge}>{t("store.detail.personalDesignBadge")}</span>
           )}
@@ -315,6 +320,7 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
           currentUid={currentUid}
           myProfile={myProfile}
           onClose={() => setGiftOpen(false)}
+          onGoToSearch={onGoToSearch}
         />
       )}
     </div>

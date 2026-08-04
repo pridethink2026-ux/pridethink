@@ -7,7 +7,8 @@ import { db } from "./firebase";
   --------
   Helpers compartidos entre pantallas: detección de pantalla angosta,
   creación de notificaciones (mismo patrón para likes, comentarios,
-  mensajes y seguidores nuevos), tiempo relativo en español, y hashtags.
+  mensajes y seguidores nuevos), tiempo relativo en el idioma activo, y
+  hashtags.
 */
 
 export function useIsMobile(breakpoint = 700) {
@@ -40,22 +41,27 @@ export async function notify(targetUid, { type, fromUid, fromName, fromIdentity,
   await addDoc(collection(db, "notifications", targetUid, "items"), data);
 }
 
-// Tiempo relativo en español: "hace 5 min", "hace 2 h", "ayer", o fecha si es más viejo.
-export function timeAgo(timestamp) {
+// Tiempo relativo en el idioma activo: "hace 5 min"/"5m ago", "hace 2 h"/"2h
+// ago", "ayer"/"yesterday", o fecha si es más viejo. "t" es la función de
+// LanguageContext.jsx (useLanguage().t) — quien llama a timeAgo() ya la
+// tiene en su propio scope, así que no hace falta que timeAgo() sea un hook
+// aparte. "common.localeCode" (es-ES/en-US en translations.js) es el locale
+// que usa el fallback de fecha larga para que también respete el idioma.
+export function timeAgo(timestamp, t) {
   if (!timestamp) return "";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (diffSec < 5) return "ahora";
-  if (diffSec < 60) return `hace ${diffSec} s`;
+  if (diffSec < 5) return t("common.timeAgo.now");
+  if (diffSec < 60) return t("common.timeAgo.secondsAgo", { n: diffSec });
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `hace ${diffMin} min`;
+  if (diffMin < 60) return t("common.timeAgo.minutesAgo", { n: diffMin });
   const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `hace ${diffH} h`;
+  if (diffH < 24) return t("common.timeAgo.hoursAgo", { n: diffH });
   const diffD = Math.floor(diffH / 24);
-  if (diffD === 1) return "ayer";
-  if (diffD < 7) return `hace ${diffD} días`;
+  if (diffD === 1) return t("common.timeAgo.yesterday");
+  if (diffD < 7) return t("common.timeAgo.daysAgo", { n: diffD });
   const sameYear = date.getFullYear() === new Date().getFullYear();
-  return date.toLocaleDateString("es-ES", {
+  return date.toLocaleDateString(t("common.localeCode"), {
     day: "numeric",
     month: "short",
     year: sameYear ? undefined : "numeric",

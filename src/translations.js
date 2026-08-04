@@ -34,6 +34,19 @@ export const translations = {
     "common.loading": "Cargando...",
     "verified.badge": "Cuenta verificada",
 
+    // Tiempo relativo (timeAgo()/formatLastSeen() en utils.js/presence.js),
+    // usado por Feed.jsx, Search.jsx, Notifications.jsx y Chat.jsx.
+    // "common.localeCode" es el locale de Intl para el fallback de fecha
+    // larga (7+ días) — no es un texto que se le muestre a nadie tal cual.
+    "common.localeCode": "es-ES",
+    "common.timeAgo.now": "ahora",
+    "common.timeAgo.secondsAgo": "hace {n} s",
+    "common.timeAgo.minutesAgo": "hace {n} min",
+    "common.timeAgo.hoursAgo": "hace {n} h",
+    "common.timeAgo.yesterday": "ayer",
+    "common.timeAgo.daysAgo": "hace {n} días",
+    "common.lastSeenPrefix": "Últ. vez {time}",
+
     // Navegación (App.js)
     "nav.wall": "Muro",
     "nav.search": "Buscar",
@@ -170,6 +183,31 @@ export const translations = {
     "profile.birthDateField": "Nacimiento",
     "profile.birthDateWithAge": "{date} ({age} años)",
     "profile.datingPreferenceField": "Busca conocer a",
+
+    // Perfil público (UserProfile.jsx)
+    "userProfile.backLink": "← Volver",
+    "userProfile.loadingProfile": "Cargando perfil...",
+    "userProfile.notFound": "Este perfil ya no existe.",
+    "userProfile.cannotView": "No puedes ver este perfil.",
+    "userProfile.follow": "Seguir",
+    "userProfile.unfollow": "Dejar de seguir",
+    "userProfile.privateProfileNotice": "🔒 Este perfil es privado. No comparte sus publicaciones.",
+    "userProfile.privateWallNotice": "🔒 Este muro es privado.",
+    "userProfile.noPosts": "Todavía no tiene publicaciones.",
+
+    // Lista de seguidores/seguidos (FollowListModal.jsx)
+    "followList.titleFollowers": "Seguidores",
+    "followList.titleFollowing": "Siguiendo",
+    "followList.emptyFollowers": "Todavía no tiene seguidores.",
+    "followList.emptyFollowing": "Todavía no sigue a nadie.",
+
+    // Buscar (Search.jsx)
+    "search.loginRequired": "Inicia sesión primero para buscar.",
+    "search.placeholder": "Buscar personas, texto o #hashtags...",
+    "search.hint": "Escribe para buscar personas y publicaciones.",
+    "search.noResults": 'No encontramos nada para "{query}".',
+    "search.peopleTitle": "Personas",
+    "search.postsTitle": "Publicaciones",
 
     // Reacciones (Reactions.jsx, compartido entre Feed.jsx y Chat.jsx)
     "reaction.like": "Me gusta",
@@ -379,14 +417,28 @@ export const translations = {
     "store.createFabTitle": "Publicar artículo",
     "store.conditionNew": "Nuevo",
     "store.conditionUsed": "Usado",
-    "store.primeBadge": "⭐ Prime",
+    "store.pridePlusBadge": "⭐ PridePlus",
     "store.officialBadge": "Marca oficial",
+
+    // Tienda: categorías (storeData.js) — el "key" guardado en Firestore
+    // (products/{id}.category) queda fijo en español; solo esta etiqueta
+    // se traduce, mismo patrón que store.tier* de acá abajo.
+    "store.categoryClothing": "Ropa y Moda",
+    "store.categoryAccessories": "Accesorios",
+    "store.categoryArtDesign": "Arte y Diseño",
+    "store.categoryJewelry": "Joyería",
+    "store.categoryBeauty": "Belleza y Cuidado",
+    "store.categoryHome": "Hogar y Decoración",
+    "store.categoryTech": "Tecnología",
+    "store.categoryBooksMedia": "Libros y Medios",
+    "store.categoryCrafts": "Artesanías",
+    "store.categoryOther": "Otros",
 
     // Tienda: tiers (storeData.js)
     "store.tierStandardLabel": "Estándar (10%)",
     "store.tierStandardDescription": "Alcance normal dentro de la Tienda.",
-    "store.tierPrimeLabel": "Prime (12%)",
-    "store.tierPrimeDescription": "Mayor visibilidad y un badge destacado en tus productos.",
+    "store.tierPridePlusLabel": "PridePlus (12%)",
+    "store.tierPridePlusDescription": "Mayor visibilidad y un badge destacado en tus productos.",
 
     // Tienda: detalle de producto (ProductDetailScreen.jsx)
     "store.detail.backLink": "← Volver",
@@ -406,7 +458,9 @@ export const translations = {
     "store.gift.title": "Regalar a un amigo",
     "store.gift.messagePlaceholder": "Escribe un mensaje para acompañar el regalo...",
     "store.gift.searchPlaceholder": "Buscar contactos...",
-    "store.gift.noContacts": "No tienes contactos disponibles para regalar.",
+    "store.gift.noContacts":
+      "Aún no tienes conexiones mutuas. ¡Sigue a alguien y espera a que te sigan de vuelta para poder enviar regalos!",
+    "store.gift.findPeopleButton": "Buscar personas",
     "store.gift.noSearchResults": "No se encontraron resultados.",
     "store.gift.sent": "¡Regalo enviado!",
     "store.gift.defaultName": "Sin nombre",
@@ -478,6 +532,19 @@ export const translations = {
     // Generic, used across more than one screen
     "common.loading": "Loading...",
     "verified.badge": "Verified account",
+
+    // Relative time (timeAgo()/formatLastSeen() in utils.js/presence.js),
+    // used by Feed.jsx, Search.jsx, Notifications.jsx and Chat.jsx.
+    // "common.localeCode" is the Intl locale for the long-date fallback
+    // (7+ days) — not text shown to anyone as-is.
+    "common.localeCode": "en-US",
+    "common.timeAgo.now": "just now",
+    "common.timeAgo.secondsAgo": "{n}s ago",
+    "common.timeAgo.minutesAgo": "{n}m ago",
+    "common.timeAgo.hoursAgo": "{n}h ago",
+    "common.timeAgo.yesterday": "yesterday",
+    "common.timeAgo.daysAgo": "{n}d ago",
+    "common.lastSeenPrefix": "Last seen {time}",
 
     // Nav (App.js)
     "nav.wall": "Wall",
@@ -611,6 +678,31 @@ export const translations = {
     "profile.changeIdentity": "Change my identity",
     "profile.logout": "Log out",
     "profile.defaultUser": "User",
+
+    // Public profile (UserProfile.jsx)
+    "userProfile.backLink": "← Back",
+    "userProfile.loadingProfile": "Loading profile...",
+    "userProfile.notFound": "This profile no longer exists.",
+    "userProfile.cannotView": "You can't view this profile.",
+    "userProfile.follow": "Follow",
+    "userProfile.unfollow": "Unfollow",
+    "userProfile.privateProfileNotice": "🔒 This profile is private. They don't share their posts.",
+    "userProfile.privateWallNotice": "🔒 This wall is private.",
+    "userProfile.noPosts": "No posts yet.",
+
+    // Followers/following list (FollowListModal.jsx)
+    "followList.titleFollowers": "Followers",
+    "followList.titleFollowing": "Following",
+    "followList.emptyFollowers": "No followers yet.",
+    "followList.emptyFollowing": "Not following anyone yet.",
+
+    // Search (Search.jsx)
+    "search.loginRequired": "Sign in first to search.",
+    "search.placeholder": "Search people, text, or #hashtags...",
+    "search.hint": "Type to search people and posts.",
+    "search.noResults": 'We found nothing for "{query}".',
+    "search.peopleTitle": "People",
+    "search.postsTitle": "Posts",
 
     // Reactions (Reactions.jsx, shared between Feed.jsx and Chat.jsx)
     "reaction.like": "Like",
@@ -817,14 +909,28 @@ export const translations = {
     "store.createFabTitle": "List an item",
     "store.conditionNew": "New",
     "store.conditionUsed": "Used",
-    "store.primeBadge": "⭐ Prime",
+    "store.pridePlusBadge": "⭐ PridePlus",
     "store.officialBadge": "Official brand",
+
+    // Store: categories (storeData.js) — the "key" saved in Firestore
+    // (products/{id}.category) stays fixed in Spanish; only this label
+    // is translated, same pattern as store.tier* below.
+    "store.categoryClothing": "Clothing & Fashion",
+    "store.categoryAccessories": "Accessories",
+    "store.categoryArtDesign": "Art & Design",
+    "store.categoryJewelry": "Jewelry",
+    "store.categoryBeauty": "Beauty & Care",
+    "store.categoryHome": "Home & Decor",
+    "store.categoryTech": "Technology",
+    "store.categoryBooksMedia": "Books & Media",
+    "store.categoryCrafts": "Crafts",
+    "store.categoryOther": "Other",
 
     // Store: tiers (storeData.js)
     "store.tierStandardLabel": "Standard (10%)",
     "store.tierStandardDescription": "Normal reach within the Store.",
-    "store.tierPrimeLabel": "Prime (12%)",
-    "store.tierPrimeDescription": "More visibility and a highlighted badge on your products.",
+    "store.tierPridePlusLabel": "PridePlus (12%)",
+    "store.tierPridePlusDescription": "More visibility and a highlighted badge on your products.",
 
     // Store: product detail (ProductDetailScreen.jsx)
     "store.detail.backLink": "← Back",
@@ -844,7 +950,9 @@ export const translations = {
     "store.gift.title": "Gift to a friend",
     "store.gift.messagePlaceholder": "Write a message to go with the gift...",
     "store.gift.searchPlaceholder": "Search contacts...",
-    "store.gift.noContacts": "You have no contacts available to gift.",
+    "store.gift.noContacts":
+      "You don't have any mutual connections yet. Follow someone and wait for them to follow you back to send gifts!",
+    "store.gift.findPeopleButton": "Find people",
     "store.gift.noSearchResults": "No results found.",
     "store.gift.sent": "Gift sent!",
     "store.gift.defaultName": "No name",

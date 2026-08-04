@@ -3,6 +3,7 @@ import { db } from "./firebase";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { useLanguage } from "./LanguageContext";
 
 /*
   FollowListModal
@@ -95,6 +96,7 @@ const styles = {
 };
 
 export default function FollowListModal({ mode, targetUid, currentUid, onClose, onOpenProfile }) {
+  const { t } = useLanguage();
   const [rawUids, setRawUids] = useState([]);
   const [uidsReady, setUidsReady] = useState(false);
   const [profiles, setProfiles] = useState({});
@@ -150,24 +152,24 @@ export default function FollowListModal({ mode, targetUid, currentUid, onClose, 
       return true;
     });
 
-  const title = mode === "followers" ? "Seguidores" : "Siguiendo";
+  const title = mode === "followers" ? t("followList.titleFollowers") : t("followList.titleFollowing");
 
   return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.panel} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
           <h2 style={styles.title}>{title}</h2>
-          <button style={styles.closeBtn} onClick={onClose} title="Cerrar">
+          <button style={styles.closeBtn} onClick={onClose} title={t("report.close")}>
             ✕
           </button>
         </div>
         <div style={styles.list}>
           {stillResolving && visible.length === 0 && (
-            <p style={styles.empty}>Cargando...</p>
+            <p style={styles.empty}>{t("common.loading")}</p>
           )}
           {!stillResolving && visible.length === 0 && (
             <p style={styles.empty}>
-              {mode === "followers" ? "Todavía no tiene seguidores." : "Todavía no sigue a nadie."}
+              {mode === "followers" ? t("followList.emptyFollowers") : t("followList.emptyFollowing")}
             </p>
           )}
           {visible.map((p) => (
@@ -186,7 +188,7 @@ export default function FollowListModal({ mode, targetUid, currentUid, onClose, 
                 size="md"
               />
               <div>
-                <p style={styles.rowName}>{p.displayName || "Sin nombre"}</p>
+                <p style={styles.rowName}>{p.displayName || t("chat.defaultName")}</p>
                 <p style={styles.rowIdentity}>{p.identity}</p>
               </div>
             </div>

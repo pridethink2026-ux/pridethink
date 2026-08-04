@@ -377,7 +377,7 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
           <option value="">{t("store.create.categoryPlaceholder")}</option>
           {CATEGORIES.map((c) => (
             <option key={c.key} value={c.key}>
-              {c.emoji} {c.key}
+              {c.emoji} {t(c.labelKey)}
             </option>
           ))}
         </select>

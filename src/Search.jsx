@@ -7,6 +7,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import { timeAgo } from "./utils";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
+import { useLanguage } from "./LanguageContext";
 
 /*
   Search
@@ -116,6 +117,7 @@ const styles = {
 };
 
 export default function Search({ onOpenProfile }) {
+  const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const users = useAllUsers();
   // Separado en dos consultas (auditoría de seguridad, 2026-07-28,
@@ -169,7 +171,7 @@ export default function Search({ onOpenProfile }) {
     return (
       <div style={styles.wrapper}>
         <div style={styles.column}>
-          <p style={styles.loginNotice}>Inicia sesión primero para buscar.</p>
+          <p style={styles.loginNotice}>{t("search.loginRequired")}</p>
         </div>
       </div>
     );
@@ -216,22 +218,22 @@ export default function Search({ onOpenProfile }) {
           <input
             style={styles.searchInput}
             type="text"
-            placeholder="Buscar personas, texto o #hashtags..."
+            placeholder={t("search.placeholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
           />
         </div>
 
-        {!q && <p style={styles.hint}>Escribe para buscar personas y publicaciones.</p>}
+        {!q && <p style={styles.hint}>{t("search.hint")}</p>}
 
         {q && matchedUsers.length === 0 && matchedPosts.length === 0 && (
-          <p style={styles.empty}>No encontramos nada para "{search.trim()}".</p>
+          <p style={styles.empty}>{t("search.noResults", { query: search.trim() })}</p>
         )}
 
         {matchedUsers.length > 0 && (
           <>
-            <p style={styles.sectionTitle}>Personas</p>
+            <p style={styles.sectionTitle}>{t("search.peopleTitle")}</p>
             {matchedUsers.map((u) => (
               <div key={u.uid} style={styles.userRow} onClick={() => onOpenProfile(u.uid)}>
                 <Avatar
@@ -242,7 +244,7 @@ export default function Search({ onOpenProfile }) {
                 />
                 <div>
                   <p style={styles.userName}>
-                    {u.displayName || "Sin nombre"}
+                    {u.displayName || t("chat.defaultName")}
                     {u.isVerified && <VerifiedBadge size="sm" />}
                   </p>
                   <p style={styles.userIdentity}>{u.identity}</p>
@@ -254,7 +256,7 @@ export default function Search({ onOpenProfile }) {
 
         {matchedPosts.length > 0 && (
           <>
-            <p style={styles.sectionTitle}>Publicaciones</p>
+            <p style={styles.sectionTitle}>{t("search.postsTitle")}</p>
             {matchedPosts.map((p) => (
               <div key={p.id} style={styles.postRow}>
                 <Avatar
@@ -269,7 +271,7 @@ export default function Search({ onOpenProfile }) {
                     {p.authorName}
                     {usersMap[p.authorId]?.isVerified && <VerifiedBadge size="sm" />}
                   </p>
-                  <p style={styles.postTime}>{timeAgo(p.createdAt)}</p>
+                  <p style={styles.postTime}>{timeAgo(p.createdAt, t)}</p>
                   <p style={styles.postText}>{p.text}</p>
                 </div>
               </div>

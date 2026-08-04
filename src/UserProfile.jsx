@@ -20,6 +20,7 @@ import ReportButton from "./ReportButton";
 import VerifiedBadge from "./VerifiedBadge";
 import { isEffectivelyOnline, canSeeOnlineStatus } from "./presence";
 import { unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { useLanguage } from "./LanguageContext";
 
 /*
   UserProfile
@@ -155,6 +156,7 @@ const styles = {
 };
 
 export default function UserProfile({ uid, onBack, onOpenProfile }) {
+  const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
   const [profileUser, setProfileUser] = useState(null);
@@ -264,9 +266,9 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
       <div style={styles.wrapper}>
         <div style={styles.column}>
           <button style={styles.backBtn} onClick={onBack}>
-            ← Volver
+            {t("userProfile.backLink")}
           </button>
-          <p style={styles.notice}>Cargando perfil...</p>
+          <p style={styles.notice}>{t("userProfile.loadingProfile")}</p>
         </div>
       </div>
     );
@@ -277,9 +279,9 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
       <div style={styles.wrapper}>
         <div style={styles.column}>
           <button style={styles.backBtn} onClick={onBack}>
-            ← Volver
+            {t("userProfile.backLink")}
           </button>
-          <p style={styles.notice}>Este perfil ya no existe.</p>
+          <p style={styles.notice}>{t("userProfile.notFound")}</p>
         </div>
       </div>
     );
@@ -293,13 +295,13 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
       <div style={styles.wrapper}>
         <div style={styles.column}>
           <button style={styles.backBtn} onClick={onBack}>
-            ← Volver
+            {t("userProfile.backLink")}
           </button>
           <div style={styles.notice}>
-            <p style={{ margin: 0 }}>No puedes ver este perfil.</p>
+            <p style={{ margin: 0 }}>{t("userProfile.cannotView")}</p>
             {iBlockedThem && (
               <button style={styles.unblockBtn} onClick={handleUnblock}>
-                Desbloquear
+                {t("profile.unblock")}
               </button>
             )}
           </div>
@@ -313,7 +315,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
       <div style={styles.column}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <button style={styles.backBtn} onClick={onBack}>
-            ← Volver
+            {t("userProfile.backLink")}
           </button>
           {!isMe && currentUid && (
             <ReportButton targetType="user" targetId={uid} currentUid={currentUid} />
@@ -337,23 +339,25 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
           <p style={styles.identity}>{profileUser.identity}</p>
           {profileUser.bio && <p style={styles.bioText}>{profileUser.bio}</p>}
           {profileUser.joinedAt && (
-            <p style={styles.joined}>Miembro desde {profileUser.joinedAt}</p>
+            <p style={styles.joined}>
+              {t("profile.memberSince")} {profileUser.joinedAt}
+            </p>
           )}
 
           <div style={styles.countsRow}>
             <div style={styles.countItem} onClick={() => setFollowModal("followers")}>
               <p style={styles.countNumber}>{followersCount}</p>
-              <p style={styles.countLabel}>Seguidores</p>
+              <p style={styles.countLabel}>{t("profile.followers")}</p>
             </div>
             <div style={styles.countItem} onClick={() => setFollowModal("following")}>
               <p style={styles.countNumber}>{followingCount}</p>
-              <p style={styles.countLabel}>Siguiendo</p>
+              <p style={styles.countLabel}>{t("profile.following")}</p>
             </div>
           </div>
 
           {!isMe && currentUid && (
             <button style={styles.followBtn(isFollowing)} onClick={handleToggleFollow}>
-              {isFollowing ? "Dejar de seguir" : "Seguir"}
+              {isFollowing ? t("userProfile.unfollow") : t("userProfile.follow")}
             </button>
           )}
 
@@ -361,11 +365,11 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
         </div>
 
         {isPrivateForMe ? (
-          <p style={styles.notice}>🔒 Este perfil es privado. No comparte sus publicaciones.</p>
+          <p style={styles.notice}>{t("userProfile.privateProfileNotice")}</p>
         ) : isWallPrivateForMe ? (
-          <p style={styles.notice}>🔒 Este muro es privado.</p>
+          <p style={styles.notice}>{t("userProfile.privateWallNotice")}</p>
         ) : posts.length === 0 ? (
-          <p style={styles.notice}>Todavía no tiene publicaciones.</p>
+          <p style={styles.notice}>{t("userProfile.noPosts")}</p>
         ) : (
           posts.map((p) => (
             <PostCard

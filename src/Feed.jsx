@@ -720,7 +720,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
             {authorIsVerified && <VerifiedBadge size="sm" />}
           </p>
           <p style={styles.authorIdentity}>{post.authorIdentity}</p>
-          <p style={styles.timeText}>{timeAgo(post.createdAt)}</p>
+          <p style={styles.timeText}>{timeAgo(post.createdAt, t)}</p>
         </div>
         {isMine ? (
           !editing && (

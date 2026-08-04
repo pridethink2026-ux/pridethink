@@ -1205,8 +1205,8 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
                     <div style={styles.chatHeaderText}>
                       <p style={styles.chatHeaderName}>{activeContact.displayName}</p>
                       <p style={styles.chatHeaderIdentity}>{activeContact.identity}</p>
-                      {!isEffectivelyOnline(liveActiveContact) && formatLastSeen(liveActiveContact) && (
-                        <p style={styles.chatHeaderLastSeen}>{formatLastSeen(liveActiveContact)}</p>
+                      {!isEffectivelyOnline(liveActiveContact) && formatLastSeen(liveActiveContact, t) && (
+                        <p style={styles.chatHeaderLastSeen}>{formatLastSeen(liveActiveContact, t)}</p>
                       )}
                     </div>
                   </div>

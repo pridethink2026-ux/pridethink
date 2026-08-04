@@ -656,6 +656,7 @@ function App() {
         onOpenProfile={openProfile}
         initialProductId={storeProductId}
         onConsumeInitialProductId={() => setStoreProductId(null)}
+        onGoToSearch={() => navigate("buscar")}
       />
     );
   } else if (view === "notificaciones") {

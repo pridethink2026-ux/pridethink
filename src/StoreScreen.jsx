@@ -192,7 +192,7 @@ const styles = {
     background: isNew ? "rgba(34,197,94,0.15)" : "rgba(255,151,66,0.18)",
     color: isNew ? "#22c55e" : "#ff9742",
   }),
-  primeBadge: {
+  pridePlusBadge: {
     fontSize: "10px",
     fontWeight: 700,
     padding: "3px 8px",
@@ -268,7 +268,7 @@ function ProductCard({ product, onOpen }) {
           <span style={styles.conditionBadge(product.condition === "new")}>
             {product.condition === "new" ? t("store.conditionNew") : t("store.conditionUsed")}
           </span>
-          {product.tier === "prime" && <span style={styles.primeBadge}>{t("store.primeBadge")}</span>}
+          {product.tier === "prime" && <span style={styles.pridePlusBadge}>{t("store.pridePlusBadge")}</span>}
         </div>
         <div style={styles.sellerRow}>
           <Avatar uid={product.sellerId} name={product.sellerName} identity={product.sellerIdentity} size="sm" />
@@ -279,7 +279,7 @@ function ProductCard({ product, onOpen }) {
   );
 }
 
-export default function StoreScreen({ onOpenProfile, initialProductId, onConsumeInitialProductId }) {
+export default function StoreScreen({ onOpenProfile, initialProductId, onConsumeInitialProductId, onGoToSearch }) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
@@ -353,6 +353,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
         onBack={backToList}
         onOpenProfile={onOpenProfile}
         onEdit={openEdit}
+        onGoToSearch={onGoToSearch}
       />
     );
   }
@@ -406,7 +407,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
               style={styles.categoryChip(category === c.key)}
               onClick={() => setCategory(category === c.key ? null : c.key)}
             >
-              {c.emoji} {c.key}
+              {c.emoji} {t(c.labelKey)}
             </span>
           ))}
         </div>

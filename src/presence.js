@@ -95,12 +95,13 @@ export function isEffectivelyOnline(user) {
   return Date.now() - user.lastSeen.toMillis() < STALE_MS;
 }
 
-// Texto "Últ. vez hace X" reutilizando timeAgo() tal cual (formato
-// relativo en español, mismo que ya usan los posts) — null si nunca se
-// registró lastSeen (cuentas viejas, de antes de esta función).
-export function formatLastSeen(user) {
+// Texto "Últ. vez hace X"/"Last seen X ago" reutilizando timeAgo() tal cual
+// (mismo formato relativo, en el idioma activo, que ya usan los posts) —
+// null si nunca se registró lastSeen (cuentas viejas, de antes de esta
+// función). "t" es la función de useLanguage(), la pasa quien llama.
+export function formatLastSeen(user, t) {
   if (!user?.lastSeen) return null;
-  return `Últ. vez ${timeAgo(user.lastSeen)}`;
+  return t("common.lastSeenPrefix", { time: timeAgo(user.lastSeen, t) });
 }
 
 // Respeta la privacidad: si el perfil es privado, el estado en línea solo
