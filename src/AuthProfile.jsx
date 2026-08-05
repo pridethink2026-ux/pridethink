@@ -1096,6 +1096,29 @@ function ProfileView({
   );
 }
 
+// Auto-repara users/{uid}.joinedAt para cuentas viejas (de antes del
+// 2026-08-04, cuando este campo se guardaba como string ya formateado en
+// español en vez de un Timestamp — ver el punto 56 en CONTEXTO.md): si
+// "data.joinedAt" sigue siendo un string, lo reemplaza acá mismo por un
+// Timestamp construido con la fecha de creación REAL de la cuenta, que
+// Firebase Auth ya guarda solo para toda cuenta (auth.currentUser.metadata.
+// creationTime) — más preciso que poner "ahora" (perderíamos la fecha real
+// de cuándo se unió) y no requiere entrar a mano a Firebase console. Se
+// dispara solo, la primera vez que carga tu perfil después de este cambio;
+// si "joinedAt" ya es un Timestamp (cuenta nueva, o ya reparada antes), no
+// hace nada. El setDoc corre en segundo plano (no se espera, mismo patrón
+// que markOnline/markOffline en presence.js) porque el valor corregido ya
+// se devuelve acá mismo para el estado local — no hace falta bloquear la
+// pantalla esperando a que la escritura termine.
+function repairJoinedAtIfLegacy(uid, data) {
+  if (typeof data?.joinedAt !== "string") return data;
+  const creationTime = auth.currentUser?.metadata?.creationTime;
+  if (!creationTime) return data;
+  const repaired = Timestamp.fromDate(new Date(creationTime));
+  setDoc(doc(db, "users", uid), { joinedAt: repaired }, { merge: true }).catch(() => {});
+  return { ...data, joinedAt: repaired };
+}
+
 export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   const { t } = useLanguage();
   // login | signup | signupPersonal | identity | profile | reset
@@ -1119,7 +1142,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       if (firebaseUser) {
         const snap = await getDoc(doc(db, "users", firebaseUser.uid));
         if (snap.exists()) {
-          setUser(snap.data());
+          setUser(repairJoinedAtIfLegacy(firebaseUser.uid, snap.data()));
           setStep("profile");
         } else {
           setPendingUid(firebaseUser.uid);
@@ -1149,7 +1172,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       // FIREBASE: firestore read (real) - revisa si ya tiene perfil guardado
       const snap = await getDoc(doc(db, "users", cred.user.uid));
       if (snap.exists()) {
-        setUser(snap.data());
+        setUser(repairJoinedAtIfLegacy(cred.user.uid, snap.data()));
         setStep("profile");
       } else {
         setPendingUid(cred.user.uid);
@@ -1246,7 +1269,20 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     try {
       // FIREBASE: firestore write (real) - guarda el perfil en Firestore
       await setDoc(doc(db, "users", uid), profileUpdate, { merge: true });
-      setUser({ ...(user || {}), ...profileUpdate });
+      // serverTimestamp() escribe bien en Firestore, pero devuelve un
+      // sentinel (FieldValue) sin .toDate() — reflejarlo tal cual en el
+      // estado local deja a formatMonthYear/formatLongDate sin nada que
+      // formatear (ni Timestamp ni string) hasta el próximo getDoc real
+      // (recién en el siguiente login/recarga). Timestamp.now() sí es un
+      // Timestamp real con .toDate(), usado SOLO para esta actualización
+      // optimista local — lo que se escribió en Firestore no cambia.
+      const optimisticNow = Timestamp.now();
+      setUser({
+        ...(user || {}),
+        ...profileUpdate,
+        identityUpdatedAt: optimisticNow,
+        ...(isNewSignup ? { joinedAt: optimisticNow } : {}),
+      });
       setSignupDraft({});
       setStep("profile");
     } catch (err) {
