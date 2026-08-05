@@ -1,9 +1,21 @@
 import React, { useEffect, useRef, useState } from "react";
 import { db } from "./firebase";
-import { doc, onSnapshot, deleteDoc, updateDoc, increment } from "firebase/firestore";
+import {
+  doc,
+  onSnapshot,
+  deleteDoc,
+  updateDoc,
+  increment,
+  setDoc,
+  deleteField,
+  serverTimestamp,
+} from "firebase/firestore";
 import Avatar from "./Avatar";
 import { useLanguage } from "./LanguageContext";
 import { getCategoryEmoji, getCategoryLabelKey } from "./storeData";
+import { getReactionEmoji, getReactionSummary, useReactionPicker, ReactionPicker } from "./Reactions";
+import { playReactionSound } from "./sound";
+import { notify } from "./utils";
 import GiftFriendModal from "./GiftFriendModal";
 
 /*
@@ -15,6 +27,15 @@ import GiftFriendModal from "./GiftFriendModal";
   vez al entrar, con el carve-out de firestore.rules que permite a
   CUALQUIER autenticado tocar solo ese campo (no es el vendedor quien
   suma la vista).
+
+  REACCIONES Y GUARDAR (2026-08-04): mismo sistema que los posts del muro
+  (ver Feed.jsx -> PostCard), reutilizado tal cual desde Reactions.jsx —
+  reacciones guardadas como products/{productId}.reactions:{[uid]:tipo}
+  (mapa, una por persona, la última pisa la anterior) y favoritos como
+  savedProducts/{miUid}/items/{productId} (id del documento = id del
+  producto, "está guardado" es solo "existe el documento", igual que
+  savedPosts). Ambos botones se muestran siempre, incluso viendo tu propio
+  producto, igual que en el muro.
 */
 
 const styles = {
@@ -137,6 +158,31 @@ const styles = {
   },
   infoLabel: { color: "var(--text-muted)" },
   infoValue: { fontWeight: 600 },
+  actionsRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+    borderTop: "1px solid var(--border)",
+    borderBottom: "1px solid var(--border)",
+    padding: "12px 0",
+    marginBottom: "4px",
+  },
+  reactionWrapper: {
+    position: "relative",
+  },
+  actionBtn: (active, hovered) => ({
+    background: hovered ? "var(--surface-alt)" : "transparent",
+    border: "none",
+    borderRadius: "999px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: 600,
+    color: active ? "var(--accent2)" : "var(--text-muted)",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 10px",
+  }),
   actionsCol: { display: "flex", flexDirection: "column", gap: "10px", marginTop: "20px" },
   giftBtn: {
     padding: "13px",
@@ -189,10 +235,40 @@ function CameraIcon() {
   );
 }
 
+// Mismo ícono de 2 estados que ya usa Feed.jsx -> PostCard (contorno/
+// relleno) — duplicado acá en vez de importado porque Feed.jsx no lo
+// exporta (es local a ese archivo, igual que CameraIcon es local a este).
+function BookmarkIcon({ filled }) {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+    </svg>
+  );
+}
+
 export default function ProductDetailScreen({ productId, currentUid, myProfile, onBack, onOpenProfile, onEdit, onGoToSearch }) {
   const { t } = useLanguage();
   const [product, setProduct] = useState(undefined); // undefined: cargando | null: no existe
   const [giftOpen, setGiftOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [reactionHover, setReactionHover] = useState(false);
+  const [saveHover, setSaveHover] = useState(false);
+  const {
+    open: pickerOpen,
+    setOpen: setPickerOpen,
+    containerRef: reactionRef,
+    triggerProps: reactionTriggerProps,
+    consumeLongPress,
+  } = useReactionPicker();
   const viewCounted = useRef(false);
 
   useEffect(() => {
@@ -209,6 +285,18 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
     viewCounted.current = true;
     updateDoc(doc(db, "products", productId), { viewCount: increment(1) }).catch(() => {});
   }, [product, productId]);
+
+  // Escucha si el producto ya está en savedProducts/{miUid}/items/{productId}
+  // — el id del documento es el propio id del producto, así que "está
+  // guardado" es solo que el documento exista (mismo patrón que savedPosts
+  // en Feed.jsx -> PostCard).
+  useEffect(() => {
+    if (!currentUid || !productId) return;
+    const unsub = onSnapshot(doc(db, "savedProducts", currentUid, "items", productId), (snap) => {
+      setSaved(snap.exists());
+    });
+    return unsub;
+  }, [currentUid, productId]);
 
   if (product === undefined) {
     return (
@@ -233,11 +321,52 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
   }
 
   const isMine = currentUid && product.sellerId === currentUid;
+  const myReaction = (product.reactions || {})[currentUid] || null;
+  const reactionSummary = getReactionSummary(product.reactions);
 
   const handleDelete = async () => {
     if (!window.confirm(t("store.detail.deleteConfirm"))) return;
     await deleteDoc(doc(db, "products", productId));
     onBack();
+  };
+
+  // Mismo patrón que setMyReaction en Feed.jsx -> PostCard: mapa
+  // reactions:{[uid]:tipo} en el propio documento, updateDoc con la ruta
+  // "reactions.<uid>" (o deleteField() al quitarla). La primera vez que
+  // alguien reacciona (no al cambiar de tipo) se notifica al vendedor.
+  const setMyReaction = async (type) => {
+    const productRef = doc(db, "products", productId);
+    const hadReaction = !!myReaction;
+    playReactionSound(!!type);
+    if (type) {
+      await updateDoc(productRef, { [`reactions.${currentUid}`]: type });
+      if (!hadReaction) {
+        await notify(product.sellerId, {
+          type: "like",
+          fromUid: currentUid,
+          fromName: myProfile?.displayName || "Alguien",
+          fromIdentity: myProfile?.identity || "",
+        });
+      }
+    } else {
+      await updateDoc(productRef, { [`reactions.${currentUid}`]: deleteField() });
+    }
+  };
+
+  // Clic simple (sin long-press ni hover previo): alterna "sin reacción" /
+  // "❤️", igual que el botón de "Me gusta" del muro.
+  const handleQuickReact = () => {
+    if (consumeLongPress()) return;
+    setMyReaction(myReaction ? null : "like");
+  };
+
+  const toggleSave = async () => {
+    const ref = doc(db, "savedProducts", currentUid, "items", productId);
+    if (saved) {
+      await deleteDoc(ref);
+    } else {
+      await setDoc(ref, { savedAt: serverTimestamp() });
+    }
   };
 
   return (
@@ -286,6 +415,44 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
           <div style={styles.infoRow}>
             <span style={styles.infoLabel}>{t("store.detail.manufacturerLabel")}</span>
             <span style={styles.infoValue}>{product.manufacturer}</span>
+          </div>
+        )}
+
+        {currentUid && (
+          <div style={styles.actionsRow}>
+            <div ref={reactionRef} style={styles.reactionWrapper} {...reactionTriggerProps}>
+              <button
+                style={styles.actionBtn(!!myReaction, reactionHover)}
+                onClick={handleQuickReact}
+                onMouseEnter={() => setReactionHover(true)}
+                onMouseLeave={() => setReactionHover(false)}
+              >
+                {myReaction ? getReactionEmoji(myReaction) : "🤍"}{" "}
+                {reactionSummary.length > 0
+                  ? reactionSummary.map((r) => `${r.emoji} ${r.count}`).join(" · ")
+                  : t("feed.like")}
+              </button>
+              {pickerOpen && (
+                <ReactionPicker
+                  myReaction={myReaction}
+                  onSelect={(type) => {
+                    setMyReaction(type);
+                    setPickerOpen(false);
+                  }}
+                  style={{ bottom: "100%", left: 0 }}
+                />
+              )}
+            </div>
+            <button
+              style={styles.actionBtn(saved, saveHover)}
+              onClick={toggleSave}
+              onMouseEnter={() => setSaveHover(true)}
+              onMouseLeave={() => setSaveHover(false)}
+              title={t(saved ? "store.detail.unsaveProduct" : "store.detail.saveProduct")}
+            >
+              <BookmarkIcon filled={saved} />
+              {t(saved ? "store.detail.unsaveProduct" : "store.detail.saveProduct")}
+            </button>
           </div>
         )}
 

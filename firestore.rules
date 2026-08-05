@@ -377,6 +377,17 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------
+    // savedProducts/{ownerUid}/items/{productId}
+    // Lista personal de productos guardados/favoritos (ProductDetailScreen.jsx,
+    // 2026-08-04) — copia exacta de savedPosts de arriba, colección aparte
+    // porque un id de post y un id de producto podrían coincidir si
+    // compartieran la misma lista.
+    // --------------------------------------------------------------------
+    match /savedProducts/{ownerUid}/items/{productId} {
+      allow read, create, update, delete: if esDueno(ownerUid);
+    }
+
+    // --------------------------------------------------------------------
     // products/{productId}
     // Artículos de la Tienda (Marketplace, Fase 1). "imageUrl" siempre
     // llega vacío por ahora (subida de imágenes pendiente, requiere el
@@ -433,6 +444,17 @@ service cloud.firestore {
           //    giftShares/{giftId} más abajo): solo se le permite tocar
           //    "giftCount".
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['giftCount'])
+          // 4) Cualquier autenticado puede reaccionar (2026-08-04, mismo
+          //    sistema que posts/{postId} y chats/{chatId}/messages/
+          //    {messageId} de más arriba): solo se le permite tocar
+          //    "reactions", y solo su propia entrada dentro de ese mapa.
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            && soloTocaMiReaccion(
+                 resource.data.get('reactions', {}),
+                 request.resource.data.get('reactions', {})
+               )
+          )
         );
     }
 
