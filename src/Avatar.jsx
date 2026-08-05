@@ -89,6 +89,7 @@ export default function Avatar({ uid, name, identity, size = "md", online = fals
     flexShrink: 0,
     cursor: onClick ? "pointer" : "default",
     userSelect: "none",
+    overflow: "hidden",
   };
 
   const style = {
@@ -100,8 +101,10 @@ export default function Avatar({ uid, name, identity, size = "md", online = fals
     alignItems: "center",
     justifyContent: "center",
     fontSize: `${font}px`,
+    lineHeight: 1,
     fontWeight: 700,
     color: "#fff",
+    overflow: "hidden",
   };
 
   const dotSize = Math.max(10, Math.round(box * 0.28));

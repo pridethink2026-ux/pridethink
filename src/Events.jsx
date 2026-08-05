@@ -11,6 +11,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { useLanguage } from "./LanguageContext";
+import { translate } from "./translations";
 
 /*
   Events
@@ -45,7 +46,7 @@ import { useLanguage } from "./LanguageContext";
 export function formatEventDateTime(dateTimestamp, language) {
   if (!dateTimestamp?.toDate) return "";
   const date = dateTimestamp.toDate();
-  const locale = language === "en" ? "en-US" : "es-ES";
+  const locale = translate(language, "common.localeCode");
   return date.toLocaleString(locale, {
     day: "numeric",
     month: "long",

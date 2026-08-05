@@ -68,6 +68,38 @@ export function timeAgo(timestamp, t) {
   });
 }
 
+// Formatea users/{uid}.joinedAt ("Miembro desde") en el idioma activo —
+// mismo principio que timeAgo(): "t" ya la tiene quien llama. "value" puede
+// ser tres cosas: un Timestamp real (caso normal, tiene .toDate), un string
+// ya formateado de cuentas viejas (de antes de este cambio, 2026-08-04,
+// cuando joinedAt se guardaba pre-formateado en español con toLocaleDateString
+// fijo — se muestra tal cual, no se puede "destraducir"), o el sentinel de
+// serverTimestamp() todavía sin resolver justo después de escribirlo (no
+// tiene .toDate ni es string — se muestra vacío un instante hasta que el
+// onSnapshot en vivo trae el Timestamp real).
+export function formatMonthYear(value, t) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (!value.toDate) return "";
+  return value.toDate().toLocaleDateString(t("common.localeCode"), {
+    year: "numeric",
+    month: "long",
+  });
+}
+
+// Mismo criterio que formatMonthYear(), para users/{uid}.identityUpdatedAt
+// ("Última actualización"), que además incluye el día.
+export function formatLongDate(value, t) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (!value.toDate) return "";
+  return value.toDate().toLocaleDateString(t("common.localeCode"), {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 // Une texto normal y hashtags en una sola pieza: cada elemento del arreglo
 // resultante es o un pedazo de texto plano, o un hashtag completo (con "#").
 const HASHTAG_RE = /(#[\p{L}0-9_]+)/gu;

@@ -434,7 +434,7 @@ function ThemeMenu() {
               <span className={THEME_ICON_ANIM_CLASS[key]} style={themeStyles.animatedIcon}>
                 {theme.emoji}
               </span>
-              <span>{theme.label}</span>
+              <span>{t(theme.labelKey)}</span>
             </div>
           ))}
           <div

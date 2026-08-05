@@ -18,6 +18,7 @@ import {
   where,
   writeBatch,
   Timestamp,
+  serverTimestamp,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { PostCard } from "./Feed";
@@ -28,6 +29,7 @@ import { useLanguage } from "./LanguageContext";
 import { MIN_SIGNUP_AGE, getCountryOptions, LANGUAGE_OPTIONS, getGenderOptions, calculateAge } from "./profileFields";
 import { markOffline } from "./presence";
 import { unblockUser, useMyBlocks } from "./Blocks";
+import { formatMonthYear, formatLongDate } from "./utils";
 
 /*
   AuthProfile
@@ -973,13 +975,13 @@ function ProfileView({
             {user.identityUpdatedAt && (
               <div style={styles.fieldRow}>
                 <span style={styles.fieldLabel}>{t("profile.lastUpdated")}</span>
-                <span style={styles.fieldValue}>{user.identityUpdatedAt}</span>
+                <span style={styles.fieldValue}>{formatLongDate(user.identityUpdatedAt, t)}</span>
               </div>
             )}
             {user.joinedAt && (
               <div style={styles.fieldRow}>
                 <span style={styles.fieldLabel}>{t("profile.memberSince")}</span>
-                <span style={styles.fieldValue}>{user.joinedAt}</span>
+                <span style={styles.fieldValue}>{formatMonthYear(user.joinedAt, t)}</span>
               </div>
             )}
 
@@ -1223,10 +1225,11 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
           isPrivate: false,
           isWallPrivate: false,
           following: [],
-          joinedAt: new Date().toLocaleDateString("es-ES", {
-            year: "numeric",
-            month: "long",
-          }),
+          // Timestamp de Firestore, NUNCA un string ya formateado — así se
+          // puede mostrar en el idioma activo al vuelo (formatMonthYear en
+          // utils.js), en vez de quedar congelado en el idioma que estaba
+          // activo el día del registro. Mismo criterio que birthDate.
+          joinedAt: serverTimestamp(),
         }
       : {};
 
@@ -1236,11 +1239,8 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       identity,
       bio: bio || "",
       datingPreference: datingPreference || "",
-      identityUpdatedAt: new Date().toLocaleDateString("es-ES", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
+      // Mismo motivo que joinedAt de arriba: Timestamp, no string.
+      identityUpdatedAt: serverTimestamp(),
     };
 
     try {

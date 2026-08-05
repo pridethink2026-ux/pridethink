@@ -629,8 +629,8 @@ function ConsentModal({ onAccept, onCancel, loading, t }) {
 }
 
 export default function WeatherWidget() {
-  const { language, t } = useLanguage();
-  const locale = language === "en" ? "en-US" : "es-ES";
+  const { t } = useLanguage();
+  const locale = t("common.localeCode");
   const weather = useWeather();
   const [expanded, setExpanded] = useState(false);
   const [preciseCityName, setPreciseCityName] = useState(null);

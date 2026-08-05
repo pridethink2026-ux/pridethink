@@ -20,7 +20,7 @@ const FONT_VARS = {
 
 export const THEMES = {
   noche: {
-    label: "Noche Violeta",
+    labelKey: "theme.noche",
     emoji: "🌙",
     vars: {
       "--bg": "#150b33",
@@ -44,7 +44,7 @@ export const THEMES = {
     borderGlow: "rgba(255, 95, 174, 0.4)",
   },
   arcoiris: {
-    label: "Arcoíris",
+    labelKey: "theme.arcoiris",
     emoji: "🌈",
     vars: {
       "--bg": "#150c28",
@@ -68,7 +68,7 @@ export const THEMES = {
     borderGlow: "rgba(255, 92, 118, 0.4)",
   },
   oceano: {
-    label: "Océano",
+    labelKey: "theme.oceano",
     emoji: "🌊",
     vars: {
       "--bg": "#051829",
@@ -92,7 +92,7 @@ export const THEMES = {
     borderGlow: "rgba(51, 194, 255, 0.4)",
   },
   atardecer: {
-    label: "Atardecer",
+    labelKey: "theme.atardecer",
     emoji: "🌅",
     vars: {
       "--bg": "#240e0a",
@@ -127,7 +127,7 @@ export const THEMES = {
   // (App.js), así que con blanco marfil → plata ese degradado compartido ya
   // sale con sheen de perla, sin tocar ningún componente.
   elegante: {
-    label: "Elegante",
+    labelKey: "theme.elegante",
     emoji: "🤵",
     vars: {
       "--bg": "#121212",

@@ -57,6 +57,13 @@ export const translations = {
     "nav.motivationalBanner": "Pridethink: tú puedes ser lo que quieras ser",
     "nav.closeBanner": "Cerrar",
 
+    // Nombres de temas visuales (themes.js -> THEMES.<key>.labelKey)
+    "theme.noche": "Noche Violeta",
+    "theme.arcoiris": "Arcoíris",
+    "theme.oceano": "Océano",
+    "theme.atardecer": "Atardecer",
+    "theme.elegante": "Elegante",
+
     // Login (LoginForm, dentro de AuthProfile.jsx)
     "login.eyebrowBack": "Bienvenido de vuelta",
     "login.eyebrowSignupStep1": "Paso 1 de 3",
@@ -557,6 +564,13 @@ export const translations = {
     "nav.themeRotating": "Rotating",
     "nav.motivationalBanner": "Pridethink: you can be whoever you want to be",
     "nav.closeBanner": "Close",
+
+    // Visual theme names (themes.js -> THEMES.<key>.labelKey)
+    "theme.noche": "Violet Night",
+    "theme.arcoiris": "Rainbow",
+    "theme.oceano": "Ocean",
+    "theme.atardecer": "Sunset",
+    "theme.elegante": "Elegant",
 
     // Login (LoginForm, inside AuthProfile.jsx)
     "login.eyebrowBack": "Welcome back",

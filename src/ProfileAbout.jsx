@@ -62,11 +62,10 @@ const styles = {
   value: { fontWeight: 500, textAlign: "right" },
 };
 
-function formatBirthDate(birthDate, language, t) {
+function formatBirthDate(birthDate, t) {
   if (!birthDate?.toDate) return null;
   const date = birthDate.toDate();
-  const locale = language === "en" ? "en-US" : "es-ES";
-  const formatted = date.toLocaleDateString(locale, {
+  const formatted = date.toLocaleDateString(t("common.localeCode"), {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -86,7 +85,7 @@ export default function ProfileAbout({ profileUser }) {
 
   const countryName = getCountryName(profileUser.country, language);
   const languageName = LANGUAGE_OPTIONS.find((l) => l.value === profileUser.language)?.label;
-  const birthDateText = formatBirthDate(profileUser.birthDate, language, t);
+  const birthDateText = formatBirthDate(profileUser.birthDate, t);
 
   const fields = [
     profileUser.fullName && { label: t("profile.fullNameField"), value: profileUser.fullName },

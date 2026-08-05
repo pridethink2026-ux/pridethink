@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { PostCard } from "./Feed";
-import { notify } from "./utils";
+import { notify, formatMonthYear } from "./utils";
 import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import ReportButton from "./ReportButton";
@@ -340,7 +340,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
           {profileUser.bio && <p style={styles.bioText}>{profileUser.bio}</p>}
           {profileUser.joinedAt && (
             <p style={styles.joined}>
-              {t("profile.memberSince")} {profileUser.joinedAt}
+              {t("profile.memberSince")} {formatMonthYear(profileUser.joinedAt, t)}
             </p>
           )}
 
