@@ -1,3 +1,68 @@
+# RESUMEN DEL PROYECTO
+
+## ¿Qué es Pridethink?
+Pridethink es una app social centrada en la libre expresión de identidad para la comunidad LGBTQ+. El lema es "you can be whoever you want to be". Permite a los usuarios crear perfiles con identidades personalizadas, publicar en un muro social, chatear, unirse a grupos, asistir a eventos, y comprar/vender productos en una tienda interna.
+
+## URL y accesos
+- **App en producción:** https://pridethink.vercel.app
+- **Firebase project ID:** pridethink-prototipo
+- **GitHub repo:** pridethink2026-ux (privado)
+- **Cuenta Firebase/Google del proyecto:** pridethink2026@gmail.com
+
+## Stack tecnológico
+- **Frontend:** React (Create React App), inline styles exclusivamente, colores desde themes.js
+- **Backend:** Firebase (Firestore + Firebase Auth) — plan Spark (gratuito)
+- **Deployment:** Vercel (auto-deploy al hacer push a main)
+- **Control de versiones:** GitHub
+- **Herramienta de desarrollo:** Claude Code CLI (desde cmd, nunca PowerShell)
+- **Internacionalización:** useLanguage() hook y translations.js con función t()
+- **Sonidos:** Web Audio API (síntesis, sin archivos de audio externos)
+
+## Funcionalidades implementadas
+- Registro con verificación 18+ (nombre, fecha nacimiento, país, idioma, género)
+- Perfiles con identidades personalizadas y avatar con anillo por identidad
+- Muro social con posts, reacciones (emojis), comentarios y guardado
+- Chat privado entre usuarios
+- Sistema de seguimiento (follow/unfollow) con conteo en tiempo real
+- Búsqueda de usuarios por nombre o identidad
+- Sistema de reportes (usuarios y posts)
+- Tienda/marketplace (Fase 1): productos, catálogos, regalos entre usuarios con mutual-follow
+- Productos guardados (colección separada savedProducts)
+- 5 temas visuales y modo Rotativo (Noche Violeta, Arcoíris, Océano, Atardecer, Elegante)
+- Sonidos temáticos por tema (con toggle de mute en Firestore)
+- Sistema i18n completo (español/inglés) con persistencia en Firestore
+- Privacidad de perfil y muro (toggles)
+- Widget de clima
+- Grupos y eventos
+
+## Funcionalidades pendientes
+- Stripe (pagos reales en la tienda) — requiere plan Blaze de Firebase
+- Subida de imágenes (fotos de perfil, productos) — requiere plan Blaze
+- Sonidos de chat (enviar/recibir) respetando el mute toggle
+- Auditoría de privacidad: campos públicos del perfil visibles para todos
+- Validación de campos en reglas de Firestore (tipo y tamaño)
+- Datos sensibles del perfil en subcolección privada
+- Gradientes mínimos: solo en botón "Post" y título "Pridethink"
+
+## Equipo
+- **Ernesto** — Fundador, dirección de producto, arquitectura de soluciones
+- **Rorby** — Socio, testing y desarrollo
+
+## Reglas de desarrollo (obligatorias)
+1. Todos los colores desde themes.js — nunca hardcodear
+2. Solo inline styles — nada de Tailwind ni CSS externo
+3. onMouseEnter/onMouseLeave para hovers — no pseudo-clases CSS
+4. Zero unused imports — Vercel falla con CI=true si hay warnings
+5. npm run build debe dar 0 errores y 0 warnings antes de push
+6. Fase de diagnóstico pre-código: Claude Code muestra plan, espera aprobación
+7. Reglas Firestore se publican manualmente: type firestore.rules | clip → pegar en Firebase Console → Publish
+8. Nunca guardar conteos como campos numéricos — calcular en tiempo real desde queries
+9. Privacidad siempre en reglas de Firestore server-side, no solo client-side
+10. CONTEXTO.md se actualiza al final de cada sesión de desarrollo
+11. Terminal: siempre cmd, nunca PowerShell
+
+---
+
 # Contexto del proyecto: Pridethink
 
 App social para la comunidad LGBTQ+ centrada en identidad libre: los usuarios
