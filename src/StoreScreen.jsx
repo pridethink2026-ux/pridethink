@@ -165,6 +165,13 @@ const styles = {
     justifyContent: "center",
     color: "var(--text-muted)",
   },
+  cardImage: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    background: "var(--surface-alt)",
+    objectFit: "contain",
+    display: "block",
+  },
   cardBody: { padding: "10px 12px 12px" },
   cardTitle: {
     fontSize: "13px",
@@ -259,9 +266,13 @@ function ProductCard({ product, sellerPhotoURL, onOpen }) {
   const { t } = useLanguage();
   return (
     <div style={styles.card} onClick={() => onOpen(product.id)}>
-      <div style={styles.cardImagePlaceholder}>
-        <CameraIcon />
-      </div>
+      {product.imageUrl ? (
+        <img src={product.imageUrl} alt={product.title} style={styles.cardImage} />
+      ) : (
+        <div style={styles.cardImagePlaceholder}>
+          <CameraIcon />
+        </div>
+      )}
       <div style={styles.cardBody}>
         <p style={styles.cardTitle}>{product.title}</p>
         <p style={styles.cardPrice}>${product.price}</p>

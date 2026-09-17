@@ -9,11 +9,13 @@ import {
   increment,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { useLanguage } from "./LanguageContext";
 import { CATEGORIES, TIERS } from "./storeData";
+import ImageUploader from "./ImageUploader";
 
 /*
   CreateProductScreen
@@ -25,6 +27,16 @@ import { CATEGORIES, TIERS } from "./storeData";
   nuevo y resta 1 al catálogo anterior si cambió (mismo espíritu que
   syncPostsPrivacyField en AuthProfile.jsx — mantener un campo
   denormalizado al día cuando cambia lo que lo origina).
+
+  IMAGEN DEL PRODUCTO (punto 59): la imagen tiene que subirse a
+  "productImages/{uid}/{productId}/main.jpg" en Cloud Storage, pero al
+  CREAR un producto todavía no existe ningún "productId" — recién lo
+  asigna Firestore cuando el documento se escribe. Se resuelve generando
+  el id del lado del cliente con "doc(collection(db,'products')).id"
+  ANTES de mostrar el formulario (no escribe nada en Firestore, solo
+  reserva un id) y usando ESE mismo id tanto para la ruta de Storage como
+  para el documento final (setDoc en vez de addDoc). Al editar, se usa
+  directamente el "productId" real que ya existía.
 */
 
 const styles = {
@@ -169,15 +181,7 @@ const styles = {
     color: active ? "var(--accent2)" : "var(--text)",
   }),
   tierDescription: { fontSize: "12px", color: "var(--text-muted)", margin: "4px 0 0" },
-  imagePlaceholder: {
-    padding: "24px",
-    textAlign: "center",
-    borderRadius: "14px",
-    border: "1px dashed var(--border)",
-    color: "var(--text-muted)",
-    fontSize: "13px",
-    marginBottom: "18px",
-  },
+  imageUploaderWrap: { marginBottom: "18px" },
   error: {
     background: "var(--accent2-softer)",
     border: "1px solid var(--accent2-soft-border)",
@@ -231,9 +235,20 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
   const [newCatalogName, setNewCatalogName] = useState("");
   const [newCatalogDescription, setNewCatalogDescription] = useState("");
   const [tier, setTier] = useState("standard");
+  const [imageUrl, setImageUrl] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const originalCatalogIdRef = useRef(null);
+
+  // Id real del producto (modo editar) o id generado del lado del cliente
+  // para uno nuevo (modo crear) — ver el docstring de arriba. "useState"
+  // en vez de "useMemo" a propósito: se calcula UNA sola vez al montar el
+  // componente y nunca más, aunque "productId" cambiara (no debería, cada
+  // producto abre su propia instancia de esta pantalla con una "key"
+  // implícita al desmontar/montar desde StoreScreen.jsx).
+  const [effectiveProductId] = useState(
+    () => productId || doc(collection(db, "products")).id
+  );
 
   useEffect(() => {
     if (!currentUid) return;
@@ -260,6 +275,7 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
         setCatalogChoice(p.catalogId || "");
         originalCatalogIdRef.current = p.catalogId || null;
         setTier(p.tier || "standard");
+        setImageUrl(p.imageUrl || "");
       }
       setLoading(false);
     })();
@@ -307,18 +323,26 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
         catalogId: finalCatalogId,
         isPublished,
         tier,
+        // Si no se subió ninguna imagen, queda "" — permitido (punto 59),
+        // mismo criterio que ya usaba este campo antes de existir subida
+        // real.
+        imageUrl,
         updatedAt: serverTimestamp(),
       };
 
       if (isEdit) {
         await updateDoc(doc(db, "products", productId), data);
       } else {
-        data.imageUrl = "";
         data.isOfficialBrand = false;
         data.giftCount = 0;
         data.viewCount = 0;
         data.createdAt = serverTimestamp();
-        await addDoc(collection(db, "products"), data);
+        // setDoc (no addDoc) con el id generado al montar el componente:
+        // ImageUploader ya pudo haber subido la imagen a
+        // "productImages/{uid}/{effectiveProductId}/main.jpg" ANTES de
+        // este guardado, así que el documento tiene que nacer con ese
+        // mismo id — ver el docstring de arriba.
+        await setDoc(doc(db, "products", effectiveProductId), data);
       }
 
       const originalCatalogId = originalCatalogIdRef.current;
@@ -483,7 +507,14 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
         </div>
 
         <label style={styles.label}>{t("store.create.imageLabel")}</label>
-        <p style={styles.imagePlaceholder}>{t("store.create.imagePlaceholder")}</p>
+        <div style={styles.imageUploaderWrap}>
+          <ImageUploader
+            storagePath={`productImages/${currentUid}/${effectiveProductId}/main.jpg`}
+            currentImageURL={imageUrl}
+            onUploadComplete={setImageUrl}
+            maxSize={1024}
+          />
+        </div>
 
         <div style={styles.actionsRow}>
           <button type="button" style={styles.draftBtn} disabled={saving} onClick={() => handleSave(false)}>

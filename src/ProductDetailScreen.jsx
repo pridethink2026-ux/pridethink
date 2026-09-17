@@ -84,6 +84,16 @@ const styles = {
     color: "var(--text-muted)",
     marginBottom: "18px",
   },
+  productImage: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    borderRadius: "20px",
+    background: "var(--surface-alt)",
+    border: "1px solid var(--border)",
+    objectFit: "contain",
+    display: "block",
+    marginBottom: "18px",
+  },
   title: {
     fontFamily: "var(--font-display)",
     fontSize: "22px",
@@ -385,9 +395,13 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
       <div style={styles.column}>
         <button style={styles.backBtn} onClick={onBack}>{t("store.detail.backLink")}</button>
 
-        <div style={styles.imagePlaceholder}>
-          <CameraIcon />
-        </div>
+        {product.imageUrl ? (
+          <img src={product.imageUrl} alt={product.title} style={styles.productImage} />
+        ) : (
+          <div style={styles.imagePlaceholder}>
+            <CameraIcon />
+          </div>
+        )}
 
         <h1 style={styles.title}>{product.title}</h1>
         <p style={styles.price}>${product.price}</p>

@@ -7,12 +7,13 @@ rules_version = '2';
 // escriben acá, se revisan, y se pegan A MANO en la consola de Firebase
 // (Storage -> Rules -> Publish). Ver la regla 7 de CONTEXTO.md.
 //
-// Hoy el bucket guarda UNA sola cosa: la foto de perfil de cada persona,
-// siempre en la misma ruta `profilePhotos/{uid}/avatar.jpg` (ver
-// ProfilePhotoUploader.jsx). Todo lo demás está cerrado con llave: si más
-// adelante se agregan fotos de producto o portadas de grupo/evento, hay
-// que abrirles su propio bloque acá, a propósito — el catch-all del final
-// no las va a dejar pasar solas.
+// El bucket guarda dos cosas: la foto de perfil de cada persona
+// (`profilePhotos/{uid}/avatar.jpg`, ver ProfilePhotoUploader.jsx) y la
+// imagen de cada producto de la Tienda (`productImages/{userId}/
+// {productId}/{fileName}`, ver ImageUploader.jsx + CreateProductScreen.jsx,
+// punto 59). Todo lo demás está cerrado con llave: si más adelante se
+// agregan portadas de grupo/evento, hay que abrirles su propio bloque acá,
+// a propósito — el catch-all del final no las va a dejar pasar solas.
 //
 // IMPORTANTE sobre `allow read`: las URLs que devuelve getDownloadURL()
 // llevan un token y se sirven sin pasar por estas reglas, así que esta
@@ -47,6 +48,38 @@ service firebase.storage {
       // En un borrado no hay request.resource (no llega ningún archivo
       // nuevo), así que acá solo se valida quién es.
       allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ------------------------------------------------------------------
+    // productImages/{userId}/{productId}/{fileName} — imagen de producto
+    // ------------------------------------------------------------------
+    // Solo el vendedor (userId == su propio uid) puede escribir dentro de
+    // su propia carpeta. A diferencia de la foto de perfil, acá SÍ importa
+    // el productId en la ruta (un vendedor puede tener muchos productos a
+    // la vez, cada uno con su propia imagen — no hay una sola ruta fija
+    // que "pisar"), pero NO se valida que ese productId corresponda a un
+    // documento real en products/{productId}: como en el resto de la app
+    // (ver "camposDeProductoValidos" en firestore.rules, que tampoco
+    // consulta otras colecciones), Storage Rules no puede hacer un get()
+    // cruzado a Firestore de forma práctica acá, así que la única defensa
+    // real es "userId == quien está subiendo" — igual que profilePhotos.
+    // "fileName" queda libre (ImageUploader.jsx siempre sube "main.jpg",
+    // pero no hace falta forzarlo en la regla).
+    match /productImages/{userId}/{productId}/{fileName} {
+      allow read: if request.auth != null;
+
+      // ImageUploader.jsx redimensiona a maxSize manteniendo aspect ratio
+      // y exporta a JPEG antes de subir, así que el resultado real pesa
+      // poco. El tope de 5 MB acá (más alto que los 2 MB de la foto de
+      // perfil, porque una foto de producto puede necesitar más detalle
+      // que un avatar circular chico) es el respaldo del servidor para
+      // alguien que llame al SDK directo salteándose la interfaz.
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
     // ------------------------------------------------------------------

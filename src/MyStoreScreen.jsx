@@ -71,6 +71,8 @@ const styles = {
     cursor: "pointer",
   }),
   productCard: {
+    display: "flex",
+    gap: "12px",
     background: "var(--surface)",
     border: "1px solid var(--border)",
     borderRadius: "16px",
@@ -78,6 +80,28 @@ const styles = {
     padding: "14px 16px",
     marginBottom: "10px",
   },
+  productThumb: {
+    width: "48px",
+    height: "48px",
+    borderRadius: "10px",
+    objectFit: "contain",
+    background: "var(--surface-alt)",
+    border: "1px solid var(--border)",
+    flexShrink: 0,
+  },
+  productThumbPlaceholder: {
+    width: "48px",
+    height: "48px",
+    borderRadius: "10px",
+    background: "var(--surface-alt)",
+    border: "1px solid var(--border)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "var(--text-muted)",
+    flexShrink: 0,
+  },
+  productBody: { flex: 1, minWidth: 0 },
   productTitle: { fontSize: "14px", fontWeight: 700, margin: "0 0 4px" },
   productPrice: { fontSize: "13px", fontWeight: 600, margin: "0 0 6px" },
   metaRow: { display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "10px" },
@@ -169,26 +193,48 @@ const styles = {
   formActions: { display: "flex", gap: "8px" },
 };
 
+// Ícono chico de cámara, mismo trazo que el de ProductDetailScreen.jsx/
+// StoreScreen.jsx (ninguno de los dos lo exporta, es local a cada
+// archivo) pero a un tamaño menor, acorde a la miniatura 48x48 de esta
+// fila del dashboard.
+function CameraIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  );
+}
+
 function ProductRow({ product, t, onOpenProduct, onEditProduct, onDelete, onTogglePublish }) {
   return (
     <div style={styles.productCard}>
-      <p style={styles.productTitle} onClick={() => onOpenProduct(product.id)}>{product.title}</p>
-      <p style={styles.productPrice}>${product.price}</p>
-      <div style={styles.metaRow}>
-        <p style={styles.metaText}>{t("store.mine.quantityLabel", { count: product.quantity ?? 0 })}</p>
-        <p style={styles.metaText}>{t("store.mine.viewsLabel", { count: product.viewCount || 0 })}</p>
-        <p style={styles.metaText}>{t("store.mine.giftsLabel", { count: product.giftCount || 0 })}</p>
-      </div>
-      <div style={styles.actionsRow}>
-        <button style={styles.smallBtn} onClick={() => onEditProduct(product.id)}>
-          {t("store.mine.editButton")}
-        </button>
-        <button style={styles.smallBtnAccent} onClick={() => onTogglePublish(product)}>
-          {product.isPublished ? t("store.mine.unpublishButton") : t("store.mine.publishButton")}
-        </button>
-        <button style={styles.smallBtnDanger} onClick={() => onDelete(product)}>
-          {t("store.mine.deleteButton")}
-        </button>
+      {product.imageUrl ? (
+        <img src={product.imageUrl} alt={product.title} style={styles.productThumb} />
+      ) : (
+        <div style={styles.productThumbPlaceholder}>
+          <CameraIcon />
+        </div>
+      )}
+      <div style={styles.productBody}>
+        <p style={styles.productTitle} onClick={() => onOpenProduct(product.id)}>{product.title}</p>
+        <p style={styles.productPrice}>${product.price}</p>
+        <div style={styles.metaRow}>
+          <p style={styles.metaText}>{t("store.mine.quantityLabel", { count: product.quantity ?? 0 })}</p>
+          <p style={styles.metaText}>{t("store.mine.viewsLabel", { count: product.viewCount || 0 })}</p>
+          <p style={styles.metaText}>{t("store.mine.giftsLabel", { count: product.giftCount || 0 })}</p>
+        </div>
+        <div style={styles.actionsRow}>
+          <button style={styles.smallBtn} onClick={() => onEditProduct(product.id)}>
+            {t("store.mine.editButton")}
+          </button>
+          <button style={styles.smallBtnAccent} onClick={() => onTogglePublish(product)}>
+            {product.isPublished ? t("store.mine.unpublishButton") : t("store.mine.publishButton")}
+          </button>
+          <button style={styles.smallBtnDanger} onClick={() => onDelete(product)}>
+            {t("store.mine.deleteButton")}
+          </button>
+        </div>
       </div>
     </div>
   );

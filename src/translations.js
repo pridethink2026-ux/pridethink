@@ -195,6 +195,22 @@ export const translations = {
     "photo.errorUpload":
       "No se pudo subir la foto. Revisá tu conexión e intentá de nuevo.",
     "photo.errorRemove": "No se pudo quitar la foto. Intentá de nuevo en un momento.",
+
+    // Subida genérica de imágenes (ImageUploader.jsx, punto 59) — a
+    // diferencia de "photo.*" (foto de perfil, siempre circular), estas
+    // claves las usa cualquier pantalla que suba UNA imagen a UNA ruta de
+    // Storage, hoy solo CreateProductScreen.jsx.
+    "image.add": "Agregar imagen",
+    "image.change": "Cambiar imagen",
+    "image.remove": "Quitar imagen",
+    "image.uploading": "Subiendo...",
+    "image.errorType": "Ese archivo no es una imagen. Elegí una foto en formato JPG, PNG o WebP.",
+    "image.errorTooLarge":
+      "La imagen pesa demasiado. El máximo es {max} MB — probá con una foto más chica.",
+    "image.errorRead": "No se pudo abrir esa imagen. Puede estar dañada; probá con otra.",
+    "image.errorUpload":
+      "No se pudo subir la imagen. Revisá tu conexión e intentá de nuevo.",
+    "image.errorRemove": "No se pudo quitar la imagen. Intentá de nuevo en un momento.",
     "profile.about": "Acerca de",
     "profile.fullNameField": "Nombre completo",
     "profile.countryField": "País",
@@ -518,7 +534,6 @@ export const translations = {
     "store.create.newCatalogDescriptionPlaceholder": "Opcional",
     "store.create.tierLabel": "Nivel de visibilidad",
     "store.create.imageLabel": "Imagen",
-    "store.create.imagePlaceholder": "📷 Disponible próximamente",
     "store.create.saveDraftButton": "Guardar como borrador",
     "store.create.publishButton": "Publicar",
     "store.create.saveChangesButton": "Guardar cambios",
@@ -718,6 +733,20 @@ export const translations = {
     "photo.errorRead": "That image could not be opened. It may be damaged; try another one.",
     "photo.errorUpload": "The photo could not be uploaded. Check your connection and try again.",
     "photo.errorRemove": "The photo could not be removed. Please try again in a moment.",
+
+    // Generic image upload (ImageUploader.jsx, point 59) — unlike
+    // "photo.*" (profile photo, always circular), these keys are used by
+    // any screen that uploads ONE image to ONE Storage path, today only
+    // CreateProductScreen.jsx.
+    "image.add": "Add image",
+    "image.change": "Change image",
+    "image.remove": "Remove image",
+    "image.uploading": "Uploading...",
+    "image.errorType": "That file is not an image. Pick a photo in JPG, PNG or WebP format.",
+    "image.errorTooLarge": "That image is too heavy. The maximum is {max} MB — try a smaller photo.",
+    "image.errorRead": "That image could not be opened. It may be damaged; try another one.",
+    "image.errorUpload": "The image could not be uploaded. Check your connection and try again.",
+    "image.errorRemove": "The image could not be removed. Please try again in a moment.",
 
     // Public profile (UserProfile.jsx)
     "userProfile.backLink": "← Back",
@@ -1030,7 +1059,6 @@ export const translations = {
     "store.create.newCatalogDescriptionPlaceholder": "Optional",
     "store.create.tierLabel": "Visibility level",
     "store.create.imageLabel": "Image",
-    "store.create.imagePlaceholder": "📷 Available soon",
     "store.create.saveDraftButton": "Save as draft",
     "store.create.publishButton": "Publish",
     "store.create.saveChangesButton": "Save changes",
