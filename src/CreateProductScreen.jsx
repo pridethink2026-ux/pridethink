@@ -14,8 +14,8 @@ import {
   where,
 } from "firebase/firestore";
 import { useLanguage } from "./LanguageContext";
-import { CATEGORIES, TIERS } from "./storeData";
-import ImageUploader from "./ImageUploader";
+import { CATEGORIES, TIERS, getProductImages, notifyFollowersOfNewProduct } from "./storeData";
+import ProductPhotosUploader from "./ProductPhotosUploader";
 
 /*
   CreateProductScreen
@@ -28,15 +28,27 @@ import ImageUploader from "./ImageUploader";
   syncPostsPrivacyField en AuthProfile.jsx — mantener un campo
   denormalizado al día cuando cambia lo que lo origina).
 
-  IMAGEN DEL PRODUCTO (punto 59): la imagen tiene que subirse a
-  "productImages/{uid}/{productId}/main.jpg" en Cloud Storage, pero al
+  IMAGEN DEL PRODUCTO: las fotos se suben a
+  "productImages/{uid}/{productId}/img_N.jpg" en Cloud Storage, pero al
   CREAR un producto todavía no existe ningún "productId" — recién lo
   asigna Firestore cuando el documento se escribe. Se resuelve generando
   el id del lado del cliente con "doc(collection(db,'products')).id"
   ANTES de mostrar el formulario (no escribe nada en Firestore, solo
   reserva un id) y usando ESE mismo id tanto para la ruta de Storage como
   para el documento final (setDoc en vez de addDoc). Al editar, se usa
-  directamente el "productId" real que ya existía.
+  directamente el "productId" real que ya existía. (Introducido en el
+  punto 59 con una sola foto; el punto 60 lo extiende a hasta 5 —
+  ver ProductPhotosUploader.jsx.)
+
+  NOTIFICAR SEGUIDORES AL PUBLICAR (punto 60): cuando "isPublished" pasa
+  de false a true (crear directo como publicado, o editar un borrador y
+  publicarlo) se avisa a cada seguidor del vendedor
+  (notifyFollowersOfNewProduct en storeData.js) — NO cuando ya estaba
+  publicado y solo se edita algo (evita spamear a los seguidores por cada
+  cambio menor). "originalIsPublishedRef" guarda el estado ANTES de este
+  guardado para poder detectar esa transición. El mismo aviso también
+  puede dispararse desde MyStoreScreen.jsx (botón "Publicar" de un
+  borrador), que llama a la misma función compartida.
 */
 
 const styles = {
@@ -235,10 +247,14 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
   const [newCatalogName, setNewCatalogName] = useState("");
   const [newCatalogDescription, setNewCatalogDescription] = useState("");
   const [tier, setTier] = useState("standard");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrls, setImageUrls] = useState([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const originalCatalogIdRef = useRef(null);
+  // Estado de "isPublished" ANTES de este guardado — false para un
+  // producto nuevo. Sirve para detectar la transición borrador -> publicado
+  // y notificar a los seguidores solo esa vez (punto 60, ver docstring).
+  const originalIsPublishedRef = useRef(false);
 
   // Id real del producto (modo editar) o id generado del lado del cliente
   // para uno nuevo (modo crear) — ver el docstring de arriba. "useState"
@@ -275,7 +291,11 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
         setCatalogChoice(p.catalogId || "");
         originalCatalogIdRef.current = p.catalogId || null;
         setTier(p.tier || "standard");
-        setImageUrl(p.imageUrl || "");
+        // getProductImages: retrocompatible con productos de antes del
+        // punto 60 que solo tenían "imageUrl" (string singular) — ver
+        // storeData.js.
+        setImageUrls(getProductImages(p));
+        originalIsPublishedRef.current = !!p.isPublished;
       }
       setLoading(false);
     })();
@@ -323,10 +343,12 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
         catalogId: finalCatalogId,
         isPublished,
         tier,
-        // Si no se subió ninguna imagen, queda "" — permitido (punto 59),
-        // mismo criterio que ya usaba este campo antes de existir subida
-        // real.
-        imageUrl,
+        // "imageUrl" (portada, retrocompatible con quien todavía lo lea)
+        // + "imageUrls" (array completo, hasta 5 — punto 60). Si no se
+        // subió ninguna foto, ambos quedan vacíos — permitido, mismo
+        // criterio de siempre.
+        imageUrl: imageUrls[0] || "",
+        imageUrls,
         updatedAt: serverTimestamp(),
       };
 
@@ -338,11 +360,24 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
         data.viewCount = 0;
         data.createdAt = serverTimestamp();
         // setDoc (no addDoc) con el id generado al montar el componente:
-        // ImageUploader ya pudo haber subido la imagen a
-        // "productImages/{uid}/{effectiveProductId}/main.jpg" ANTES de
+        // ProductPhotosUploader ya pudo haber subido fotos a
+        // "productImages/{uid}/{effectiveProductId}/img_N.jpg" ANTES de
         // este guardado, así que el documento tiene que nacer con ese
         // mismo id — ver el docstring de arriba.
         await setDoc(doc(db, "products", effectiveProductId), data);
+      }
+
+      // Notificar a los seguidores SOLO en la transición borrador ->
+      // publicado (punto 60, ver docstring) — nunca al editar algo que
+      // ya estaba publicado.
+      if (isPublished && !originalIsPublishedRef.current) {
+        notifyFollowersOfNewProduct({
+          sellerId: currentUid,
+          sellerName: myProfile?.displayName,
+          sellerIdentity: myProfile?.identity,
+          productId: effectiveProductId,
+          productTitle: title.trim(),
+        }).catch(() => {});
       }
 
       const originalCatalogId = originalCatalogIdRef.current;
@@ -508,10 +543,11 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
 
         <label style={styles.label}>{t("store.create.imageLabel")}</label>
         <div style={styles.imageUploaderWrap}>
-          <ImageUploader
-            storagePath={`productImages/${currentUid}/${effectiveProductId}/main.jpg`}
-            currentImageURL={imageUrl}
-            onUploadComplete={setImageUrl}
+          <ProductPhotosUploader
+            basePath={`productImages/${currentUid}/${effectiveProductId}`}
+            images={imageUrls}
+            onChange={setImageUrls}
+            maxImages={5}
             maxSize={1024}
           />
         </div>

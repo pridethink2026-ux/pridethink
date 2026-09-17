@@ -211,6 +211,12 @@ export const translations = {
     "image.errorUpload":
       "No se pudo subir la imagen. Revisá tu conexión e intentá de nuevo.",
     "image.errorRemove": "No se pudo quitar la imagen. Intentá de nuevo en un momento.",
+
+    // Visor de imagen completa (ImageViewer.jsx, punto 60)
+    "imageViewer.close": "Cerrar",
+    "imageViewer.previous": "Foto anterior",
+    "imageViewer.next": "Foto siguiente",
+    "imageViewer.counter": "{current} de {total}",
     "profile.about": "Acerca de",
     "profile.fullNameField": "Nombre completo",
     "profile.countryField": "País",
@@ -387,6 +393,7 @@ export const translations = {
     "notifications.message": "{name} te envió un mensaje",
     "notifications.follow": "{name} empezó a seguirte",
     "notifications.mention": "{name} te mencionó",
+    "notifications.newProduct": "{name} publicó un nuevo producto: {title}",
     "notifications.generic": "Notificación",
 
     // Errores de Firebase Auth (login/registro/recuperar contraseña)
@@ -533,7 +540,8 @@ export const translations = {
     "store.create.newCatalogDescriptionLabel": "Descripción del catálogo",
     "store.create.newCatalogDescriptionPlaceholder": "Opcional",
     "store.create.tierLabel": "Nivel de visibilidad",
-    "store.create.imageLabel": "Imagen",
+    "store.create.imageLabel": "Fotos (hasta 5)",
+    "store.create.imageHint": "{count} de {max} fotos",
     "store.create.saveDraftButton": "Guardar como borrador",
     "store.create.publishButton": "Publicar",
     "store.create.saveChangesButton": "Guardar cambios",
@@ -748,6 +756,12 @@ export const translations = {
     "image.errorUpload": "The image could not be uploaded. Check your connection and try again.",
     "image.errorRemove": "The image could not be removed. Please try again in a moment.",
 
+    // Full image viewer (ImageViewer.jsx, point 60)
+    "imageViewer.close": "Close",
+    "imageViewer.previous": "Previous photo",
+    "imageViewer.next": "Next photo",
+    "imageViewer.counter": "{current} of {total}",
+
     // Public profile (UserProfile.jsx)
     "userProfile.backLink": "← Back",
     "userProfile.loadingProfile": "Loading profile...",
@@ -913,6 +927,7 @@ export const translations = {
     "notifications.message": "{name} sent you a message",
     "notifications.follow": "{name} started following you",
     "notifications.mention": "{name} mentioned you",
+    "notifications.newProduct": "{name} listed a new product: {title}",
     "notifications.generic": "Notification",
 
     // Firebase Auth errors (login/signup/forgot password)
@@ -1058,7 +1073,8 @@ export const translations = {
     "store.create.newCatalogDescriptionLabel": "Catalog description",
     "store.create.newCatalogDescriptionPlaceholder": "Optional",
     "store.create.tierLabel": "Visibility level",
-    "store.create.imageLabel": "Image",
+    "store.create.imageLabel": "Photos (up to 5)",
+    "store.create.imageHint": "{count} of {max} photos",
     "store.create.saveDraftButton": "Save as draft",
     "store.create.publishButton": "Publish",
     "store.create.saveChangesButton": "Save changes",

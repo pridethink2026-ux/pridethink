@@ -660,7 +660,13 @@ function App() {
       />
     );
   } else if (view === "notificaciones") {
-    content = <NotificationsScreen onOpenProfile={openProfile} onOpenPost={openPost} />;
+    content = (
+      <NotificationsScreen
+        onOpenProfile={openProfile}
+        onOpenPost={openPost}
+        onOpenProduct={openStoreProduct}
+      />
+    );
   } else {
     content = <AuthProfile onOpenProfile={openProfile} onOpenSaved={openSaved} />;
   }
@@ -700,7 +706,13 @@ function App() {
         )}
         <div style={navStyles.actionsSlot}>
           <ThemeMenu />
-          {!isMobile && <Notifications onOpenProfile={openProfile} onOpenPost={openPost} />}
+          {!isMobile && (
+            <Notifications
+              onOpenProfile={openProfile}
+              onOpenPost={openPost}
+              onOpenProduct={openStoreProduct}
+            />
+          )}
         </div>
       </div>
 

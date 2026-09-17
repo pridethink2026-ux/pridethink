@@ -24,10 +24,15 @@ import { useLanguage } from "./LanguageContext";
 
   Estructura en Firestore:
   - "notifications/{uid}/items/{itemId}"
-      -> { type: 'like' | 'comment' | 'message' | 'follow' | 'mention', fromUid, fromName, fromIdentity, createdAt, read, postId? }
+      -> { type: 'like' | 'comment' | 'message' | 'follow' | 'mention' | 'newProduct', fromUid, fromName, fromIdentity, createdAt, read, postId?, productId?, productTitle? }
       -> "postId" solo lo trae "mention" (ver utils.notify y Mentions.jsx):
          al tocar esa notificación se navega directo al post en vez de al
          perfil de quien la generó.
+      -> "productId"/"productTitle" solo los trae "newProduct" (punto 60,
+         ver CreateProductScreen.jsx/MyStoreScreen.jsx: se crea para cada
+         seguidor del vendedor cuando un producto pasa de borrador a
+         publicado) — al tocar esa notificación se navega directo al
+         producto, mismo criterio que "mention" con el post.
 
   Este archivo exporta tres cosas:
   - useNotifications(uid): hook con la lógica de datos (items, contador de
@@ -49,6 +54,12 @@ const LABELS = {
   message: (n, t) => t("notifications.message", { name: n.fromName }),
   follow: (n, t) => t("notifications.follow", { name: n.fromName }),
   mention: (n, t) => t("notifications.mention", { name: n.fromName }),
+  // Punto 60: se crea para cada seguidor del vendedor cuando uno de sus
+  // productos pasa de borrador a publicado — ver CreateProductScreen.jsx/
+  // MyStoreScreen.jsx. "productTitle" es una copia del momento en que se
+  // publicó (no se vuelve a leer el producto en vivo), mismo criterio que
+  // "productTitle" en giftShares/{giftId}.
+  newProduct: (n, t) => t("notifications.newProduct", { name: n.fromName, title: n.productTitle }),
 };
 
 const styles = {
@@ -210,11 +221,17 @@ function usePhotoByUid() {
   }, [allUsers]);
 }
 
-function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, dropdown }) {
+function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduct, dropdown }) {
   const { t } = useLanguage();
   const handleClick = () => {
     if (n.type === "mention" && n.postId && onOpenPost) {
       onOpenPost(n.postId);
+      return;
+    }
+    // Punto 60: mismo criterio que "mention" -> onOpenPost, pero al
+    // producto en vez de al perfil de quien la generó.
+    if (n.type === "newProduct" && n.productId && onOpenProduct) {
+      onOpenProduct(n.productId);
       return;
     }
     if (n.fromUid) onOpenProfile?.(n.fromUid);
@@ -235,7 +252,7 @@ function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, dropdown }) 
   );
 }
 
-export default function Notifications({ onOpenProfile, onOpenPost }) {
+export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct }) {
   const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -286,6 +303,7 @@ export default function Notifications({ onOpenProfile, onOpenPost }) {
               photoURL={photoByUid[n.fromUid]}
               onOpenProfile={onOpenProfile}
               onOpenPost={onOpenPost}
+              onOpenProduct={onOpenProduct}
               dropdown
             />
           ))}
@@ -296,7 +314,7 @@ export default function Notifications({ onOpenProfile, onOpenPost }) {
 }
 
 // Misma lista, como pantalla completa para la barra de navegación inferior en móvil.
-export function NotificationsScreen({ onOpenProfile, onOpenPost }) {
+export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct }) {
   const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -336,6 +354,7 @@ export function NotificationsScreen({ onOpenProfile, onOpenPost }) {
             photoURL={photoByUid[n.fromUid]}
             onOpenProfile={onOpenProfile}
             onOpenPost={onOpenPost}
+            onOpenProduct={onOpenProduct}
             dropdown={false}
           />
         ))}

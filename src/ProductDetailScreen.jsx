@@ -13,11 +13,12 @@ import {
 import Avatar from "./Avatar";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
-import { getCategoryEmoji, getCategoryLabelKey } from "./storeData";
+import { getCategoryEmoji, getCategoryLabelKey, getProductImages } from "./storeData";
 import { getReactionEmoji, getReactionSummary, useReactionPicker, ReactionPicker } from "./Reactions";
 import { playReactionSound } from "./sound";
 import { notify } from "./utils";
 import GiftFriendModal from "./GiftFriendModal";
+import ImageViewer from "./ImageViewer";
 
 /*
   ProductDetailScreen
@@ -92,7 +93,21 @@ const styles = {
     border: "1px solid var(--border)",
     objectFit: "contain",
     display: "block",
-    marginBottom: "18px",
+    cursor: "pointer",
+  },
+  productImageWrap: { position: "relative", marginBottom: "18px" },
+  // Punto 60: mismo criterio que StoreScreen.jsx -> ProductCard, indica
+  // que hay más de una foto y que tocar la imagen abre el visor.
+  photoCountBadge: {
+    position: "absolute",
+    bottom: "10px",
+    right: "10px",
+    padding: "4px 10px",
+    borderRadius: "999px",
+    background: "rgba(0,0,0,0.55)",
+    color: "#fff",
+    fontSize: "12px",
+    fontWeight: 700,
   },
   title: {
     fontFamily: "var(--font-display)",
@@ -273,6 +288,7 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
   const [saved, setSaved] = useState(false);
   const [reactionHover, setReactionHover] = useState(false);
   const [saveHover, setSaveHover] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const {
     open: pickerOpen,
     setOpen: setPickerOpen,
@@ -342,6 +358,7 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
   }
 
   const isMine = currentUid && product.sellerId === currentUid;
+  const images = getProductImages(product);
   const myReaction = (product.reactions || {})[currentUid] || null;
   const reactionSummary = getReactionSummary(product.reactions);
 
@@ -395,8 +412,16 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
       <div style={styles.column}>
         <button style={styles.backBtn} onClick={onBack}>{t("store.detail.backLink")}</button>
 
-        {product.imageUrl ? (
-          <img src={product.imageUrl} alt={product.title} style={styles.productImage} />
+        {images.length > 0 ? (
+          <div style={styles.productImageWrap}>
+            <img
+              src={images[0]}
+              alt={product.title}
+              style={styles.productImage}
+              onClick={() => setViewerOpen(true)}
+            />
+            {images.length > 1 && <span style={styles.photoCountBadge}>📷 {images.length}</span>}
+          </div>
         ) : (
           <div style={styles.imagePlaceholder}>
             <CameraIcon />
@@ -520,6 +545,10 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
           onClose={() => setGiftOpen(false)}
           onGoToSearch={onGoToSearch}
         />
+      )}
+
+      {viewerOpen && (
+        <ImageViewer images={images} startIndex={0} onClose={() => setViewerOpen(false)} />
       )}
     </div>
   );

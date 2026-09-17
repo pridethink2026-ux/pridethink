@@ -13,6 +13,7 @@ import {
   where,
 } from "firebase/firestore";
 import { useLanguage } from "./LanguageContext";
+import { getProductImages, notifyFollowersOfNewProduct } from "./storeData";
 
 /*
   MyStoreScreen
@@ -22,6 +23,14 @@ import { useLanguage } from "./LanguageContext";
   sellerId == currentUid (sin orderBy, para no necesitar un índice
   compuesto — mismo motivo que StoreScreen.jsx) y separa publicados de
   borradores en el cliente con "isPublished".
+
+  "myProfile" es nuevo (punto 60): antes esta pantalla no lo necesitaba
+  (solo mostraba y administraba TUS propios productos, nunca escribía
+  nada que necesitara tu nombre/identidad) — ahora hace falta para poder
+  notificar a los seguidores al publicar un borrador desde acá (ver
+  handleTogglePublish), con tu nombre/identidad real (exigido por
+  notificacionValida() en firestore.rules). StoreScreen.jsx ya lo tenía
+  cargado, así que solo hizo falta pasarlo hacia abajo.
 */
 
 const styles = {
@@ -207,10 +216,13 @@ function CameraIcon() {
 }
 
 function ProductRow({ product, t, onOpenProduct, onEditProduct, onDelete, onTogglePublish }) {
+  // getProductImages: retrocompatible con productos de antes del punto 60
+  // que solo tenían "imageUrl" — ver storeData.js.
+  const cover = getProductImages(product)[0];
   return (
     <div style={styles.productCard}>
-      {product.imageUrl ? (
-        <img src={product.imageUrl} alt={product.title} style={styles.productThumb} />
+      {cover ? (
+        <img src={cover} alt={product.title} style={styles.productThumb} />
       ) : (
         <div style={styles.productThumbPlaceholder}>
           <CameraIcon />
@@ -291,7 +303,7 @@ function CreateCatalogForm({ currentUid, onCreated, onCancel, t }) {
   );
 }
 
-export default function MyStoreScreen({ currentUid, onBack, onOpenProduct, onEditProduct }) {
+export default function MyStoreScreen({ currentUid, myProfile, onBack, onOpenProduct, onEditProduct }) {
   const { t } = useLanguage();
   const [tab, setTab] = useState("published");
   const [products, setProducts] = useState([]);
@@ -330,10 +342,23 @@ export default function MyStoreScreen({ currentUid, onBack, onOpenProduct, onEdi
   };
 
   const handleTogglePublish = async (product) => {
+    const willPublish = !product.isPublished;
     await updateDoc(doc(db, "products", product.id), {
-      isPublished: !product.isPublished,
+      isPublished: willPublish,
       updatedAt: serverTimestamp(),
     });
+    // Notificar a los seguidores SOLO al pasar de borrador a publicado
+    // (punto 60) — no al despublicar. Mismo criterio y misma función
+    // compartida que CreateProductScreen.jsx.
+    if (willPublish) {
+      notifyFollowersOfNewProduct({
+        sellerId: currentUid,
+        sellerName: myProfile?.displayName,
+        sellerIdentity: myProfile?.identity,
+        productId: product.id,
+        productTitle: product.title,
+      }).catch(() => {});
+    }
   };
 
   const published = products.filter((p) => p.isPublished);

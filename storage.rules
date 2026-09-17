@@ -63,8 +63,10 @@ service firebase.storage {
     // consulta otras colecciones), Storage Rules no puede hacer un get()
     // cruzado a Firestore de forma práctica acá, así que la única defensa
     // real es "userId == quien está subiendo" — igual que profilePhotos.
-    // "fileName" queda libre (ImageUploader.jsx siempre sube "main.jpg",
-    // pero no hace falta forzarlo en la regla).
+    // "fileName" queda libre a propósito: CreateProductScreen.jsx sube
+    // hasta 5 fotos por producto (punto 60, ProductPhotosUploader.jsx),
+    // numeradas "img_0.jpg".."img_4.jpg" — no hace falta forzar ese
+    // patrón en la regla, la app nunca sube nada más ahí.
     match /productImages/{userId}/{productId}/{fileName} {
       allow read: if request.auth != null;
 

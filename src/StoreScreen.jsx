@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import Avatar from "./Avatar";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useIsMobile } from "./utils";
-import { CATEGORIES } from "./storeData";
+import { CATEGORIES, getProductImages } from "./storeData";
 import ProductDetailScreen from "./ProductDetailScreen";
 import CreateProductScreen from "./CreateProductScreen";
 import MyStoreScreen from "./MyStoreScreen";
+import ImageViewer from "./ImageViewer";
 
 /*
   StoreScreen
@@ -33,6 +34,20 @@ import MyStoreScreen from "./MyStoreScreen";
   Firestore — mismo motivo/patrón que ya usa GroupView.jsx con
   "authorIsPrivate"), y se ordenan/filtran (búsqueda, categoría,
   oficial/comunidad) del lado del cliente.
+
+  FIX (punto 60): el where("isPublished","==",true) de arriba FALTABA —
+  este archivo escuchaba collection(db,"products") a secas, sin ningún
+  filtro. La regla de firestore.rules exige "isPublished==true ||
+  sellerId==miUid", y Firestore rechaza por completo un "list" si, dado
+  SOLO lo que la query restringe (acá: nada), podría llegar a devolver un
+  documento que la regla no permitiría — no evalúa la regla documento por
+  documento como un filtro. Sin el where, la consulta entera fallaba con
+  "permission-denied" para CUALQUIER usuario (el onSnapshot no tenía
+  manejador de error, así que fallaba en silencio y la lista quedaba
+  vacía) — parecía "no veo productos de otros" porque MyStoreScreen.jsx
+  SÍ filtra por "sellerId" (esa rama del OR se puede probar segura) y
+  siempre funcionó, dando la falsa impresión de que "lo mío se ve, lo de
+  otros no".
 */
 
 const styles = {
@@ -172,6 +187,21 @@ const styles = {
     objectFit: "contain",
     display: "block",
   },
+  cardImageWrap: { position: "relative" },
+  // Punto 60: indica que hay más de una foto para ver en el visor — sin
+  // esto, nadie se enteraría de que tocar la imagen abre un visor con
+  // flechas para navegar entre varias.
+  photoCountBadge: {
+    position: "absolute",
+    bottom: "6px",
+    right: "6px",
+    padding: "2px 8px",
+    borderRadius: "999px",
+    background: "rgba(0,0,0,0.55)",
+    color: "#fff",
+    fontSize: "10px",
+    fontWeight: 700,
+  },
   cardBody: { padding: "10px 12px 12px" },
   cardTitle: {
     fontSize: "13px",
@@ -262,12 +292,24 @@ function PlusIcon() {
   );
 }
 
-function ProductCard({ product, sellerPhotoURL, onOpen }) {
+function ProductCard({ product, sellerPhotoURL, onOpen, onViewImages }) {
   const { t } = useLanguage();
+  const images = getProductImages(product);
   return (
     <div style={styles.card} onClick={() => onOpen(product.id)}>
-      {product.imageUrl ? (
-        <img src={product.imageUrl} alt={product.title} style={styles.cardImage} />
+      {images.length > 0 ? (
+        <div
+          style={styles.cardImageWrap}
+          onClick={(e) => {
+            // Tocar la imagen abre el visor en vez de navegar al detalle
+            // — el resto de la tarjeta sigue llevando al detalle.
+            e.stopPropagation();
+            onViewImages(images, 0);
+          }}
+        >
+          <img src={images[0]} alt={product.title} style={styles.cardImage} />
+          {images.length > 1 && <span style={styles.photoCountBadge}>📷 {images.length}</span>}
+        </div>
       ) : (
         <div style={styles.cardImagePlaceholder}>
           <CameraIcon />
@@ -300,6 +342,10 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(null);
   const [subView, setSubView] = useState({ type: "list" });
+  // Visor de imagen completa (punto 60), disparado al tocar la foto de
+  // cualquier tarjeta de la grilla — null cuando está cerrado.
+  const [viewer, setViewer] = useState(null); // { images, startIndex } | null
+  const openViewer = (images, startIndex) => setViewer({ images, startIndex });
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
@@ -328,10 +374,9 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
   }, [currentUid]);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "products"), (snap) => {
-      const list = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((p) => p.isPublished);
+    const q = query(collection(db, "products"), where("isPublished", "==", true));
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setProducts(list);
     });
@@ -398,6 +443,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
     return (
       <MyStoreScreen
         currentUid={currentUid}
+        myProfile={myProfile}
         onBack={backToList}
         onOpenProduct={openProduct}
         onEditProduct={openEdit}
@@ -448,7 +494,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
           ) : (
             <div style={styles.grid}>
               {officialProducts.map((p) => (
-                <ProductCard key={p.id} product={p} sellerPhotoURL={sellerPhotos[p.sellerId]} onOpen={openProduct} />
+                <ProductCard key={p.id} product={p} sellerPhotoURL={sellerPhotos[p.sellerId]} onOpen={openProduct} onViewImages={openViewer} />
               ))}
             </div>
           )}
@@ -463,7 +509,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
           ) : (
             <div style={styles.grid}>
               {communityProducts.map((p) => (
-                <ProductCard key={p.id} product={p} sellerPhotoURL={sellerPhotos[p.sellerId]} onOpen={openProduct} />
+                <ProductCard key={p.id} product={p} sellerPhotoURL={sellerPhotos[p.sellerId]} onOpen={openProduct} onViewImages={openViewer} />
               ))}
             </div>
           )}
@@ -474,6 +520,14 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
         <button style={styles.fab(isMobile)} onClick={openCreate} title={t("store.createFabTitle")}>
           <PlusIcon />
         </button>
+      )}
+
+      {viewer && (
+        <ImageViewer
+          images={viewer.images}
+          startIndex={viewer.startIndex}
+          onClose={() => setViewer(null)}
+        />
       )}
     </div>
   );

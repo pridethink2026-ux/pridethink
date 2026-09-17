@@ -27,7 +27,16 @@ export function useIsMobile(breakpoint = 700) {
 // patrón para likes, comentarios, mensajes nuevos, seguidores nuevos y
 // menciones. "postId" es opcional (solo lo usan las menciones, para poder
 // llevar directo al post/comentario donde ocurrió — ver Notifications.jsx).
-export async function notify(targetUid, { type, fromUid, fromName, fromIdentity, postId }) {
+// "productId"/"productTitle" son opcionales (solo el tipo "newProduct",
+// punto 60): mismo criterio que "postId", solo se agregan al documento si
+// vienen, y sirven para poder llevar directo al producto y mostrar su
+// título sin tener que leerlo de nuevo — ver CreateProductScreen.jsx/
+// MyStoreScreen.jsx (quién las crea) y Notifications.jsx (cómo se
+// muestran y a dónde navegan).
+export async function notify(
+  targetUid,
+  { type, fromUid, fromName, fromIdentity, postId, productId, productTitle }
+) {
   if (!targetUid || targetUid === fromUid) return;
   const data = {
     type,
@@ -38,6 +47,8 @@ export async function notify(targetUid, { type, fromUid, fromName, fromIdentity,
     read: false,
   };
   if (postId) data.postId = postId;
+  if (productId) data.productId = productId;
+  if (productTitle) data.productTitle = productTitle;
   await addDoc(collection(db, "notifications", targetUid, "items"), data);
 }
 
