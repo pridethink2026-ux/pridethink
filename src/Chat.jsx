@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import { auth, db } from "./firebase";
+import { auth, db, storage } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -13,6 +13,7 @@ import {
   updateDoc,
   deleteField,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Avatar from "./Avatar";
 import { notify, useIsMobile } from "./utils";
 import { useLanguage } from "./LanguageContext";
@@ -23,6 +24,7 @@ import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Block
 import { useAllUsers } from "./Mentions";
 import { playReactionSound } from "./sound";
 import GiftNotification from "./GiftNotification";
+import ImageViewer from "./ImageViewer";
 
 /*
   Chat
@@ -54,7 +56,19 @@ import GiftNotification from "./GiftNotification";
   muy por debajo del límite de 1MB por documento de Firestore.
   Mensaje de audio: { senderId, type: "audio", audioData, audioDuration, createdAt }
   Mensaje de texto (como antes): { senderId, text, createdAt }
-  Los tres tipos de mensaje pueden tener además `reactions: { [uid]: tipo }`
+  Mensaje de imagen (punto 61): { senderId, type: "image", imageUrl, createdAt }
+  — A DIFERENCIA de una nota de voz, la imagen SÍ usa Cloud Storage (una
+  sola foto por mensaje pesa mucho más que 1MB si se guardara base64
+  directo en el documento, como sí es viable con el audio comprimido a
+  32kbps). Sube a "chatImages/{chatId}/{messageId}/img.jpg" — el
+  messageId se genera del lado del cliente ANTES de crear el mensaje
+  (mismo patrón que "postId"/"productId" en Feed.jsx/
+  CreateProductScreen.jsx), así que el mensaje se crea con setDoc en vez
+  de addDoc. El envío sigue el mismo esqueleto que una nota de voz:
+  elegir el archivo lo redimensiona y lo deja "listo" para confirmar o
+  cancelar (pendingImage), nunca se sube directo — ver
+  handlePickImage/sendPendingImage/cancelPendingImage.
+  Todos los tipos de mensaje pueden tener además `reactions: { [uid]: tipo }`
   (ver Reactions.jsx, compartido con Feed.jsx) — como mucho reaccionan las
   2 personas de la conversación. Mantener presionado (mobile) o pasar el
   mouse (desktop) sobre CUALQUIER mensaje (texto, nota de voz o post
@@ -164,6 +178,80 @@ function StickerIcon() {
       <path d="M8.5 14a3.5 3.5 0 0 0 6 0" />
     </svg>
   );
+}
+
+// Ícono del botón "enviar una imagen": mismo estilo de trazo (currentColor,
+// redondeado) que MicIcon/StickerIcon, para que los tres combinen.
+function ImageIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="10" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M21 15l-5-5-9 9" />
+    </svg>
+  );
+}
+
+// Validación de tipo/peso y redimensionado con <canvas> (máximo
+// PENDING_IMAGE_MAX_SIZE de lado, manteniendo aspect ratio, JPEG 0.85) —
+// duplicado a propósito de MultiImageUploader.jsx/ImageUploader.jsx en vez
+// de importado: acá la imagen se redimensiona ANTES de mostrar la vista
+// previa (no al tocar "Enviar"), y el resultado se guarda en estado junto
+// con una URL de objeto local para esa vista previa — un flujo un poco
+// distinto al de esos dos componentes (que suben apenas se elige el
+// archivo), así que no comparten la misma función de más arriba.
+const PENDING_IMAGE_MAX_MB = 10;
+const PENDING_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PENDING_IMAGE_MAX_SIZE = 1024;
+const PENDING_IMAGE_JPEG_QUALITY = 0.85;
+
+function resizeImageKeepingAspect(file, maxSize) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      if (!img.width || !img.height) {
+        reject(new Error("empty"));
+        return;
+      }
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const targetW = Math.round(img.width * scale);
+      const targetH = Math.round(img.height * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("nocontext"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("noblob"))),
+        "image/jpeg",
+        PENDING_IMAGE_JPEG_QUALITY
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("decode"));
+    };
+
+    img.src = objectUrl;
+  });
 }
 
 function blobToDataUrl(blob) {
@@ -534,6 +622,47 @@ const styles = {
     cursor: "pointer",
     flexShrink: 0,
   },
+  // Punto 61: mismo esqueleto que recordingRow (fila que reemplaza al
+  // input normal mientras hay "algo listo" para confirmar/cancelar), con
+  // una miniatura de la imagen elegida en vez del ícono de micrófono.
+  imagePreviewRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "14px 16px",
+    borderTop: "1px solid var(--border)",
+  },
+  imagePreviewThumb: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "8px",
+    objectFit: "cover",
+    flexShrink: 0,
+  },
+  sendingSpinner: {
+    width: "14px",
+    height: "14px",
+    borderRadius: "50%",
+    border: "2px solid rgba(255,255,255,0.4)",
+    borderTopColor: "var(--bg)",
+    boxSizing: "border-box",
+    display: "inline-block",
+  },
+  // Burbuja de imagen en el chat (punto 61): sin fondo de color, mismo
+  // criterio que stickerBubble — la propia foto ya da el peso visual, un
+  // fondo de acento detrás se vería raro. maxWidth acota el tamaño dentro
+  // de bubbleWrapper (75% del ancho del chat).
+  imageBubble: {
+    padding: "2px",
+    lineHeight: 0,
+  },
+  imageBubbleImg: {
+    maxWidth: "240px",
+    width: "100%",
+    borderRadius: "14px",
+    display: "block",
+    cursor: "pointer",
+  },
   audioMessage: {
     display: "flex",
     alignItems: "center",
@@ -723,6 +852,13 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
   const { open, setOpen, containerRef, triggerProps } = useReactionPicker();
   const myReaction = (message.reactions || {})[currentUid] || null;
   const reactionEmojis = getDistinctReactionEmojis(message.reactions);
+  // Punto 61: se chequea "message.imageUrl" (no "message.type === 'image'")
+  // a propósito — cubre tanto un mensaje SOLO imagen (type:"image", el
+  // único caso que hoy produce el composer) como uno de texto que
+  // TAMBIÉN tuviera imagen, si algún día se conecta esa combinación (ver
+  // el docstring de sendPendingImage). Un solo "click abre el visor" con
+  // esa única foto — ImageViewer.jsx acepta un array de 1 sin problema.
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
 
   const setMyReaction = async (type) => {
     const msgRef = doc(db, "chats", chatId, "messages", message.id);
@@ -735,7 +871,17 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
   return (
     <div style={styles.bubbleRow(mine)}>
       <div ref={containerRef} style={styles.bubbleWrapper} {...triggerProps}>
-        {message.type === "sticker" ? (
+        {message.imageUrl ? (
+          <div style={styles.imageBubble}>
+            <img
+              src={message.imageUrl}
+              alt=""
+              style={styles.imageBubbleImg}
+              onClick={() => setImageViewerOpen(true)}
+            />
+            {message.text && <div style={styles.bubble(mine)}>{message.text}</div>}
+          </div>
+        ) : message.type === "sticker" ? (
           <div style={styles.stickerBubble}>
             <StickerImage stickerId={message.stickerId} size={96} />
           </div>
@@ -787,6 +933,13 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
           />
         )}
       </div>
+      {imageViewerOpen && (
+        <ImageViewer
+          images={[message.imageUrl]}
+          startIndex={0}
+          onClose={() => setImageViewerOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -815,6 +968,15 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
   const chunksRef = useRef([]);
   const secondsRef = useRef(0);
   const pendingActionRef = useRef(null); // "cancel" | "send" | "auto"
+
+  // Punto 61: enviar una imagen sigue el mismo esqueleto que una nota de
+  // voz — elegir/grabar deja algo "listo" (pendingImage/pendingAudio) que
+  // hay que confirmar o cancelar ANTES de que se suba/envíe nada. La
+  // preview usa una URL de objeto local (revocada al cancelar o al
+  // terminar de enviar, para no filtrar memoria).
+  const [pendingImage, setPendingImage] = useState(null); // { blob, previewUrl } | null
+  const [sendingImage, setSendingImage] = useState(false);
+  const imageInputRef = useRef(null);
 
   // Escucha si hay sesión activa (viene del mismo login de AuthProfile)
   useEffect(() => {
@@ -1058,6 +1220,84 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
     }
   };
 
+  // Elegir archivo -> validar -> redimensionar YA (mismo patrón de canvas
+  // que MultiImageUploader.jsx/ImageUploader.jsx, ver el docstring de
+  // resizeImageKeepingAspect más arriba) -> queda "listo" en pendingImage
+  // con una preview local. Recién se sube al tocar "Enviar"
+  // (sendPendingImage) — errores con alert(), mismo criterio que
+  // startRecording()/uploadAudioMessage() en este mismo archivo.
+  const handlePickImage = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!PENDING_IMAGE_TYPES.includes(file.type)) {
+      alert(t("image.errorType"));
+      return;
+    }
+    if (file.size > PENDING_IMAGE_MAX_MB * 1024 * 1024) {
+      alert(t("image.errorTooLarge", { max: PENDING_IMAGE_MAX_MB }));
+      return;
+    }
+
+    try {
+      const blob = await resizeImageKeepingAspect(file, PENDING_IMAGE_MAX_SIZE);
+      setPendingImage({ blob, previewUrl: URL.createObjectURL(blob) });
+    } catch (err) {
+      alert(t("image.errorRead"));
+    }
+  };
+
+  const cancelPendingImage = () => {
+    if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
+    setPendingImage(null);
+  };
+
+  // Sube a "chatImages/{chatId}/{messageId}/img.jpg" — el messageId se
+  // genera del lado del cliente ANTES de crear el mensaje (mismo problema
+  // y misma solución que "postId"/"productId" en Feed.jsx/
+  // CreateProductScreen.jsx: la ruta de Storage necesita un id que
+  // Firestore recién asignaría en addDoc), así que acá se usa setDoc con
+  // ese id en vez de addDoc.
+  const sendPendingImage = async () => {
+    if (!pendingImage || !activeContact || !currentUid) return;
+    setSendingImage(true);
+    try {
+      const chatId = getChatId(currentUid, activeContact.uid);
+      await setDoc(
+        doc(db, "chats", chatId),
+        { participants: [currentUid, activeContact.uid] },
+        { merge: true }
+      );
+
+      const messageId = doc(collection(db, "chats", chatId, "messages")).id;
+      const fileRef = ref(storage, `chatImages/${chatId}/${messageId}/img.jpg`);
+      await uploadBytes(fileRef, pendingImage.blob, { contentType: "image/jpeg" });
+      const imageUrl = await getDownloadURL(fileRef);
+
+      await setDoc(doc(db, "chats", chatId, "messages", messageId), {
+        senderId: currentUid,
+        type: "image",
+        imageUrl,
+        createdAt: serverTimestamp(),
+      });
+
+      await notify(activeContact.uid, {
+        type: "message",
+        fromUid: currentUid,
+        fromName: myProfile?.displayName || "Alguien",
+        fromIdentity: myProfile?.identity || "",
+      });
+
+      URL.revokeObjectURL(pendingImage.previewUrl);
+      setPendingImage(null);
+    } catch (err) {
+      alert(t("image.errorUpload"));
+    } finally {
+      setSendingImage(false);
+    }
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
     if (!text.trim() || !activeContact || !currentUid) return;
@@ -1233,7 +1473,30 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
                   ))}
                   <div ref={messagesEndRef} />
                 </div>
-                {recordingState === "idle" ? (
+                {pendingImage ? (
+                  <div style={styles.imagePreviewRow}>
+                    <img src={pendingImage.previewUrl} alt="" style={styles.imagePreviewThumb} />
+                    <span style={styles.recordingLabel}>{t("chat.imageReady")}</span>
+                    <button
+                      type="button"
+                      style={styles.recordCancelBtn}
+                      onClick={cancelPendingImage}
+                      disabled={sendingImage}
+                      title={t("chat.cancel")}
+                    >
+                      ✕
+                    </button>
+                    <button
+                      type="button"
+                      style={styles.recordSendBtn}
+                      onClick={sendPendingImage}
+                      disabled={sendingImage}
+                      title={t("chat.send")}
+                    >
+                      {sendingImage ? <span className="pt-spin" style={styles.sendingSpinner} /> : "➤"}
+                    </button>
+                  </div>
+                ) : recordingState === "idle" ? (
                   <form style={styles.inputRow} onSubmit={handleSend}>
                     <input
                       style={styles.input}
@@ -1253,6 +1516,21 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
                       </button>
                       {stickerPanelOpen && <StickerPicker onSelect={handleSendSticker} />}
                     </div>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePickImage}
+                      style={{ display: "none" }}
+                    />
+                    <button
+                      type="button"
+                      style={styles.micBtn}
+                      onClick={() => imageInputRef.current && imageInputRef.current.click()}
+                      title={t("chat.sendImage")}
+                    >
+                      <ImageIcon />
+                    </button>
                     <button
                       type="button"
                       style={styles.micBtn}

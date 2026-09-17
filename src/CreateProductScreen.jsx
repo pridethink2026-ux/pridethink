@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import { useLanguage } from "./LanguageContext";
 import { CATEGORIES, TIERS, getProductImages, notifyFollowersOfNewProduct } from "./storeData";
-import ProductPhotosUploader from "./ProductPhotosUploader";
+import MultiImageUploader from "./MultiImageUploader";
 
 /*
   CreateProductScreen
@@ -38,7 +38,7 @@ import ProductPhotosUploader from "./ProductPhotosUploader";
   para el documento final (setDoc en vez de addDoc). Al editar, se usa
   directamente el "productId" real que ya existía. (Introducido en el
   punto 59 con una sola foto; el punto 60 lo extiende a hasta 5 —
-  ver ProductPhotosUploader.jsx.)
+  ver MultiImageUploader.jsx — renombrado en el punto 61 al generalizarse.)
 
   NOTIFICAR SEGUIDORES AL PUBLICAR (punto 60): cuando "isPublished" pasa
   de false a true (crear directo como publicado, o editar un borrador y
@@ -360,7 +360,7 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
         data.viewCount = 0;
         data.createdAt = serverTimestamp();
         // setDoc (no addDoc) con el id generado al montar el componente:
-        // ProductPhotosUploader ya pudo haber subido fotos a
+        // MultiImageUploader ya pudo haber subido fotos a
         // "productImages/{uid}/{effectiveProductId}/img_N.jpg" ANTES de
         // este guardado, así que el documento tiene que nacer con ese
         // mismo id — ver el docstring de arriba.
@@ -543,7 +543,7 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
 
         <label style={styles.label}>{t("store.create.imageLabel")}</label>
         <div style={styles.imageUploaderWrap}>
-          <ProductPhotosUploader
+          <MultiImageUploader
             basePath={`productImages/${currentUid}/${effectiveProductId}`}
             images={imageUrls}
             onChange={setImageUrls}

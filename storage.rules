@@ -7,13 +7,17 @@ rules_version = '2';
 // escriben acá, se revisan, y se pegan A MANO en la consola de Firebase
 // (Storage -> Rules -> Publish). Ver la regla 7 de CONTEXTO.md.
 //
-// El bucket guarda dos cosas: la foto de perfil de cada persona
-// (`profilePhotos/{uid}/avatar.jpg`, ver ProfilePhotoUploader.jsx) y la
+// El bucket guarda: la foto de perfil de cada persona
+// (`profilePhotos/{uid}/avatar.jpg`, ver ProfilePhotoUploader.jsx), la
 // imagen de cada producto de la Tienda (`productImages/{userId}/
-// {productId}/{fileName}`, ver ImageUploader.jsx + CreateProductScreen.jsx,
-// punto 59). Todo lo demás está cerrado con llave: si más adelante se
-// agregan portadas de grupo/evento, hay que abrirles su propio bloque acá,
-// a propósito — el catch-all del final no las va a dejar pasar solas.
+// {productId}/{fileName}`, ver MultiImageUploader.jsx + CreateProductScreen.jsx,
+// punto 59-60), las fotos de un post del muro (`postImages/{userId}/
+// {postId}/{fileName}`, ver MultiImageUploader.jsx + Feed.jsx, punto 61) y
+// la imagen de un mensaje de chat (`chatImages/{chatId}/{messageId}/
+// {fileName}`, ver Chat.jsx, punto 61). Todo lo demás está cerrado con
+// llave: si más adelante se agregan portadas de grupo/evento, hay que
+// abrirles su propio bloque acá, a propósito — el catch-all del final no
+// las va a dejar pasar solas.
 //
 // IMPORTANTE sobre `allow read`: las URLs que devuelve getDownloadURL()
 // llevan un token y se sirven sin pasar por estas reglas, así que esta
@@ -64,7 +68,7 @@ service firebase.storage {
     // cruzado a Firestore de forma práctica acá, así que la única defensa
     // real es "userId == quien está subiendo" — igual que profilePhotos.
     // "fileName" queda libre a propósito: CreateProductScreen.jsx sube
-    // hasta 5 fotos por producto (punto 60, ProductPhotosUploader.jsx),
+    // hasta 5 fotos por producto (punto 60, MultiImageUploader.jsx),
     // numeradas "img_0.jpg".."img_4.jpg" — no hace falta forzar ese
     // patrón en la regla, la app nunca sube nada más ahí.
     match /productImages/{userId}/{productId}/{fileName} {
@@ -82,6 +86,51 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
 
       allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ------------------------------------------------------------------
+    // postImages/{userId}/{postId}/{fileName} — foto de un post del muro
+    // ------------------------------------------------------------------
+    // Copia exacta del bloque de productImages de arriba, mismo motivo:
+    // solo el autor (userId == su propio uid) escribe dentro de su propia
+    // carpeta, el postId no se valida contra un documento real en
+    // posts/{postId} (misma limitación de Storage Rules explicada arriba),
+    // y "fileName" queda libre — Feed.jsx sube hasta 4 fotos por post
+    // (punto 61, MultiImageUploader.jsx), numeradas "img_0.jpg".."img_3.jpg".
+    match /postImages/{userId}/{postId}/{fileName} {
+      allow read: if request.auth != null;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ------------------------------------------------------------------
+    // chatImages/{chatId}/{messageId}/{fileName} — imagen de un mensaje
+    // ------------------------------------------------------------------
+    // A diferencia de los dos bloques de arriba (una sola persona dueña
+    // de la carpeta), acá los DOS participantes del chat necesitan poder
+    // leer Y escribir — mismo criterio exacto que ya usa
+    // esParticipanteDelChat() en firestore.rules para
+    // chats/{chatId}/messages/{messageId}: separar el chatId por "_" (así
+    // se arma en getChatId(), Chat.jsx) y confirmar que el uid de quien
+    // pide es una de las dos mitades. Storage Rules usa el mismo lenguaje
+    // que Firestore Rules, así que "chatId.split('_')" funciona igual acá.
+    // "fileName" siempre es "img.jpg" (Chat.jsx sube UNA sola imagen por
+    // mensaje, cada mensaje ya tiene su propia carpeta por messageId, así
+    // que no hace falta numerar como en productImages/postImages).
+    match /chatImages/{chatId}/{messageId}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
+
+      allow create, update: if request.auth != null
+        && request.auth.uid in chatId.split('_')
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if request.auth != null && request.auth.uid in chatId.split('_');
     }
 
     // ------------------------------------------------------------------

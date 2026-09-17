@@ -16,6 +16,8 @@ import {
   where,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
+import MultiImageUploader from "./MultiImageUploader";
+import ImageViewer from "./ImageViewer";
 import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import ReportButton from "./ReportButton";
@@ -185,6 +187,7 @@ const styles = {
     minHeight: "70px",
     fontFamily: "inherit",
   },
+  composerImagesWrap: { marginTop: "12px" },
   postBtn: {
     marginTop: "10px",
     padding: "10px 20px",
@@ -254,6 +257,50 @@ const styles = {
   authorIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: 0 },
   timeText: { fontSize: "11px", color: "var(--text-muted)", margin: "2px 0 0" },
   postText: { fontSize: "14px", lineHeight: 1.5, margin: "0 0 12px", whiteSpace: "pre-wrap" },
+  // Punto 61: fotos de un post. 1 foto = ancho completo, sin recortar
+  // (se ve tal cual, como en el visor); 2+ = grilla de 2 columnas con
+  // objectFit:cover (uniforme, a diferencia de las miniaturas de
+  // producto en StoreScreen.jsx que usan "contain" — acá se prioriza que
+  // la grilla quede pareja, tocar una imagen abre el original sin
+  // recortar en ImageViewer.jsx). Para 3 fotos, la segunda fila queda con
+  // una sola celda ocupada — interpretación más simple de "grilla 2x2".
+  postImageSingle: {
+    width: "100%",
+    borderRadius: "14px",
+    display: "block",
+    cursor: "pointer",
+    marginBottom: "12px",
+  },
+  postImageGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "4px",
+    borderRadius: "14px",
+    overflow: "hidden",
+    marginBottom: "12px",
+    position: "relative",
+  },
+  postImageGridItem: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    objectFit: "cover",
+    display: "block",
+    cursor: "pointer",
+  },
+  // Mismo criterio que StoreScreen.jsx/ProductDetailScreen.jsx: indica
+  // que hay más de una foto (acá técnicamente ya se ven todas en la
+  // grilla, pero sirve como conteo rápido sin tener que contar celdas).
+  postImageCountBadge: {
+    position: "absolute",
+    bottom: "8px",
+    right: "8px",
+    padding: "3px 9px",
+    borderRadius: "999px",
+    background: "rgba(0,0,0,0.55)",
+    color: "#fff",
+    fontSize: "11px",
+    fontWeight: 700,
+  },
   hashtag: {
     color: "var(--accent2)",
     fontWeight: 600,
@@ -562,6 +609,12 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const [likePop, setLikePop] = useState(false);
   const [saved, setSaved] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // Punto 61: fotos del post (siempre un array, [] si no tiene ninguna) y
+  // el visor de imagen completa — cada PostCard maneja el suyo, así los
+  // 4 lugares que reusan PostCard (UserProfile.jsx, SavedPosts.jsx,
+  // PostView.jsx, GroupView.jsx) lo obtienen gratis, sin tocar ninguno.
+  const images = post.imageUrls || [];
+  const [viewer, setViewer] = useState(null); // { startIndex } | null
   const { open: pickerOpen, setOpen: setPickerOpen, containerRef: reactionRef, triggerProps: reactionTriggerProps, consumeLongPress } =
     useReactionPicker();
   const allUsers = useAllUsers();
@@ -784,7 +837,34 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           </div>
         </>
       ) : (
-        <p style={styles.postText}>{renderPostText(post.text, allUsers, onHashtagClick, onOpenProfile)}</p>
+        <>
+          {post.text && (
+            <p style={styles.postText}>{renderPostText(post.text, allUsers, onHashtagClick, onOpenProfile)}</p>
+          )}
+          {images.length === 1 ? (
+            <img
+              src={images[0]}
+              alt=""
+              style={styles.postImageSingle}
+              onClick={() => setViewer({ startIndex: 0 })}
+            />
+          ) : (
+            images.length > 1 && (
+              <div style={styles.postImageGrid}>
+                {images.map((url, i) => (
+                  <img
+                    key={url + i}
+                    src={url}
+                    alt=""
+                    style={styles.postImageGridItem}
+                    onClick={() => setViewer({ startIndex: i })}
+                  />
+                ))}
+                <span style={styles.postImageCountBadge}>📷 {images.length}</span>
+              </div>
+            )
+          )}
+        </>
       )}
 
       <div style={styles.actionsRow}>
@@ -880,6 +960,10 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           </form>
         </div>
       )}
+
+      {viewer && (
+        <ImageViewer images={images} startIndex={viewer.startIndex} onClose={() => setViewer(null)} />
+      )}
     </div>
   );
 }
@@ -895,6 +979,18 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const [postsLoading, setPostsLoading] = useState(true);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
+  const [composerImages, setComposerImages] = useState([]);
+  // Id del PRÓXIMO post a publicar, generado del lado del cliente (punto
+  // 61): las fotos se suben a "postImages/{uid}/{postId}/img_N.jpg" ANTES
+  // de que el post exista en Firestore, así que hace falta un id de
+  // antemano — mismo problema y misma solución que "productId" en
+  // CreateProductScreen.jsx (punto 59). Diferencia importante: ese
+  // formulario se abre y cierra por producto, pero el composer del muro
+  // es UNA sola instancia que vive todo el tiempo — así que este id se
+  // "rota" a uno nuevo después de cada post exitoso (ver handlePost), si
+  // no, el segundo post subiría sus fotos a la carpeta del primero y
+  // pisaría sus archivos.
+  const [composerPostId, setComposerPostId] = useState(() => doc(collection(db, "posts")).id);
   const [feedTab, setFeedTab] = useState("todos"); // "todos" | "siguiendo"
   const [activeHashtag, setActiveHashtag] = useState(null);
   const allUsers = useAllUsers();
@@ -974,18 +1070,26 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     );
   }, [publicPosts, myPosts]);
 
+  // Punto 61: un post puede tener texto solo, imágenes solas, o ambos —
+  // antes exigía texto sí o sí. "setDoc" con el id pre-generado
+  // (composerPostId, ver el useState de arriba) en vez de "addDoc": las
+  // fotos, si las hay, ya se subieron a "postImages/{uid}/{composerPostId}/
+  // img_N.jpg" ANTES de este guardado (MultiImageUploader las sube apenas
+  // se eligen, no recién al publicar), así que el documento tiene que
+  // nacer con ese mismo id.
   const handlePost = async (e) => {
     e.preventDefault();
-    if (!text.trim() || !currentUid || !myProfile) return;
+    const trimmed = text.trim();
+    if ((!trimmed && composerImages.length === 0) || !currentUid || !myProfile) return;
     setPosting(true);
     try {
-      const trimmed = text.trim();
       const mentionedUids = extractMentionedUids(trimmed, allUsers, currentUid);
-      const postRef = await addDoc(collection(db, "posts"), {
+      await setDoc(doc(db, "posts", composerPostId), {
         authorId: currentUid,
         authorName: myProfile.displayName || "Sin nombre",
         authorIdentity: myProfile.identity || "",
         text: trimmed,
+        imageUrls: composerImages,
         hashtags: extractHashtags(trimmed),
         mentionedUids,
         createdAt: serverTimestamp(),
@@ -1001,11 +1105,15 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
             fromUid: currentUid,
             fromName: myProfile.displayName || "Alguien",
             fromIdentity: myProfile.identity || "",
-            postId: postRef.id,
+            postId: composerPostId,
           })
         )
       );
       setText("");
+      setComposerImages([]);
+      // Rota a un id nuevo para el PRÓXIMO post — ver el comentario junto
+      // al useState de composerPostId.
+      setComposerPostId(doc(collection(db, "posts")).id);
       postMention.closeMentions();
     } finally {
       setPosting(false);
@@ -1123,6 +1231,15 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
                   onSelect={(u) => postMention.selectMention(u, text, setText)}
                 />
               )}
+            </div>
+            <div style={styles.composerImagesWrap}>
+              <MultiImageUploader
+                basePath={`postImages/${currentUid}/${composerPostId}`}
+                images={composerImages}
+                onChange={setComposerImages}
+                maxImages={4}
+                maxSize={1024}
+              />
             </div>
             <button type="submit" style={styles.postBtn} disabled={posting}>
               {posting ? t("feed.posting") : t("feed.postButton")}

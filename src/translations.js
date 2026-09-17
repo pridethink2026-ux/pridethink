@@ -211,6 +211,7 @@ export const translations = {
     "image.errorUpload":
       "No se pudo subir la imagen. Revisá tu conexión e intentá de nuevo.",
     "image.errorRemove": "No se pudo quitar la imagen. Intentá de nuevo en un momento.",
+    "image.countHint": "{count} de {max} fotos",
 
     // Visor de imagen completa (ImageViewer.jsx, punto 60)
     "imageViewer.close": "Cerrar",
@@ -363,6 +364,8 @@ export const translations = {
     "chat.unblock": "Desbloquear",
     "chat.messagePlaceholder": "Escribe un mensaje...",
     "chat.recordVoice": "Grabar nota de voz",
+    "chat.sendImage": "Enviar una imagen",
+    "chat.imageReady": "Imagen lista para enviar",
     "chat.openStickers": "Enviar un sticker",
     "chat.send": "Enviar",
     "chat.recording": "Grabando nota de voz...",
@@ -541,7 +544,6 @@ export const translations = {
     "store.create.newCatalogDescriptionPlaceholder": "Opcional",
     "store.create.tierLabel": "Nivel de visibilidad",
     "store.create.imageLabel": "Fotos (hasta 5)",
-    "store.create.imageHint": "{count} de {max} fotos",
     "store.create.saveDraftButton": "Guardar como borrador",
     "store.create.publishButton": "Publicar",
     "store.create.saveChangesButton": "Guardar cambios",
@@ -755,6 +757,7 @@ export const translations = {
     "image.errorRead": "That image could not be opened. It may be damaged; try another one.",
     "image.errorUpload": "The image could not be uploaded. Check your connection and try again.",
     "image.errorRemove": "The image could not be removed. Please try again in a moment.",
+    "image.countHint": "{count} of {max} photos",
 
     // Full image viewer (ImageViewer.jsx, point 60)
     "imageViewer.close": "Close",
@@ -899,6 +902,8 @@ export const translations = {
     "chat.unblock": "Unblock",
     "chat.messagePlaceholder": "Write a message...",
     "chat.recordVoice": "Record voice note",
+    "chat.sendImage": "Send an image",
+    "chat.imageReady": "Image ready to send",
     "chat.openStickers": "Send a sticker",
     "chat.send": "Send",
     "chat.recording": "Recording voice note...",
@@ -1074,7 +1079,6 @@ export const translations = {
     "store.create.newCatalogDescriptionPlaceholder": "Optional",
     "store.create.tierLabel": "Visibility level",
     "store.create.imageLabel": "Photos (up to 5)",
-    "store.create.imageHint": "{count} of {max} photos",
     "store.create.saveDraftButton": "Save as draft",
     "store.create.publishButton": "Publish",
     "store.create.saveChangesButton": "Save changes",

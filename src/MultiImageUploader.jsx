@@ -4,17 +4,18 @@ import { storage } from "./firebase";
 import { useLanguage } from "./LanguageContext";
 
 /*
-  ProductPhotosUploader
-  ----------------------
-  Fila horizontal de hasta `maxImages` fotos de un producto (punto 60):
-  cada foto ya subida se ve como una miniatura con una "✕" para quitarla,
-  y mientras queden lugares libres aparece un cuadro "+" al final para
-  agregar otra. Reemplaza a `ImageUploader.jsx` (una sola imagen) en
-  `CreateProductScreen.jsx` — se deja `ImageUploader.jsx` intacto y sin
-  usar acá a propósito: sigue siendo el primitivo genérico de "una imagen,
-  una ruta fija" para el resto de la app (así lo documenta su propio
-  archivo), y este componente es específico de la fila de fotos de un
-  producto, con su propia numeración de archivos y su propio layout.
+  MultiImageUploader
+  -------------------
+  Fila horizontal de hasta `maxImages` fotos (genérico — punto 60, hecho
+  genérico de verdad en el punto 61): cada foto ya subida se ve como una
+  miniatura con una "✕" para quitarla, y mientras queden lugares libres
+  aparece un cuadro "+" al final para agregar otra. Introducido como
+  `ProductPhotosUploader.jsx` para `CreateProductScreen.jsx` (hasta 5
+  fotos de un producto); renombrado en el punto 61 al reusarse también en
+  `Feed.jsx` (hasta 4 fotos de un post) — el componente en sí no tenía
+  nada específico de la Tienda, solo el nombre. `ImageUploader.jsx` (una
+  sola imagen, una ruta fija) sigue intacto y sin usar acá a propósito:
+  sigue siendo el primitivo genérico para el caso de UNA sola imagen.
 
   DUPLICACIÓN INTENCIONAL: la validación de tipo/peso y el redimensionado
   con <canvas> son casi idénticos a los de `ImageUploader.jsx` (mismo
@@ -39,9 +40,10 @@ import { useLanguage } from "./LanguageContext";
   contador (`nextSlotRef`) SOLO avanza, nunca se reutiliza dentro de la
   sesión de edición — así puede haber huecos en la numeración
   ("img_0.jpg", "img_2.jpg", sin "img_1.jpg") pero nunca una colisión. Al
-  editar un producto ya existente, el contador arranca en la cantidad de
-  fotos que ya tenía (se sincroniza con `Math.max` cada vez que cambia la
-  cantidad de fotos, así que un borrado nunca lo hace retroceder).
+  editar un producto ya existente (o, desde el punto 61, mientras se
+  compone un post nuevo), el contador arranca en la cantidad de fotos que
+  ya tenía (se sincroniza con `Math.max` cada vez que cambia la cantidad
+  de fotos, así que un borrado nunca lo hace retroceder).
 
   Al quitar una foto se intenta borrar el archivo real del bucket
   (`deleteObject`, construido directo desde la URL de descarga — el SDK
@@ -51,12 +53,14 @@ import { useLanguage } from "./LanguageContext";
 
   Props:
   - `basePath` (string): carpeta del bucket, ej.
-    "productImages/{uid}/{productId}" (SIN barra final).
+    "productImages/{uid}/{productId}" o "postImages/{uid}/{postId}" (SIN
+    barra final).
   - `images` (array de strings): fotos ya subidas, controlado por quien
     usa este componente.
   - `onChange(newArray)`: se llama con el array actualizado al agregar o
     quitar una foto.
-  - `maxImages` (número, default 5).
+  - `maxImages` (número, default 5): `CreateProductScreen.jsx` pasa 5,
+    `Feed.jsx` pasa 4.
   - `maxSize` (número, default 1024): igual que en ImageUploader.jsx.
 */
 
@@ -104,7 +108,7 @@ function resizeKeepingAspect(file, maxSize) {
   });
 }
 
-export default function ProductPhotosUploader({
+export default function MultiImageUploader({
   basePath,
   images,
   onChange,
@@ -291,7 +295,7 @@ export default function ProductPhotosUploader({
         />
       </div>
 
-      <p style={hintStyle}>{t("store.create.imageHint", { count: images.length, max: maxImages })}</p>
+      <p style={hintStyle}>{t("image.countHint", { count: images.length, max: maxImages })}</p>
 
       {error && <p style={errorStyle}>{error}</p>}
     </div>
