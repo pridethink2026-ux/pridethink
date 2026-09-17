@@ -289,7 +289,7 @@ export default function GiftFriendModal({ product, currentUid, myProfile, onClos
           )}
           {contacts.map((c) => (
             <div key={c.uid} style={styles.row} onClick={() => handleGift(c)}>
-              <Avatar uid={c.uid} name={c.displayName || c.identity} identity={c.identity} size="md" />
+              <Avatar uid={c.uid} name={c.displayName || c.identity} identity={c.identity} photoURL={c.photoURL} size="md" />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={styles.rowName}>{c.displayName || t("store.gift.defaultName")}</p>
                 <p style={styles.rowIdentity}>{c.identity}</p>

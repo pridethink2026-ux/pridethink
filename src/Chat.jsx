@@ -1168,6 +1168,7 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
                     uid={c.uid}
                     name={c.displayName || c.identity}
                     identity={c.identity}
+                    photoURL={c.photoURL}
                     size="md"
                     online={isEffectivelyOnline(c)}
                   />
@@ -1199,6 +1200,7 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
                       uid={activeContact.uid}
                       name={activeContact.displayName || activeContact.identity}
                       identity={activeContact.identity}
+                      photoURL={liveActiveContact?.photoURL}
                       size="sm"
                       online={isEffectivelyOnline(liveActiveContact)}
                     />

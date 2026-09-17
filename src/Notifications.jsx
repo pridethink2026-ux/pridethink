@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -11,6 +11,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
+import { useAllUsersContext } from "./AllUsersContext";
 import { timeAgo } from "./utils";
 import { useLanguage } from "./LanguageContext";
 
@@ -190,7 +191,26 @@ export function useNotifications(uid) {
   return { items, unreadCount, markAllRead };
 }
 
-function NotificationItem({ n, onOpenProfile, onOpenPost, dropdown }) {
+/*
+  Foto de perfil de quien generó cada notificación (punto 58). La
+  notificación guarda fromName/fromIdentity como copia del momento en que
+  se creó, pero la foto se busca en vivo por uid en el listener único de
+  AllUsersContext — mismo criterio que el badge de verificado en
+  Feed.jsx. El mapa se arma UNA vez por lista (no una vez por
+  notificación) para no recorrer todos los usuarios en cada fila.
+*/
+function usePhotoByUid() {
+  const allUsers = useAllUsersContext();
+  return useMemo(() => {
+    const map = {};
+    allUsers.forEach((u) => {
+      if (u.photoURL) map[u.uid] = u.photoURL;
+    });
+    return map;
+  }, [allUsers]);
+}
+
+function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, dropdown }) {
   const { t } = useLanguage();
   const handleClick = () => {
     if (n.type === "mention" && n.postId && onOpenPost) {
@@ -204,7 +224,7 @@ function NotificationItem({ n, onOpenProfile, onOpenPost, dropdown }) {
       style={dropdown ? styles.item(!n.read) : styles.screenItem(!n.read)}
       onClick={handleClick}
     >
-      <Avatar uid={n.fromUid} name={n.fromName} identity={n.fromIdentity} size="sm" />
+      <Avatar uid={n.fromUid} name={n.fromName} identity={n.fromIdentity} photoURL={photoURL} size="sm" />
       <div>
         <p style={styles.itemText}>
           {LABELS[n.type] ? LABELS[n.type](n, t) : t("notifications.generic")}
@@ -216,6 +236,7 @@ function NotificationItem({ n, onOpenProfile, onOpenPost, dropdown }) {
 }
 
 export default function Notifications({ onOpenProfile, onOpenPost }) {
+  const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [open, setOpen] = useState(false);
@@ -262,6 +283,7 @@ export default function Notifications({ onOpenProfile, onOpenPost }) {
             <NotificationItem
               key={n.id}
               n={n}
+              photoURL={photoByUid[n.fromUid]}
               onOpenProfile={onOpenProfile}
               onOpenPost={onOpenPost}
               dropdown
@@ -275,6 +297,7 @@ export default function Notifications({ onOpenProfile, onOpenPost }) {
 
 // Misma lista, como pantalla completa para la barra de navegación inferior en móvil.
 export function NotificationsScreen({ onOpenProfile, onOpenPost }) {
+  const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const { items, unreadCount, markAllRead } = useNotifications(currentUid);
@@ -310,6 +333,7 @@ export function NotificationsScreen({ onOpenProfile, onOpenPost }) {
           <NotificationItem
             key={n.id}
             n={n}
+            photoURL={photoByUid[n.fromUid]}
             onOpenProfile={onOpenProfile}
             onOpenPost={onOpenPost}
             dropdown={false}

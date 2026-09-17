@@ -240,6 +240,7 @@ export default function Search({ onOpenProfile }) {
                   uid={u.uid}
                   name={u.displayName || u.identity}
                   identity={u.identity}
+                  photoURL={u.photoURL}
                   size="md"
                 />
                 <div>
@@ -263,6 +264,7 @@ export default function Search({ onOpenProfile }) {
                   uid={p.authorId}
                   name={p.authorName}
                   identity={p.authorIdentity}
+                  photoURL={usersMap[p.authorId]?.photoURL}
                   size="sm"
                   onClick={() => onOpenProfile(p.authorId)}
                 />

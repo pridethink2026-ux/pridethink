@@ -1,0 +1,59 @@
+rules_version = '2';
+
+// ----------------------------------------------------------------------
+// Reglas de seguridad de Cloud Storage — Pridethink
+// ----------------------------------------------------------------------
+// Mismo criterio y mismo flujo de publicación que firestore.rules: se
+// escriben acá, se revisan, y se pegan A MANO en la consola de Firebase
+// (Storage -> Rules -> Publish). Ver la regla 7 de CONTEXTO.md.
+//
+// Hoy el bucket guarda UNA sola cosa: la foto de perfil de cada persona,
+// siempre en la misma ruta `profilePhotos/{uid}/avatar.jpg` (ver
+// ProfilePhotoUploader.jsx). Todo lo demás está cerrado con llave: si más
+// adelante se agregan fotos de producto o portadas de grupo/evento, hay
+// que abrirles su propio bloque acá, a propósito — el catch-all del final
+// no las va a dejar pasar solas.
+//
+// IMPORTANTE sobre `allow read`: las URLs que devuelve getDownloadURL()
+// llevan un token y se sirven sin pasar por estas reglas, así que esta
+// condición NO es lo que protege una foto ya compartida — es lo que
+// impide listar/leer el bucket por ruta directa sin sesión iniciada. Se
+// deja en "cualquier persona autenticada", el mismo nivel que ya tiene
+// `users/{uid}` en firestore.rules (que es donde vive el photoURL).
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ------------------------------------------------------------------
+    // profilePhotos/{uid}/avatar.jpg — foto de perfil
+    // ------------------------------------------------------------------
+    // Solo la propia persona puede subir, reemplazar o borrar la suya.
+    // La ruta es fija (siempre "avatar.jpg"), así que una foto nueva pisa
+    // a la anterior: nadie puede acumular archivos sueltos en el bucket.
+    match /profilePhotos/{uid}/avatar.jpg {
+      allow read: if request.auth != null;
+
+      // El cliente ya redimensiona a 512x512 y exporta a JPEG antes de
+      // subir (ProfilePhotoUploader.jsx), así que el resultado real pesa
+      // decenas de KB. El tope de 2 MB acá es el respaldo del lado del
+      // servidor, para alguien que llame al SDK directo salteándose la
+      // interfaz — misma lógica que el resto de las validaciones de
+      // firestore.rules: la interfaz propone, las reglas disponen.
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+
+      // En un borrado no hay request.resource (no llega ningún archivo
+      // nuevo), así que acá solo se valida quién es.
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ------------------------------------------------------------------
+    // Todo lo demás: cerrado
+    // ------------------------------------------------------------------
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

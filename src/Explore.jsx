@@ -279,7 +279,7 @@ function SuggestionCard({ user, currentUid, myProfile, onOpenProfile }) {
 
   return (
     <div style={styles.suggestCard} onClick={() => onOpenProfile(user.uid)}>
-      <Avatar uid={user.uid} name={user.displayName || user.identity} identity={user.identity} size="md" />
+      <Avatar uid={user.uid} name={user.displayName || user.identity} identity={user.identity} photoURL={user.photoURL} size="md" />
       <p style={styles.suggestName}>{user.displayName || "Sin nombre"}</p>
       {user.identity && <p style={styles.suggestIdentity}>{user.identity}</p>}
       <button style={styles.suggestFollowBtn} onClick={handleFollow}>

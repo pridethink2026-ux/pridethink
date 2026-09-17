@@ -185,6 +185,7 @@ export default function FollowListModal({ mode, targetUid, currentUid, onClose, 
                 uid={p.uid}
                 name={p.displayName || p.identity}
                 identity={p.identity}
+                photoURL={p.photoURL}
                 size="md"
               />
               <div>

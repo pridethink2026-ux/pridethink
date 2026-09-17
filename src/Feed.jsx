@@ -485,6 +485,9 @@ function CommentRow({ comment, postId, currentUid, myProfile, allUsers, onOpenPr
     useReactionPicker();
   const myReaction = (comment.reactions || {})[currentUid] || null;
   const reactionSummary = getReactionSummary(comment.reactions);
+  // Foto de perfil en vivo desde allUsers (ya recibido como prop para las
+  // menciones), mismo criterio que en PostCard — ver el comentario ahi.
+  const commentAuthor = allUsers.find((u) => u.uid === comment.authorId);
 
   const setMyReaction = async (type) => {
     const commentRef = doc(db, "posts", postId, "comments", comment.id);
@@ -516,6 +519,7 @@ function CommentRow({ comment, postId, currentUid, myProfile, allUsers, onOpenPr
         uid={comment.authorId}
         name={comment.authorName || comment.authorIdentity}
         identity={comment.authorIdentity}
+        photoURL={commentAuthor?.photoURL}
         size="sm"
         onClick={() => onOpenProfile(comment.authorId)}
       />
@@ -564,11 +568,17 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const editMention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
   const commentMention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
-  // Badge de verificado: el post guarda authorName/authorIdentity como
-  // copia del momento en que se publicó, pero isVerified se busca en vivo
-  // en allUsers (ya cargado para las menciones) para reflejar el estado
-  // actual, no una copia vieja.
-  const authorIsVerified = !!allUsers.find((u) => u.uid === post.authorId)?.isVerified;
+  // Badge de verificado y foto de perfil: el post guarda
+  // authorName/authorIdentity como copia del momento en que se publicó,
+  // pero isVerified y photoURL se buscan en vivo en allUsers (ya cargado
+  // para las menciones) para reflejar el estado actual, no una copia
+  // vieja. La foto, en particular, NO se denormaliza en el post a
+  // propósito (punto 58): si se copiara, cambiarla obligaría a reescribir
+  // en lote todos los posts de esa persona (como hace
+  // syncPostsPrivacyField en AuthProfile.jsx) y a migrar los posts viejos,
+  // cuando acá ya tenemos el dato fresco gratis.
+  const author = allUsers.find((u) => u.uid === post.authorId);
+  const authorIsVerified = !!author?.isVerified;
 
   const myReaction = (post.reactions || {})[currentUid] || null;
   const reactionSummary = getReactionSummary(post.reactions);
@@ -711,6 +721,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           uid={post.authorId}
           name={post.authorName || post.authorIdentity}
           identity={post.authorIdentity}
+          photoURL={author?.photoURL}
           size="md"
           onClick={() => onOpenProfile(post.authorId)}
         />

@@ -21,6 +21,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
+import ProfilePhotoUploader from "./ProfilePhotoUploader";
 import { PostCard } from "./Feed";
 import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
@@ -289,6 +290,9 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "14px",
+    marginBottom: "18px",
+  },
+  photoUploaderRow: {
     marginBottom: "18px",
   },
   tabsRow: {
@@ -854,6 +858,7 @@ function BlockedUserRow({ uid, onUnblock }) {
         uid={uid}
         name={profile?.displayName || profile?.identity}
         identity={profile?.identity}
+        photoURL={profile?.photoURL}
         size="sm"
       />
       <div style={styles.blockedInfo}>
@@ -929,6 +934,7 @@ function ProfileView({
               uid={uid}
               name={user.displayName || user.identity}
               identity={user.identity}
+              photoURL={user.photoURL}
               size="lg"
             />
             <div>
@@ -939,6 +945,12 @@ function ProfileView({
               <p style={{ ...styles.subtitle, margin: 0 }}>{user.identity}</p>
               {user.bio && <p style={styles.bioText}>{user.bio}</p>}
             </div>
+          </div>
+
+          {/* Punto 58: único lugar de la app donde se cambia la foto de
+              perfil — siempre la propia (el uploader recibe TU uid). */}
+          <div style={styles.photoUploaderRow}>
+            <ProfilePhotoUploader uid={uid} photoURL={user.photoURL} />
           </div>
 
           <div style={styles.countsRow}>

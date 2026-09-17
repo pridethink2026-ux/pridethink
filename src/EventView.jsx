@@ -243,7 +243,7 @@ export default function EventView({ eventId, onBack, onOpenProfile }) {
             const u = attendeeProfiles[uid];
             return (
               <div key={uid} style={styles.attendeeRow} onClick={() => onOpenProfile(uid)}>
-                <Avatar uid={uid} name={u?.displayName || u?.identity} identity={u?.identity} size="sm" />
+                <Avatar uid={uid} name={u?.displayName || u?.identity} identity={u?.identity} photoURL={u?.photoURL} size="sm" />
                 <p style={styles.attendeeName}>
                   {u?.displayName || "Sin nombre"}
                   {u?.isVerified && <VerifiedBadge size="sm" />}

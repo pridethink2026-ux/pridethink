@@ -11,6 +11,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
+import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { getCategoryEmoji, getCategoryLabelKey } from "./storeData";
 import { getReactionEmoji, getReactionSummary, useReactionPicker, ReactionPicker } from "./Reactions";
@@ -271,6 +272,16 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
   } = useReactionPicker();
   const viewCounted = useRef(false);
 
+  // Foto de perfil del vendedor (punto 58): el producto guarda
+  // sellerName/sellerIdentity como copia del momento en que se publicó,
+  // pero la foto se busca en vivo por uid en el listener único de
+  // AllUsersContext — mismo criterio que el badge de verificado en
+  // Feed.jsx.
+  const allUsers = useAllUsersContext();
+  const sellerPhotoURL = product
+    ? allUsers.find((u) => u.uid === product.sellerId)?.photoURL
+    : undefined;
+
   useEffect(() => {
     setProduct(undefined);
     viewCounted.current = false;
@@ -400,7 +411,13 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
         {product.description && <p style={styles.description}>{product.description}</p>}
 
         <div style={styles.sellerCard} onClick={() => onOpenProfile(product.sellerId)}>
-          <Avatar uid={product.sellerId} name={product.sellerName} identity={product.sellerIdentity} size="md" />
+          <Avatar
+            uid={product.sellerId}
+            name={product.sellerName}
+            identity={product.sellerIdentity}
+            photoURL={sellerPhotoURL}
+            size="md"
+          />
           <div>
             <p style={styles.sellerName}>{product.sellerName}</p>
             <p style={styles.sellerLink}>{t("store.detail.viewProfile")}</p>

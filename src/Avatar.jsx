@@ -1,18 +1,35 @@
-import React from "react";
+import React, { useState } from "react";
 import { getIdentityColors } from "./identityStyles";
 
 /*
   Avatar
   ------
-  Círculo con las iniciales del usuario sobre un gradiente de color, con un
-  anillo alrededor que refleja su identidad libre (`identity`), usando la
-  misma detección de palabras clave/paleta que ya usa el ícono de Inicio de
-  la nav (`identityStyles.js`, compartido con `homeIcon.js`).
+  Foto de perfil del usuario (prop `photoURL`) o, si no tiene, un círculo
+  con sus iniciales sobre un gradiente de color. En los dos casos lleva
+  alrededor el mismo anillo que refleja su identidad libre (`identity`),
+  usando la misma detección de palabras clave/paleta que ya usa el ícono de
+  Inicio de la nav (`identityStyles.js`, compartido con `homeIcon.js`).
 
   El color de fondo de las iniciales se genera de forma determinista a
   partir del uid (un hash simple elige un tono), así que el mismo usuario
-  siempre tiene el mismo color en toda la app, sin necesidad de guardar una
-  foto de perfil real.
+  siempre tiene el mismo color en toda la app.
+
+  FOTO DE PERFIL (`photoURL`, punto 58): es la URL de descarga que
+  `ProfilePhotoUploader.jsx` deja en `users/{uid}.photoURL` tras subir la
+  imagen a Cloud Storage. Es una prop NORMAL, que cada pantalla pasa desde
+  el documento del usuario que ya tiene en la mano — a propósito NO se
+  resuelve acá adentro leyendo `AllUsersContext` por uid, aunque sería más
+  cómodo: `Avatar` es el componente que más veces se instancia en toda la
+  app (muro, comentarios, chat, notificaciones, búsqueda...), y suscribirlo
+  al contexto de `users` haría que TODOS los avatares en pantalla se
+  volvieran a renderizar con cada latido de presencia (`presence.js`
+  reescribe el documento de cada usuario conectado cada 60 segundos) — que
+  es exactamente el problema de rendimiento que se resolvió en la auditoría
+  del 2026-07-28. Si falta la prop, simplemente se muestran las iniciales.
+
+  Si la imagen no carga (URL vencida, foto borrada del bucket, sin
+  conexión), `onError` la descarta y se vuelve a las iniciales, así que
+  nunca queda un cuadro roto.
 
   EXCEPCIONES INTENCIONALES a la regla de "solo variables CSS de temas":
   - El gradiente de fondo (iniciales) es un color de IDENTIDAD por usuario,
@@ -62,7 +79,21 @@ function getInitials(name) {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-export default function Avatar({ uid, name, identity, size = "md", online = false, onClick }) {
+export default function Avatar({
+  uid,
+  name,
+  identity,
+  photoURL,
+  size = "md",
+  online = false,
+  onClick,
+}) {
+  // Se guarda la URL que falló (no un booleano) para que, si la persona
+  // cambia su foto por otra, la nueva se vuelva a intentar sola sin
+  // necesidad de un useEffect que resetee el estado.
+  const [failedPhoto, setFailedPhoto] = useState(null);
+  const showPhoto = !!photoURL && failedPhoto !== photoURL;
+
   const { box, font, ring } = SIZES[size] || SIZES.md;
   const seed = uid || name || "?";
   const hue = hashToHue(seed);
@@ -107,6 +138,14 @@ export default function Avatar({ uid, name, identity, size = "md", online = fals
     overflow: "hidden",
   };
 
+  const photoStyle = {
+    width: "100%",
+    height: "100%",
+    borderRadius: "50%",
+    objectFit: "cover",
+    display: "block",
+  };
+
   const dotSize = Math.max(10, Math.round(box * 0.28));
   const onlineDotStyle = {
     position: "absolute",
@@ -122,7 +161,16 @@ export default function Avatar({ uid, name, identity, size = "md", online = fals
 
   return (
     <div style={ringStyle} onClick={onClick} title={name || undefined}>
-      <div style={style}>{getInitials(name)}</div>
+      {showPhoto ? (
+        <img
+          src={photoURL}
+          alt={name || ""}
+          style={photoStyle}
+          onError={() => setFailedPhoto(photoURL)}
+        />
+      ) : (
+        <div style={style}>{getInitials(name)}</div>
+      )}
       {online && <span style={onlineDotStyle} />}
     </div>
   );

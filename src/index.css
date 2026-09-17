@@ -246,3 +246,20 @@ code {
     transform: scaleY(1);
   }
 }
+
+/* Spinner de la subida de foto de perfil (ProfilePhotoUploader.jsx). Los
+   colores del círculo se pasan inline desde el componente con las
+   variables del tema activo; acá solo vive el giro, porque un @keyframes
+   no se puede escribir inline. */
+.pt-spin {
+  animation: pt-spin 0.7s linear infinite;
+}
+
+@keyframes pt-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

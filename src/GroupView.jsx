@@ -392,7 +392,7 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
                 const u = usersById[uid];
                 return (
                   <div key={uid} style={styles.memberRow} onClick={() => onOpenProfile(uid)}>
-                    <Avatar uid={uid} name={u?.displayName || u?.identity} identity={u?.identity} size="sm" />
+                    <Avatar uid={uid} name={u?.displayName || u?.identity} identity={u?.identity} photoURL={u?.photoURL} size="sm" />
                     <p style={styles.memberName}>
                       {u?.displayName || "Sin nombre"}
                       {u?.isVerified && <VerifiedBadge size="sm" />}

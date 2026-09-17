@@ -19,6 +19,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "deploy:rules": "firebase deploy --only firestore:rules",
+    "deploy:storage-rules": "firebase deploy --only storage",
     "migrate:post-privacy": "node scripts/migrate-post-privacy.js"
   },
   "eslintConfig": {

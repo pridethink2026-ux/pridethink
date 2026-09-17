@@ -182,6 +182,19 @@ export const translations = {
     "profile.changeIdentity": "Cambiar mi identidad",
     "profile.logout": "Cerrar sesión",
     "profile.defaultUser": "Usuario",
+
+    // Foto de perfil (ProfilePhotoUploader.jsx, punto 58)
+    "photo.add": "Agregar foto",
+    "photo.change": "Cambiar foto",
+    "photo.remove": "Quitar foto",
+    "photo.uploading": "Subiendo...",
+    "photo.errorType": "Ese archivo no es una imagen. Elegí una foto en formato JPG, PNG o WebP.",
+    "photo.errorTooLarge":
+      "La imagen pesa demasiado. El máximo es {max} MB — probá con una foto más chica.",
+    "photo.errorRead": "No se pudo abrir esa imagen. Puede estar dañada; probá con otra.",
+    "photo.errorUpload":
+      "No se pudo subir la foto. Revisá tu conexión e intentá de nuevo.",
+    "photo.errorRemove": "No se pudo quitar la foto. Intentá de nuevo en un momento.",
     "profile.about": "Acerca de",
     "profile.fullNameField": "Nombre completo",
     "profile.countryField": "País",
@@ -694,6 +707,17 @@ export const translations = {
     "profile.changeIdentity": "Change my identity",
     "profile.logout": "Log out",
     "profile.defaultUser": "User",
+
+    // Profile photo (ProfilePhotoUploader.jsx, point 58)
+    "photo.add": "Add photo",
+    "photo.change": "Change photo",
+    "photo.remove": "Remove photo",
+    "photo.uploading": "Uploading...",
+    "photo.errorType": "That file is not an image. Pick a photo in JPG, PNG or WebP format.",
+    "photo.errorTooLarge": "That image is too heavy. The maximum is {max} MB — try a smaller photo.",
+    "photo.errorRead": "That image could not be opened. It may be damaged; try another one.",
+    "photo.errorUpload": "The photo could not be uploaded. Check your connection and try again.",
+    "photo.errorRemove": "The photo could not be removed. Please try again in a moment.",
 
     // Public profile (UserProfile.jsx)
     "userProfile.backLink": "← Back",

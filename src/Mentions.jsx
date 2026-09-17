@@ -253,7 +253,7 @@ export function MentionSuggestions({ suggestions, onSelect }) {
             onSelect(u);
           }}
         >
-          <Avatar uid={u.uid} name={u.displayName} identity={u.identity} size="sm" />
+          <Avatar uid={u.uid} name={u.displayName} identity={u.identity} photoURL={u.photoURL} size="sm" />
           <div style={{ minWidth: 0 }}>
             <p style={styles.dropdownName}>{u.displayName}</p>
             {u.identity && <p style={styles.dropdownIdentity}>{u.identity}</p>}

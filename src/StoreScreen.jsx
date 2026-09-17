@@ -3,6 +3,7 @@ import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, onSnapshot } from "firebase/firestore";
 import Avatar from "./Avatar";
+import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useIsMobile } from "./utils";
 import { CATEGORIES } from "./storeData";
@@ -254,7 +255,7 @@ function PlusIcon() {
   );
 }
 
-function ProductCard({ product, onOpen }) {
+function ProductCard({ product, sellerPhotoURL, onOpen }) {
   const { t } = useLanguage();
   return (
     <div style={styles.card} onClick={() => onOpen(product.id)}>
@@ -271,7 +272,7 @@ function ProductCard({ product, onOpen }) {
           {product.tier === "prime" && <span style={styles.pridePlusBadge}>{t("store.pridePlusBadge")}</span>}
         </div>
         <div style={styles.sellerRow}>
-          <Avatar uid={product.sellerId} name={product.sellerName} identity={product.sellerIdentity} size="sm" />
+          <Avatar uid={product.sellerId} name={product.sellerName} identity={product.sellerIdentity} photoURL={sellerPhotoURL} size="sm" />
           <p style={styles.sellerName}>{product.sellerName}</p>
         </div>
       </div>
@@ -325,6 +326,20 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
     });
     return unsub;
   }, []);
+
+  // Foto de perfil del vendedor (punto 58): el producto guarda
+  // sellerName/sellerIdentity como copia, pero la foto se resuelve en vivo
+  // por uid desde el listener único de AllUsersContext — mismo criterio
+  // que el badge de verificado en Feed.jsx. El mapa se arma una sola vez
+  // para toda la grilla, no una vez por tarjeta.
+  const allUsers = useAllUsersContext();
+  const sellerPhotos = useMemo(() => {
+    const map = {};
+    allUsers.forEach((u) => {
+      if (u.photoURL) map[u.uid] = u.photoURL;
+    });
+    return map;
+  }, [allUsers]);
 
   const searchLower = search.trim().toLowerCase();
   const filtered = useMemo(() => {
@@ -422,7 +437,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
           ) : (
             <div style={styles.grid}>
               {officialProducts.map((p) => (
-                <ProductCard key={p.id} product={p} onOpen={openProduct} />
+                <ProductCard key={p.id} product={p} sellerPhotoURL={sellerPhotos[p.sellerId]} onOpen={openProduct} />
               ))}
             </div>
           )}
@@ -437,7 +452,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
           ) : (
             <div style={styles.grid}>
               {communityProducts.map((p) => (
-                <ProductCard key={p.id} product={p} onOpen={openProduct} />
+                <ProductCard key={p.id} product={p} sellerPhotoURL={sellerPhotos[p.sellerId]} onOpen={openProduct} />
               ))}
             </div>
           )}

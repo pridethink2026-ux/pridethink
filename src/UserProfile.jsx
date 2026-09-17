@@ -328,6 +328,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
               uid={uid}
               name={profileUser.displayName || profileUser.identity}
               identity={profileUser.identity}
+              photoURL={profileUser.photoURL}
               size="lg"
               online={canSeeOnline && isEffectivelyOnline(profileUser)}
             />
