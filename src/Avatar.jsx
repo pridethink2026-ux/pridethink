@@ -31,6 +31,13 @@ import { getIdentityColors } from "./identityStyles";
   conexión), `onError` la descarta y se vuelve a las iniciales, así que
   nunca queda un cuadro roto.
 
+  `onPhotoClick` (opcional, punto 63): a diferencia de `onClick` (que se
+  dispara siempre), solo se llama si de verdad se está mostrando la foto —
+  nunca con las iniciales, ni cuando la persona no tiene foto ni cuando
+  la URL falló (onError). Lo usa UserProfile.jsx para abrir la foto en
+  grande con ImageViewer.jsx sin tener que saber si la imagen cargó. El
+  cursor solo cambia a "pointer" en ese caso.
+
   EXCEPCIONES INTENCIONALES a la regla de "solo variables CSS de temas":
   - El gradiente de fondo (iniciales) es un color de IDENTIDAD por usuario,
     no un color de tema — por diseño debe verse igual sin importar qué tema
@@ -87,12 +94,18 @@ export default function Avatar({
   size = "md",
   online = false,
   onClick,
+  onPhotoClick,
 }) {
   // Se guarda la URL que falló (no un booleano) para que, si la persona
   // cambia su foto por otra, la nueva se vuelva a intentar sola sin
   // necesidad de un useEffect que resetee el estado.
   const [failedPhoto, setFailedPhoto] = useState(null);
   const showPhoto = !!photoURL && failedPhoto !== photoURL;
+  const photoClickable = showPhoto && !!onPhotoClick;
+  const handleClick = (e) => {
+    onClick?.(e);
+    if (photoClickable) onPhotoClick(e);
+  };
 
   const { box, font, ring } = SIZES[size] || SIZES.md;
   const seed = uid || name || "?";
@@ -118,7 +131,7 @@ export default function Avatar({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    cursor: onClick ? "pointer" : "default",
+    cursor: onClick || photoClickable ? "pointer" : "default",
     userSelect: "none",
     overflow: "hidden",
   };
@@ -160,7 +173,7 @@ export default function Avatar({
   };
 
   return (
-    <div style={ringStyle} onClick={onClick} title={name || undefined}>
+    <div style={ringStyle} onClick={handleClick} title={name || undefined}>
       {showPhoto ? (
         <img
           src={photoURL}

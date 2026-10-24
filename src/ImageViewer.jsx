@@ -22,6 +22,15 @@ import { useLanguage } from "./LanguageContext";
   - `images` (array de strings, obligatoria): las URLs a mostrar.
   - `startIndex` (número, default 0): con cuál empezar.
   - `onClose()` (obligatoria).
+  - `alt` (string, default ""): texto alternativo de la imagen (punto 63:
+    el nombre de la persona, para la foto de perfil).
+  - `preventSave` (booleano, default false, punto 63 — solo lo activa la
+    foto de perfil en UserProfile.jsx): desactiva, SOLO sobre la imagen, el
+    menú de clic derecho ("Guardar imagen como…"), arrastrarla fuera de la
+    página y el menú de mantener presionado en iOS (WebkitTouchCallout).
+    No toca el teclado, el botón ✕ ni el texto alternativo. Es solo una
+    traba de "un clic": no impide capturas de pantalla ni sacar la URL
+    desde las herramientas de desarrollo (photoURL es un campo público).
 
   Fondo `rgba(0,0,0,0.85)` fijo (no de tema) a propósito: mismo criterio
   ya documentado en GiftFriendModal.jsx/SharePostModal.jsx para sus
@@ -99,7 +108,7 @@ const styles = {
   },
 };
 
-export default function ImageViewer({ images, startIndex = 0, onClose }) {
+export default function ImageViewer({ images, startIndex = 0, onClose, alt = "", preventSave = false }) {
   const { t } = useLanguage();
   const [index, setIndex] = useState(startIndex);
   const count = images.length;
@@ -126,9 +135,12 @@ export default function ImageViewer({ images, startIndex = 0, onClose }) {
     <div style={styles.overlay} onClick={onClose}>
       <img
         src={images[index]}
-        alt=""
-        style={styles.image}
+        alt={alt}
+        style={preventSave ? { ...styles.image, WebkitTouchCallout: "none" } : styles.image}
         onClick={(e) => e.stopPropagation()}
+        draggable={preventSave ? false : undefined}
+        onDragStart={preventSave ? (e) => e.preventDefault() : undefined}
+        onContextMenu={preventSave ? (e) => e.preventDefault() : undefined}
       />
 
       <button

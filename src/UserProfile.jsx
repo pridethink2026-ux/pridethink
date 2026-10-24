@@ -17,6 +17,7 @@ import { notify, formatMonthYear } from "./utils";
 import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import ReportButton from "./ReportButton";
+import ImageViewer from "./ImageViewer";
 import VerifiedBadge from "./VerifiedBadge";
 import { isEffectivelyOnline, canSeeOnlineStatus } from "./presence";
 import { unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
@@ -165,6 +166,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const [followersCount, setFollowersCount] = useState(0);
   const [posts, setPosts] = useState([]);
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
@@ -347,6 +349,11 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
               photoURL={profileUser.photoURL}
               size="lg"
               online={canSeeOnline && isEffectivelyOnline(profileUser)}
+              // Punto 63: tocar la foto la abre en grande — salvo perfil
+              // privado ajeno (isPrivateForMe). Con bloqueo este avatar ni
+              // se dibuja (return temprano de arriba), y sin foto (o si no
+              // cargó) Avatar no llama a onPhotoClick.
+              onPhotoClick={isPrivateForMe ? undefined : () => setPhotoViewerOpen(true)}
             />
           </div>
           <h1 style={styles.name}>
@@ -401,6 +408,15 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
           ))
         )}
       </div>
+
+      {photoViewerOpen && profileUser.photoURL && !isPrivateForMe && (
+        <ImageViewer
+          images={[profileUser.photoURL]}
+          alt={profileUser.displayName || ""}
+          preventSave
+          onClose={() => setPhotoViewerOpen(false)}
+        />
+      )}
 
       {followModal && (
         <FollowListModal
