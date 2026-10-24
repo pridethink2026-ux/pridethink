@@ -3,6 +3,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage
 import { doc, updateDoc } from "firebase/firestore";
 import { db, storage } from "./firebase";
 import { useLanguage } from "./LanguageContext";
+import ImageEditor from "./ImageEditor";
 
 /*
   ProfilePhotoUploader
@@ -17,13 +18,14 @@ import { useLanguage } from "./LanguageContext";
      resto de la app (los controles nativos de archivo no se pueden
      estilar de forma consistente entre navegadores).
   2. Se valida tipo y peso ANTES de tocar la red.
-  3. Se redimensiona en el navegador con <canvas> a 512x512 como máximo,
-     recortando al cuadrado desde el CENTRO (la foto siempre se muestra
-     dentro de un círculo en `Avatar.jsx`, así que un recorte cuadrado
-     centrado es lo que efectivamente se ve). Se exporta a JPEG, que para
-     fotos pesa mucho menos que PNG. Esto baja una foto de cámara de
-     varios MB a unas decenas de KB: menos espera para quien sube, menos
-     datos para quien mira, y menos consumo del bucket.
+  3. Se abre `ImageEditor.jsx` (punto 65): la persona puede girar la foto
+     de a 90° y mover/achicar el recorte, siempre CUADRADO (`squareOnly`),
+     con una guía circular de lo que se ve en `Avatar.jsx`. Sin tocar nada,
+     el recorte es el cuadrado centrado más grande — lo mismo que hacía
+     este archivo antes del editor. El editor devuelve el resultado ya
+     reducido a 512x512 como máximo y en JPEG 0.85, que para fotos pesa
+     mucho menos que PNG: una foto de cámara de varios MB queda en unas
+     decenas de KB. "Cancelar" (o Escape) no sube nada.
   4. Se sube SIEMPRE a la misma ruta `profilePhotos/{uid}/avatar.jpg`, así
      que una foto nueva pisa a la anterior y cada persona nunca ocupa más
      de un archivo en el bucket (nada que limpiar después).
@@ -47,7 +49,6 @@ import { useLanguage } from "./LanguageContext";
 // de la app (`Avatar.jsx`, size "lg") mide 72px, así que incluso en una
 // pantalla con densidad 3x sobra resolución.
 const MAX_SIDE = 512;
-const JPEG_QUALITY = 0.85;
 
 // Tope del archivo ORIGINAL que se acepta procesar (el resultado subido
 // siempre pesa muchísimo menos). Evita que alguien intente cargar en
@@ -56,63 +57,13 @@ const MAX_INPUT_MB = 10;
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-// Recorta la imagen al cuadrado desde el centro y la reduce a MAX_SIDE,
-// devolviendo un Blob JPEG. Rechaza si el archivo no se puede decodificar.
-function resizeToSquareJpeg(file) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const side = Math.min(img.width, img.height);
-      if (!side) {
-        reject(new Error("empty"));
-        return;
-      }
-      const target = Math.min(side, MAX_SIDE);
-      const canvas = document.createElement("canvas");
-      canvas.width = target;
-      canvas.height = target;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("nocontext"));
-        return;
-      }
-      // Origen: el cuadrado centrado más grande que entra en la foto.
-      ctx.drawImage(
-        img,
-        (img.width - side) / 2,
-        (img.height - side) / 2,
-        side,
-        side,
-        0,
-        0,
-        target,
-        target
-      );
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error("noblob"))),
-        "image/jpeg",
-        JPEG_QUALITY
-      );
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("decode"));
-    };
-
-    img.src = objectUrl;
-  });
-}
-
 export default function ProfilePhotoUploader({ uid, photoURL }) {
   const { t } = useLanguage();
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [hovered, setHovered] = useState(null); // null | "change" | "remove"
+  const [editingFile, setEditingFile] = useState(null); // File abierto en ImageEditor
 
   const photoRef = () => ref(storage, `profilePhotos/${uid}/avatar.jpg`);
 
@@ -134,22 +85,33 @@ export default function ProfilePhotoUploader({ uid, photoURL }) {
       return;
     }
 
+    // Punto 65: antes de subir, se abre el editor (girar/recortar).
+    setEditingFile(file);
+  };
+
+  // "Usar foto" en ImageEditor: el Blob ya viene girado, recortado al
+  // cuadrado, reducido a MAX_SIDE y en JPEG 0.85.
+  const handleEdited = async (blob) => {
+    setEditingFile(null);
     setBusy(true);
     try {
-      const blob = await resizeToSquareJpeg(file);
       await uploadBytes(photoRef(), blob, { contentType: "image/jpeg" });
       const url = await getDownloadURL(photoRef());
       await updateDoc(doc(db, "users", uid), { photoURL: url });
     } catch (err) {
-      // "decode"/"noblob"/"empty"/"nocontext" vienen de resizeToSquareJpeg
-      // (archivo corrupto o formato que el navegador no puede abrir);
-      // cualquier otra cosa es un fallo de red, de permisos de Storage o
-      // de Firestore.
-      const localFailure = ["decode", "noblob", "empty", "nocontext"].includes(err?.message);
-      setError(localFailure ? t("photo.errorRead") : t("photo.errorUpload"));
+      // Fallo de red, de permisos de Storage o de Firestore (los errores
+      // de "no se pudo abrir la imagen" llegan por handleEditorError).
+      setError(t("photo.errorUpload"));
     } finally {
       setBusy(false);
     }
+  };
+
+  // "decode"/"noblob"/"empty"/"nocontext" de ImageEditor: archivo corrupto
+  // o formato que el navegador no puede abrir.
+  const handleEditorError = () => {
+    setEditingFile(null);
+    setError(t("photo.errorRead"));
   };
 
   const handleRemove = async () => {
@@ -261,6 +223,18 @@ export default function ProfilePhotoUploader({ uid, photoURL }) {
       </div>
 
       {error && <p style={errorStyle}>{error}</p>}
+
+      {editingFile && (
+        <ImageEditor
+          file={editingFile}
+          squareOnly
+          circleGuide
+          maxSize={MAX_SIDE}
+          onConfirm={handleEdited}
+          onCancel={() => setEditingFile(null)}
+          onError={handleEditorError}
+        />
+      )}
     </div>
   );
 }

@@ -218,6 +218,15 @@ export const translations = {
     "imageViewer.previous": "Foto anterior",
     "imageViewer.next": "Foto siguiente",
     "imageViewer.counter": "{current} de {total}",
+    // Editor de foto antes de subirla (ImageEditor.jsx, punto 65)
+    "editor.title": "Editar foto",
+    "editor.loading": "Cargando foto...",
+    "editor.rotateLeft": "Girar a la izquierda",
+    "editor.rotateRight": "Girar a la derecha",
+    "editor.cropFree": "Libre",
+    "editor.cropSquare": "Cuadrado",
+    "editor.cancel": "Cancelar",
+    "editor.use": "Usar foto",
     "profile.about": "Acerca de",
     "profile.fullNameField": "Nombre completo",
     "profile.countryField": "País",
@@ -765,6 +774,15 @@ export const translations = {
     "imageViewer.previous": "Previous photo",
     "imageViewer.next": "Next photo",
     "imageViewer.counter": "{current} of {total}",
+    // Photo editor before upload (ImageEditor.jsx, point 65)
+    "editor.title": "Edit photo",
+    "editor.loading": "Loading photo...",
+    "editor.rotateLeft": "Rotate left",
+    "editor.rotateRight": "Rotate right",
+    "editor.cropFree": "Free",
+    "editor.cropSquare": "Square",
+    "editor.cancel": "Cancel",
+    "editor.use": "Use photo",
 
     // Public profile (UserProfile.jsx)
     "userProfile.backLink": "← Back",
