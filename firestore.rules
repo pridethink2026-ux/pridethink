@@ -68,10 +68,42 @@ service cloud.firestore {
     // siendo el chequeo preciso para la experiencia de usuario; este es
     // solo un piso de seguridad contra un bypass del cliente.
     function esMayorDeEdad() {
-      let nacimiento = request.resource.data.get('birthDate', null);
+      return fechaEsDeMayorDeEdad(request.resource.data.get('birthDate', null));
+    }
+
+    function fechaEsDeMayorDeEdad(nacimiento) {
       return nacimiento != null
         && nacimiento is timestamp
         && (request.time.toMillis() - nacimiento.toMillis()) >= 568036800000;
+    }
+
+    // Hallazgo H1 (2026-10-24): "birthDate" ya no vive en users/{uid} (que
+    // lee cualquier autenticado) sino en users/{uid}/private/data (solo el
+    // dueño). El registro escribe los dos documentos en un mismo
+    // writeBatch (AuthProfile.jsx → handleIdentitySubmit), así que al
+    // crear el documento público se mira el privado TAL COMO QUEDARÁ al
+    // terminar el batch (getAfter), y la barrera de mayoría de edad del
+    // servidor se mantiene igual que antes.
+    function privadoEsDeMayorDeEdad(uid) {
+      let ruta = /databases/$(database)/documents/users/$(uid)/private/data;
+      return existsAfter(ruta)
+        && fechaEsDeMayorDeEdad(getAfter(ruta).data.get('birthDate', null));
+    }
+
+    // Campos de users/{uid}/private/data (hallazgo H1) — mismo criterio
+    // "si está presente" que camposDePerfilValidos() de abajo, porque
+    // LanguageContext.jsx/SoundContext.jsx actualizan un solo campo a la
+    // vez con merge:true. Límites holgados: fullName 100 (nombre legal
+    // completo), country 10 (código ISO de profileFields.js), gender 30
+    // (valor interno de getGenderOptions), genderOther 50, language 10
+    // (código de LANGUAGE_OPTIONS).
+    function camposPrivadosValidos(datos) {
+      return (!('fullName' in datos) || textoValido(datos.fullName, 100))
+        && (!('country' in datos) || textoValido(datos.country, 10))
+        && (!('gender' in datos) || textoValido(datos.gender, 30))
+        && (!('genderOther' in datos) || textoValido(datos.genderOther, 50))
+        && (!('language' in datos) || textoValido(datos.language, 10))
+        && (!('soundMuted' in datos) || datos.soundMuted is bool);
     }
 
     // Auditoría de seguridad (2026-07-28, hallazgo M1): antes, la ÚNICA
@@ -186,9 +218,14 @@ service cloud.firestore {
       // de verdad y no solo "la interfaz no ofrece un botón para esto" —
       // la consola usa el SDK de administrador, que no pasa por estas
       // reglas, así que sigue pudiendo activarlo/desactivarlo sin problema.
+      //
+      // Hallazgo H1, fase A (transición): se acepta la fecha de nacimiento
+      // en el documento público (código viejo, todavía en caché en alguna
+      // pestaña) O en private/data (código nuevo, ver
+      // privadoEsDeMayorDeEdad arriba).
       allow create: if esDueno(uid)
         && !('isVerified' in request.resource.data)
-        && esMayorDeEdad()
+        && (esMayorDeEdad() || privadoEsDeMayorDeEdad(uid))
         && camposDePerfilValidos(request.resource.data);
       allow update: if esDueno(uid)
         && request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false)
@@ -196,6 +233,41 @@ service cloud.firestore {
 
       // Nadie borra perfiles desde la app.
       allow delete: if false;
+
+      // ------------------------------------------------------------------
+      // users/{uid}/private/data (hallazgo H1, 2026-10-24)
+      // Datos personales del registro (fullName, birthDate, gender,
+      // genderOther, country) y ajustes privados (language, soundMuted).
+      // Antes vivían en users/{uid}, que cualquier autenticado lee entero
+      // (y AllUsersContext.jsx descarga para TODOS los usuarios) — reglas
+      // de Firestore no pueden ocultar un campo puntual de un documento
+      // legible, así que la única forma de protegerlos es otro documento.
+      // ------------------------------------------------------------------
+      match /private/{docId} {
+        allow read: if esDueno(uid);
+
+        // Un solo documento "data". Si trae fecha de nacimiento, tiene que
+        // ser de mayor de edad (el registro). Puede crearse SIN fecha
+        // (cambiar idioma o silenciar sonidos antes de que exista), y en
+        // ese caso el documento público igual no se puede crear, porque
+        // privadoEsDeMayorDeEdad() exige la fecha.
+        allow create: if esDueno(uid)
+          && docId == 'data'
+          && (!('birthDate' in request.resource.data) || esMayorDeEdad())
+          && camposPrivadosValidos(request.resource.data);
+
+        // La fecha de nacimiento no cambia una vez puesta (ninguna
+        // pantalla la edita); solo se puede agregar si todavía no había, y
+        // de mayor de edad.
+        allow update: if esDueno(uid)
+          && (
+            request.resource.data.get('birthDate', null) == resource.data.get('birthDate', null)
+            || (resource.data.get('birthDate', null) == null && esMayorDeEdad())
+          )
+          && camposPrivadosValidos(request.resource.data);
+
+        allow delete: if false;
+      }
     }
 
     // --------------------------------------------------------------------

@@ -8,8 +8,8 @@ import { setSoundMuted } from "./sound";
   SoundContext
   ------------
   Sincroniza sound.js (el flag interno que playThemeSound/playReactionSound/
-  playCommentSound consultan antes de sonar) con users/{uid}.soundMuted en
-  Firestore — un solo listener para toda la app, mismo patrón que
+  playCommentSound consultan antes de sonar) con
+  users/{uid}/private/data.soundMuted en Firestore (hallazgo H1) — un solo listener para toda la app, mismo patrón que
   BlocksContext.jsx. No expone nada vía useContext: las funciones de
   sonido son funciones planas que se llaman desde manejadores de eventos
   (no desde el render de ningún componente), así que alcanza con mantener
@@ -29,10 +29,24 @@ export function SoundProvider({ children }) {
       setSoundMuted(false);
       return;
     }
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      setSoundMuted(!!snap.data()?.soundMuted);
+    // Hallazgo H1: soundMuted vive en users/{uid}/private/data. Mientras
+    // dure la migración, si ahí todavía no está, se usa el valor viejo del
+    // documento público (se escuchan los dos; lo privado manda).
+    let privateValue;
+    let publicValue;
+    const apply = () => setSoundMuted(!!(privateValue ?? publicValue));
+    const unsubPrivate = onSnapshot(doc(db, "users", currentUid, "private", "data"), (snap) => {
+      privateValue = snap.data()?.soundMuted;
+      apply();
     });
-    return unsub;
+    const unsubPublic = onSnapshot(doc(db, "users", currentUid), (snap) => {
+      publicValue = snap.data()?.soundMuted;
+      apply();
+    });
+    return () => {
+      unsubPrivate();
+      unsubPublic();
+    };
   }, [currentUid]);
 
   return children;

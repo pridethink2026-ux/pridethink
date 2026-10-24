@@ -20,6 +20,12 @@ import { db } from "./firebase";
 
   AllUsersProvider abre ese único listener una sola vez para toda la app
   (montado en index.js); useAllUsers (Mentions.jsx) ahora solo lee de acá.
+
+  Ojo: este listener descarga el documento users/{uid} COMPLETO de todos
+  los usuarios a cada cliente. Por eso ningún dato sensible puede vivir
+  ahí: los datos personales y ajustes privados están en
+  users/{uid}/private/data (hallazgo H1, 2026-10-24), que solo lee el
+  dueño y que este listener no toca.
 */
 
 const AllUsersContext = createContext([]);

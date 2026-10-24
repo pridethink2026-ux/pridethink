@@ -34,7 +34,8 @@ import { useLanguage } from "./LanguageContext";
     ya se usa en Chat.jsx y Feed.jsx para ocultar contactos/posts), el
     perfil no se puede ver en absoluto.
   - Si el perfil es privado (isPrivate) y no eres tú, se muestra lo mínimo
-    (avatar, nombre, identidad, contadores) con un aviso, sin publicaciones.
+    (avatar, nombre, identidad, contadores) con un aviso, sin publicaciones
+    y sin la sección "Acerca de".
   - El puntito de "en línea" sobre el avatar (ver presence.js) respeta esa
     misma privacidad: si el perfil es privado, solo se muestra si hay
     seguimiento MUTUO entre vos y esa persona (`canSeeOnlineStatus`) — a
@@ -187,6 +188,21 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
     });
     return unsub;
   }, [uid]);
+
+  // Hallazgo H1: los datos personales viven en users/{uid}/private/data,
+  // que solo el dueño puede leer — así que solo se piden si es tu propio
+  // perfil, para que "Acerca de" muestre lo mismo que en AuthProfile.jsx.
+  const [myPrivateData, setMyPrivateData] = useState(null);
+  useEffect(() => {
+    if (!uid || uid !== currentUid) {
+      setMyPrivateData(null);
+      return;
+    }
+    const unsub = onSnapshot(doc(db, "users", uid, "private", "data"), (snap) => {
+      setMyPrivateData(snap.exists() ? snap.data() : null);
+    });
+    return unsub;
+  }, [uid, currentUid]);
 
   // Seguidores = usuarios cuyo campo "following" contiene este uid (en tiempo real)
   useEffect(() => {
@@ -362,7 +378,9 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
             </button>
           )}
 
-          <ProfileAbout profileUser={profileUser} />
+          {/* Detrás del chequeo de perfil privado (hallazgo H1): en un
+              perfil privado, ni siquiera datingPreference se muestra. */}
+          {!isPrivateForMe && <ProfileAbout profileUser={{ ...profileUser, ...(myPrivateData || {}) }} />}
         </div>
 
         {isPrivateForMe ? (

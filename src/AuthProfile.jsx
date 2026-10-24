@@ -39,8 +39,8 @@ import { formatMonthYear, formatLongDate } from "./utils";
 
   YA CONECTADO A FIREBASE (Auth + Firestore reales):
   - Auth real -> createUserWithEmailAndPassword / signInWithEmailAndPassword
-  - Firestore write -> setDoc(doc(db, "users", uid), perfil)
-  - Firestore read  -> getDoc(doc(db, "users", uid))
+  - Firestore write -> setDoc(doc(db, "users", uid), perfil) + private/data (registro)
+  - Firestore read  -> getDoc de users/{uid} y users/{uid}/private/data (loadOwnProfile)
 
   Ahora los datos SÍ persisten al recargar la página, y dos personas
   distintas (tú y tu socio) ven la misma base de datos real.
@@ -1131,6 +1131,23 @@ function repairJoinedAtIfLegacy(uid, data) {
   return { ...data, joinedAt: repaired };
 }
 
+// Hallazgo H1 (2026-10-24): los datos personales del registro y los
+// ajustes privados viven en users/{uid}/private/data (solo el dueño los
+// lee), no en users/{uid}. Tu propio perfil necesita los dos documentos
+// juntos (ProfileAbout, interruptor de sonidos), así que se leen los dos
+// y se mezclan en el estado local "user" — lo privado pisa a lo público.
+// Mientras dure la migración, una cuenta todavía sin migrar no tiene
+// private/data y sus campos siguen saliendo del documento público.
+async function loadOwnProfile(uid) {
+  const [publicSnap, privateSnap] = await Promise.all([
+    getDoc(doc(db, "users", uid)),
+    getDoc(doc(db, "users", uid, "private", "data")),
+  ]);
+  if (!publicSnap.exists()) return null;
+  const data = { ...publicSnap.data(), ...(privateSnap.exists() ? privateSnap.data() : {}) };
+  return repairJoinedAtIfLegacy(uid, data);
+}
+
 export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   const { t } = useLanguage();
   // login | signup | signupPersonal | identity | profile | reset
@@ -1152,9 +1169,9 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const snap = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (snap.exists()) {
-          setUser(repairJoinedAtIfLegacy(firebaseUser.uid, snap.data()));
+        const profile = await loadOwnProfile(firebaseUser.uid);
+        if (profile) {
+          setUser(profile);
           setStep("profile");
         } else {
           setPendingUid(firebaseUser.uid);
@@ -1182,9 +1199,9 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
       // FIREBASE: firestore read (real) - revisa si ya tiene perfil guardado
-      const snap = await getDoc(doc(db, "users", cred.user.uid));
-      if (snap.exists()) {
-        setUser(repairJoinedAtIfLegacy(cred.user.uid, snap.data()));
+      const profile = await loadOwnProfile(cred.user.uid);
+      if (profile) {
+        setUser(profile);
         setStep("profile");
       } else {
         setPendingUid(cred.user.uid);
@@ -1244,10 +1261,11 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     const isNewSignup = !user;
 
     // En un registro nuevo se guardan también los datos personales
-    // juntados en los pasos anteriores. Al EDITAR (isNewSignup === false)
-    // no se reenvían: con merge:true, no tocarlos deja intactos los que ya
-    // están guardados en Firestore (país, fecha de nacimiento, etc.).
-    const personalFields = isNewSignup
+    // juntados en los pasos anteriores — en users/{uid}/private/data, no
+    // en el documento público (hallazgo H1, ver loadOwnProfile). Al EDITAR
+    // (isNewSignup === false) no se reenvían: no tocarlos deja intactos
+    // los que ya están guardados (país, fecha de nacimiento, etc.).
+    const privateFields = isNewSignup
       ? {
           fullName: signupDraft.fullName || "",
           birthDate: signupDraft.birthDate
@@ -1257,6 +1275,10 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
           language: signupDraft.language || "es",
           gender: signupDraft.gender || "",
           genderOther: signupDraft.gender === "otro" ? signupDraft.genderOther || "" : "",
+        }
+      : {};
+    const personalFields = isNewSignup
+      ? {
           isPrivate: false,
           isWallPrivate: false,
           following: [],
@@ -1279,8 +1301,16 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     };
 
     try {
-      // FIREBASE: firestore write (real) - guarda el perfil en Firestore
-      await setDoc(doc(db, "users", uid), profileUpdate, { merge: true });
+      // FIREBASE: firestore write (real) - guarda el perfil en Firestore.
+      // En el registro, público y privado van en el MISMO batch: la regla
+      // de create de users/{uid} mira la fecha de nacimiento de
+      // private/data tal como queda al terminar el batch (getAfter).
+      const batch = writeBatch(db);
+      batch.set(doc(db, "users", uid), profileUpdate, { merge: true });
+      if (isNewSignup) {
+        batch.set(doc(db, "users", uid, "private", "data"), privateFields, { merge: true });
+      }
+      await batch.commit();
       // serverTimestamp() escribe bien en Firestore, pero devuelve un
       // sentinel (FieldValue) sin .toDate() — reflejarlo tal cual en el
       // estado local deja a formatMonthYear/formatLongDate sin nada que
@@ -1291,6 +1321,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       const optimisticNow = Timestamp.now();
       setUser({
         ...(user || {}),
+        ...privateFields,
         ...profileUpdate,
         identityUpdatedAt: optimisticNow,
         ...(isNewSignup ? { joinedAt: optimisticNow } : {}),
@@ -1307,11 +1338,13 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   const handleTogglePrivacy = async (newValue) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const updated = { ...user, isPrivate: newValue };
-    setUser(updated);
+    setUser({ ...user, isPrivate: newValue });
     try {
-      // FIREBASE: firestore write (real) - guarda la preferencia de privacidad
-      await setDoc(doc(db, "users", uid), updated, { merge: true });
+      // FIREBASE: firestore write (real) - guarda la preferencia de
+      // privacidad. Solo este campo, nunca el objeto "user" entero: ese
+      // estado local también tiene los datos de private/data (ver
+      // loadOwnProfile), que no deben volver al documento público.
+      await setDoc(doc(db, "users", uid), { isPrivate: newValue }, { merge: true });
     } catch (err) {
       setUser(user); // revierte si falla
       return;
@@ -1331,11 +1364,11 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   const handleToggleWallPrivacy = async (newValue) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const updated = { ...user, isWallPrivate: newValue };
-    setUser(updated);
+    setUser({ ...user, isWallPrivate: newValue });
     try {
-      // FIREBASE: firestore write (real) - guarda la preferencia de muro privado
-      await setDoc(doc(db, "users", uid), updated, { merge: true });
+      // FIREBASE: firestore write (real) - guarda la preferencia de muro
+      // privado (solo este campo, ver handleTogglePrivacy).
+      await setDoc(doc(db, "users", uid), { isWallPrivate: newValue }, { merge: true });
     } catch (err) {
       setUser(user); // revierte si falla
       return;
@@ -1350,15 +1383,14 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
 
   // Interruptor general de sonidos (2026-07-29): a diferencia de
   // isPrivate/isWallPrivate, no hay ningún otro documento que sincronizar
-  // — SoundContext.jsx ya escucha users/{uid} en vivo y actualiza el flag
-  // interno de sound.js apenas cambia este campo.
+  // — SoundContext.jsx ya escucha users/{uid}/private/data en vivo y
+  // actualiza el flag interno de sound.js apenas cambia este campo.
   const handleToggleSoundMuted = async (newValue) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const updated = { ...user, soundMuted: newValue };
-    setUser(updated);
+    setUser({ ...user, soundMuted: newValue });
     try {
-      await setDoc(doc(db, "users", uid), updated, { merge: true });
+      await setDoc(doc(db, "users", uid, "private", "data"), { soundMuted: newValue }, { merge: true });
     } catch (err) {
       setUser(user); // revierte si falla
     }

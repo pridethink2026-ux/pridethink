@@ -27,3 +27,8 @@ yarn-error.log*
 # El patrón cubre variantes de nombre (ej. el .json quedó duplicado al
 # descargarla del navegador en un caso real: serviceAccountKey.json.json).
 scripts/serviceAccountKey*
+
+# Respaldos que genera scripts/migrate-private-profile.js antes de escribir
+# (hallazgo H1) — contienen datos personales (nombre completo, fecha de
+# nacimiento, género, país, email viejo), nunca se suben al repo.
+scripts/backups/

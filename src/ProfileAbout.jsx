@@ -28,11 +28,19 @@ import { LANGUAGE_OPTIONS, getGenderOptions, getCountryName, calculateAge } from
   guarda la edad calculada: se calcula al vuelo con calculateAge() al
   renderizar (mismo principio que los demás conteos derivados de la app).
 
+  Hallazgo H1 (2026-10-24): nombre completo, género, país, idioma y fecha
+  de nacimiento viven en users/{uid}/private/data, que solo el dueño puede
+  leer. En el perfil de OTRA persona esos campos simplemente no llegan, y
+  como cada fila se muestra solo si tiene valor, ahí solo queda
+  datingPreference — este componente no necesita saber de quién es el
+  perfil. AuthProfile.jsx (y UserProfile.jsx cuando es tu propio perfil)
+  le pasan el perfil público mezclado con el privado.
+
   Quién puede VER esta sección ya lo decide quien llama: UserProfile.jsx
   no llega a renderizar este componente si hay bloqueo (corta antes, con
-  la pantalla "No puedes ver este perfil"). El muro privado (isWallPrivate)
-  NO afecta esta sección — solo oculta la lista de publicaciones, la info
-  de perfil se sigue mostrando igual.
+  la pantalla "No puedes ver este perfil") ni si el perfil es privado y
+  no es tuyo. El muro privado (isWallPrivate) NO afecta esta sección —
+  solo oculta la lista de publicaciones.
 */
 
 const styles = {
