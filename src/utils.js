@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from "./firebase";
 
 /*
@@ -33,6 +33,17 @@ export function useIsMobile(breakpoint = 700) {
 // título sin tener que leerlo de nuevo — ver CreateProductScreen.jsx/
 // MyStoreScreen.jsx (quién las crea) y Notifications.jsx (cómo se
 // muestran y a dónde navegan).
+//
+// "expireAt" (punto 64): la política TTL de Firestore sobre el grupo de
+// colecciones "items" borra sola cada notificación cuando llega esa fecha
+// (30 días después de creada). Se calcula con el reloj del cliente porque
+// "createdAt" es serverTimestamp() (un sentinel, no se le puede sumar
+// nada acá). OJO: ese grupo "items" también incluye savedPosts/{uid}/items
+// y savedProducts/{uid}/items — "expireAt" NUNCA debe escribirse ahí (las
+// reglas de esas dos colecciones ya lo rechazan, ver sinExpiracion() en
+// firestore.rules), o la TTL borraría los guardados.
+const NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export async function notify(
   targetUid,
   { type, fromUid, fromName, fromIdentity, postId, productId, productTitle }
@@ -44,6 +55,7 @@ export async function notify(
     fromName,
     fromIdentity,
     createdAt: serverTimestamp(),
+    expireAt: Timestamp.fromMillis(Date.now() + NOTIFICATION_TTL_MS),
     read: false,
   };
   if (postId) data.postId = postId;
