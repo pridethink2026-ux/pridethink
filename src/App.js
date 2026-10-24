@@ -531,6 +531,11 @@ function App() {
   // que lo consume una vez (onConsumeStoreProduct) para no reabrir el
   // mismo producto si el usuario vuelve a la lista y sale de nuevo.
   const [storeProductId, setStoreProductId] = useState(null);
+  // Mismo puente que storeProductId, para la pestaña Chat: uid de la
+  // persona cuya conversación hay que abrir al llegar desde una
+  // notificación de mensaje (Notifications.jsx -> onOpenChat). Chat.jsx lo
+  // consume una vez (onConsumeInitialContactUid).
+  const [chatContactUid, setChatContactUid] = useState(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const { unreadCount } = useNotifications(currentUid);
 
@@ -616,6 +621,7 @@ function App() {
     setViewingGroupId(null);
     setViewingEventId(null);
     setStoreProductId(null);
+    setChatContactUid(null);
   };
 
   // Desde un mensaje de regalo en el chat (GiftNotification.jsx): cambia
@@ -629,6 +635,19 @@ function App() {
     setViewingGroupId(null);
     setViewingEventId(null);
     setStoreProductId(productId);
+  };
+
+  // Desde una notificación de mensaje: cambia a la pestaña Chat y le pide
+  // que abra la conversación con esa persona (mismo patrón que
+  // openStoreProduct de arriba).
+  const openChat = (uid) => {
+    setView("chat");
+    closeProfile();
+    setViewingSaved(false);
+    setViewingPostId(null);
+    setViewingGroupId(null);
+    setViewingEventId(null);
+    setChatContactUid(uid);
   };
 
   let content;
@@ -647,7 +666,15 @@ function App() {
   } else if (view === "feed") {
     content = <Feed onOpenProfile={openProfile} onOpenGroup={openGroup} onOpenEvent={openEvent} />;
   } else if (view === "chat") {
-    content = <Chat onOpenProfile={openProfile} onOpenPost={openPost} onOpenProduct={openStoreProduct} />;
+    content = (
+      <Chat
+        onOpenProfile={openProfile}
+        onOpenPost={openPost}
+        onOpenProduct={openStoreProduct}
+        initialContactUid={chatContactUid}
+        onConsumeInitialContactUid={() => setChatContactUid(null)}
+      />
+    );
   } else if (view === "buscar") {
     content = <Search onOpenProfile={openProfile} />;
   } else if (view === "tienda") {
@@ -665,6 +692,7 @@ function App() {
         onOpenProfile={openProfile}
         onOpenPost={openPost}
         onOpenProduct={openStoreProduct}
+        onOpenChat={openChat}
       />
     );
   } else {
@@ -711,6 +739,7 @@ function App() {
               onOpenProfile={openProfile}
               onOpenPost={openPost}
               onOpenProduct={openStoreProduct}
+              onOpenChat={openChat}
             />
           )}
         </div>

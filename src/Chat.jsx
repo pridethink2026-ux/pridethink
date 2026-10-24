@@ -944,12 +944,22 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
   );
 }
 
-export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
+export default function Chat({
+  onOpenProfile,
+  onOpenPost,
+  onOpenProduct,
+  initialContactUid,
+  onConsumeInitialContactUid,
+}) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
   const [activeContact, setActiveContact] = useState(null);
+  // Se llegó desde una notificación de mensaje (initialContactUid) pero esa
+  // persona no aparece entre los contactos visibles — ver el efecto que
+  // consume initialContactUid más abajo.
+  const [chatUnavailable, setChatUnavailable] = useState(false);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [search, setSearch] = useState("");
@@ -1029,6 +1039,33 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
   const liveActiveContact = activeContact
     ? allUsers.find((u) => u.uid === activeContact.uid) || activeContact
     : null;
+
+  // Abrir una conversación puntual al llegar desde una notificación de
+  // mensaje (App.js -> openChat, mismo patrón que initialProductId en
+  // StoreScreen.jsx). Espera a que llegue la lista de usuarios para no
+  // marcar "no disponible" mientras todavía está cargando. Mismo criterio
+  // que visibleContacts de arriba: si la persona tiene perfil privado, hay
+  // bloqueo en cualquier dirección o ya no existe, no se abre nada y se
+  // muestra un aviso genérico — el mismo texto en los tres casos, para no
+  // revelar quién bloqueó a quién.
+  useEffect(() => {
+    if (!initialContactUid || !currentUid || allUsersRaw.length === 0) return;
+    const target = allUsersRaw.find((u) => u.uid === initialContactUid);
+    const available =
+      !!target &&
+      target.uid !== currentUid &&
+      !target.isPrivate &&
+      !isBlockedEitherWay(blockedByMe, blockedMe, target.uid);
+    if (available) {
+      setActiveContact(target);
+      setStickerPanelOpen(false);
+      setChatUnavailable(false);
+    } else {
+      setActiveContact(null);
+      setChatUnavailable(true);
+    }
+    onConsumeInitialContactUid?.();
+  }, [initialContactUid, currentUid, allUsersRaw, blockedByMe, blockedMe, onConsumeInitialContactUid]);
 
   const handleToggleBlock = async () => {
     if (!activeContact || !currentUid) return;
@@ -1378,6 +1415,11 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
         {showContactsList && (
           <div style={styles.contactsCol(isMobile)}>
             <p style={styles.contactsHeader}>{t("chat.peopleHeader")}</p>
+            {chatUnavailable && (
+              <p style={{ padding: "0 16px 8px", fontSize: "13px", color: "var(--text-muted)" }}>
+                {t("chat.conversationUnavailable")}
+              </p>
+            )}
             <div style={styles.searchBox}>
               <input
                 style={styles.searchInput}
@@ -1401,6 +1443,7 @@ export default function Chat({ onOpenProfile, onOpenPost, onOpenProduct }) {
                     if (recordingState === "idle") {
                       setActiveContact(c);
                       setStickerPanelOpen(false);
+                      setChatUnavailable(false);
                     }
                   }}
                 >

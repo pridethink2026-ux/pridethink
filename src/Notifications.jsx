@@ -33,6 +33,9 @@ import { useLanguage } from "./LanguageContext";
          seguidor del vendedor cuando un producto pasa de borrador a
          publicado) — al tocar esa notificación se navega directo al
          producto, mismo criterio que "mention" con el post.
+      -> "message" no trae ningún campo extra: al tocarla se abre la
+         conversación con "fromUid" (App.js -> openChat -> Chat.jsx
+         initialContactUid).
 
   Este archivo exporta tres cosas:
   - useNotifications(uid): hook con la lógica de datos (items, contador de
@@ -221,9 +224,17 @@ function usePhotoByUid() {
   }, [allUsers]);
 }
 
-function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduct, dropdown }) {
+function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduct, onOpenChat, dropdown }) {
   const { t } = useLanguage();
   const handleClick = () => {
+    // Mensaje nuevo (texto, audio, imagen, sticker, post compartido o
+    // regalo): abre directo la conversación con quien lo mandó. No hace
+    // falta guardar un chatId en la notificación — Chat.jsx lo arma con
+    // getChatId(miUid, fromUid), así que sirve también para las viejas.
+    if (n.type === "message" && n.fromUid && onOpenChat) {
+      onOpenChat(n.fromUid);
+      return;
+    }
     if (n.type === "mention" && n.postId && onOpenPost) {
       onOpenPost(n.postId);
       return;
@@ -252,7 +263,7 @@ function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduc
   );
 }
 
-export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct }) {
+export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct, onOpenChat }) {
   const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -304,6 +315,7 @@ export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct
               onOpenProfile={onOpenProfile}
               onOpenPost={onOpenPost}
               onOpenProduct={onOpenProduct}
+              onOpenChat={onOpenChat}
               dropdown
             />
           ))}
@@ -314,7 +326,7 @@ export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct
 }
 
 // Misma lista, como pantalla completa para la barra de navegación inferior en móvil.
-export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct }) {
+export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct, onOpenChat }) {
   const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -355,6 +367,7 @@ export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct }
             onOpenProfile={onOpenProfile}
             onOpenPost={onOpenPost}
             onOpenProduct={onOpenProduct}
+            onOpenChat={onOpenChat}
             dropdown={false}
           />
         ))}
