@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "./firebase";
 import { useLanguage } from "./LanguageContext";
+import ImageEditor from "./ImageEditor";
 
 /*
   MultiImageUploader
@@ -17,15 +18,17 @@ import { useLanguage } from "./LanguageContext";
   sola imagen, una ruta fija) sigue intacto y sin usar acá a propósito:
   sigue siendo el primitivo genérico para el caso de UNA sola imagen.
 
-  DUPLICACIÓN INTENCIONAL: la validación de tipo/peso y el redimensionado
-  con <canvas> son casi idénticos a los de `ImageUploader.jsx` (mismo
-  criterio: máximo `maxSize` de lado, manteniendo el aspect ratio, JPEG
-  0.85) — se copian acá en vez de importarse porque `ImageUploader.jsx`
-  sube UNA imagen con UNA ruta fija ya resuelta por quien lo usa, y este
-  componente necesita decidir la ruta de CADA foto por su cuenta (ver
-  "numeración de archivos" abajo) — mismo espíritu que `CameraIcon`/
-  `BookmarkIcon`, duplicados a propósito entre archivos de la Tienda en
-  vez de compartidos, según ya documentan esos componentes.
+  EDITOR ANTES DE SUBIR (punto 65): elegir fotos (el selector acepta
+  VARIAS a la vez, `multiple`) no sube nada todavía — cada foto pasa por
+  `ImageEditor.jsx` (girar de a 90°, recorte Libre/Cuadrado), en el orden
+  en que se eligieron. "Usar foto" sube el Blob que devuelve el editor (ya
+  reducido a `maxSize` de lado, manteniendo el recorte elegido, JPEG 0.85
+  — reemplaza a la función de redimensionado que este archivo tenía
+  copiada); "Cancelar"/Escape salta SOLO esa foto y sigue con la próxima.
+  El máximo (`maxImages`) se respeta igual que antes: si se eligen más
+  fotos que lugares libres, se toman las primeras que entran y se avisa
+  (`image.tooMany`). La validación de tipo/peso sigue siendo la misma, por
+  archivo. Mientras haya fotos en la cola, el "+" queda deshabilitado.
 
   NUMERACIÓN DE ARCHIVOS Y POR QUÉ NO ES SIMPLEMENTE "images.length":
   cada foto se sube a "{basePath}/img_{N}.jpg". Si se numerara por la
@@ -64,49 +67,8 @@ import { useLanguage } from "./LanguageContext";
   - `maxSize` (número, default 1024): igual que en ImageUploader.jsx.
 */
 
-const JPEG_QUALITY = 0.85;
 const MAX_INPUT_MB = 10;
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-function resizeKeepingAspect(file, maxSize) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      if (!img.width || !img.height) {
-        reject(new Error("empty"));
-        return;
-      }
-      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      const targetW = Math.round(img.width * scale);
-      const targetH = Math.round(img.height * scale);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("nocontext"));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error("noblob"))),
-        "image/jpeg",
-        JPEG_QUALITY
-      );
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("decode"));
-    };
-
-    img.src = objectUrl;
-  });
-}
 
 export default function MultiImageUploader({
   basePath,
@@ -130,38 +92,78 @@ export default function MultiImageUploader({
     nextSlotRef.current = Math.max(nextSlotRef.current, images.length);
   }, [images.length]);
 
-  const handleFile = async (e) => {
-    const file = e.target.files && e.target.files[0];
+  // Punto 65: fotos elegidas que esperan pasar por ImageEditor, en el
+  // orden en que se eligieron. Se edita de a una (queue[0]); "Usar foto"
+  // la sube y recién al terminar pasa a la siguiente, "Cancelar" la salta.
+  // Cada entrada lleva un id para que el editor se vuelva a montar limpio
+  // con cada foto (key).
+  const [queue, setQueue] = useState([]); // [{ id, file }]
+  const queueIdRef = useRef(0);
+  const nextInQueue = () => setQueue((q) => q.slice(1));
+
+  const handleFile = (e) => {
+    const picked = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file || !basePath || images.length >= maxImages) return;
+    if (picked.length === 0 || !basePath) return;
 
     setError("");
 
-    if (!TYPES.includes(file.type)) {
-      setError(t("image.errorType"));
-      return;
-    }
-    if (file.size > MAX_INPUT_MB * 1024 * 1024) {
-      setError(t("image.errorTooLarge", { max: MAX_INPUT_MB }));
-      return;
-    }
+    // Mismas validaciones de siempre, por archivo: los inválidos se saltan
+    // (mostrando el error del último) y el resto sigue.
+    const valid = [];
+    picked.forEach((file) => {
+      if (!TYPES.includes(file.type)) {
+        setError(t("image.errorType"));
+      } else if (file.size > MAX_INPUT_MB * 1024 * 1024) {
+        setError(t("image.errorTooLarge", { max: MAX_INPUT_MB }));
+      } else {
+        valid.push(file);
+      }
+    });
 
+    // Respeta el máximo: solo entran las que caben en los lugares libres
+    // (descontando las que ya esperan en la cola).
+    const free = maxImages - images.length - queue.length;
+    if (free <= 0) return;
+    if (valid.length > free) {
+      setError(t("image.tooMany", { count: free, max: maxImages }));
+    }
+    const accepted = valid.slice(0, free).map((file) => {
+      queueIdRef.current += 1;
+      return { id: queueIdRef.current, file };
+    });
+    if (accepted.length > 0) setQueue((q) => [...q, ...accepted]);
+  };
+
+  // "Usar foto" en ImageEditor: el Blob ya viene girado, recortado,
+  // reducido a maxSize y en JPEG 0.85.
+  const handleEdited = async (blob) => {
+    if (images.length >= maxImages) {
+      nextInQueue();
+      return;
+    }
     const slot = nextSlotRef.current;
     nextSlotRef.current = slot + 1;
 
     setBusy(true);
     try {
-      const blob = await resizeKeepingAspect(file, maxSize);
       const fileRef = ref(storage, `${basePath}/img_${slot}.jpg`);
       await uploadBytes(fileRef, blob, { contentType: "image/jpeg" });
       const url = await getDownloadURL(fileRef);
       onChange([...images, url]);
     } catch (err) {
-      const localFailure = ["decode", "noblob", "empty", "nocontext"].includes(err?.message);
-      setError(localFailure ? t("image.errorRead") : t("image.errorUpload"));
+      setError(t("image.errorUpload"));
     } finally {
       setBusy(false);
+      nextInQueue();
     }
+  };
+
+  // La foto no se pudo abrir ("decode"/"empty"/"nocontext"/"noblob"): se
+  // salta, igual que con Cancelar, y sigue con la siguiente.
+  const handleEditorError = () => {
+    setError(t("image.errorRead"));
+    nextInQueue();
   };
 
   const handleRemove = async (index) => {
@@ -273,7 +275,7 @@ export default function MultiImageUploader({
           <button
             type="button"
             style={addTileStyle}
-            disabled={busy}
+            disabled={busy || queue.length > 0}
             onClick={() => inputRef.current && inputRef.current.click()}
             title={t("image.add")}
             aria-label={t("image.add")}
@@ -290,6 +292,7 @@ export default function MultiImageUploader({
           ref={inputRef}
           type="file"
           accept="image/*"
+          multiple
           onChange={handleFile}
           style={{ display: "none" }}
         />
@@ -298,6 +301,17 @@ export default function MultiImageUploader({
       <p style={hintStyle}>{t("image.countHint", { count: images.length, max: maxImages })}</p>
 
       {error && <p style={errorStyle}>{error}</p>}
+
+      {queue.length > 0 && !busy && (
+        <ImageEditor
+          key={queue[0].id}
+          file={queue[0].file}
+          maxSize={maxSize}
+          onConfirm={handleEdited}
+          onCancel={nextInQueue}
+          onError={handleEditorError}
+        />
+      )}
     </div>
   );
 }

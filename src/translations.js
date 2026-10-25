@@ -212,6 +212,7 @@ export const translations = {
       "No se pudo subir la imagen. Revisá tu conexión e intentá de nuevo.",
     "image.errorRemove": "No se pudo quitar la imagen. Intentá de nuevo en un momento.",
     "image.countHint": "{count} de {max} fotos",
+    "image.tooMany": "Solo entran {count} foto(s) más: el máximo es {max}. Se agregaron las primeras.",
 
     // Visor de imagen completa (ImageViewer.jsx, punto 60)
     "imageViewer.close": "Cerrar",
@@ -768,6 +769,7 @@ export const translations = {
     "image.errorUpload": "The image could not be uploaded. Check your connection and try again.",
     "image.errorRemove": "The image could not be removed. Please try again in a moment.",
     "image.countHint": "{count} of {max} photos",
+    "image.tooMany": "Only {count} more photo(s) fit: the maximum is {max}. The first ones were added.",
 
     // Full image viewer (ImageViewer.jsx, point 60)
     "imageViewer.close": "Close",
