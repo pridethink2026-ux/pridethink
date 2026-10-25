@@ -134,6 +134,31 @@ service firebase.storage {
     }
 
     // ------------------------------------------------------------------
+    // momentImages/{userId}/{fileName} — foto de un momento (punto 66)
+    // ------------------------------------------------------------------
+    // "fileName" es "{momentId}.jpg" (ver publishMoment en moments.js).
+    // A diferencia del resto del bucket, LEER por ruta es solo del dueño:
+    // los ids de los momentos son públicos (momentIndex/{uid} en
+    // firestore.rules), así que con "cualquier autenticado" alguien
+    // bloqueado o que no sigue al autor podría armar la ruta y descargar
+    // la foto. Quien sí puede verla usa la URL con token guardada en
+    // moments/{momentId}.imageURL, que se sirve sin pasar por estas
+    // reglas — y ese documento sí está protegido por firestore.rules.
+    // No hay "update": cada momento tiene su propio archivo, nunca se
+    // pisa. Una regla de ciclo de vida del bucket (prefijo momentImages/,
+    // 2 días) borra las fotos solas — ver CONTEXTO.md, punto 66.
+    match /momentImages/{userId}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ------------------------------------------------------------------
     // Todo lo demás: cerrado
     // ------------------------------------------------------------------
     match /{allPaths=**} {

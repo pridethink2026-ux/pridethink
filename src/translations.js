@@ -427,6 +427,21 @@ export const translations = {
     "errors.reset.generic": "No se pudo enviar el correo. Intenta de nuevo.",
     "errors.profileSaveFailed": "No se pudo guardar tu perfil. Intenta de nuevo.",
 
+    // Momentos (MomentsStrip.jsx, MomentViewer.jsx, punto 66)
+    "moments.yours": "Tu momento",
+    "moments.add": "Publicar un momento",
+    "moments.viewMine": "Ver tus momentos",
+    "moments.publishing": "Publicando...",
+    "moments.published": "¡Listo! Tu momento se ve durante 24 horas.",
+    "moments.privateNotice": "Tu perfil es privado: solo tú verás este momento.",
+    "moments.limitReached": "Ya tienes {max} momentos activos, que es el máximo. Espera a que venza alguno para publicar otro.",
+    "moments.errorPublish":
+      "No se pudo publicar el momento. Revisa tu conexión y que la hora de tu dispositivo esté bien, y prueba de nuevo.",
+    "moments.viewerLabel": "Momentos",
+    "moments.close": "Cerrar",
+    "moments.loading": "Cargando...",
+    "moments.imageAlt": "Momento de {name}",
+
     // Reportar publicaciones/usuarios (ReportButton.jsx)
     "report.action": "Reportar",
     "report.reasonLabel": "Motivo",
@@ -972,6 +987,21 @@ export const translations = {
     "errors.reset.auth/too-many-requests": "Too many attempts. Wait a moment and try again.",
     "errors.reset.generic": "Couldn't send the email. Try again.",
     "errors.profileSaveFailed": "Couldn't save your profile. Try again.",
+
+    // Moments (MomentsStrip.jsx, MomentViewer.jsx, point 66)
+    "moments.yours": "Your moment",
+    "moments.add": "Post a moment",
+    "moments.viewMine": "View your moments",
+    "moments.publishing": "Posting...",
+    "moments.published": "Done! Your moment is visible for 24 hours.",
+    "moments.privateNotice": "Your profile is private: only you will see this moment.",
+    "moments.limitReached": "You already have {max} active moments, which is the maximum. Wait for one to expire to post another.",
+    "moments.errorPublish":
+      "The moment could not be posted. Check your connection and that your device's clock is correct, then try again.",
+    "moments.viewerLabel": "Moments",
+    "moments.close": "Close",
+    "moments.loading": "Loading...",
+    "moments.imageAlt": "Moment by {name}",
 
     // Reporting posts/users (ReportButton.jsx)
     "report.action": "Report",

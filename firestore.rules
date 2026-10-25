@@ -777,6 +777,101 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------
+    // Momentos (punto 66): fotos que duran 24 h, como las historias.
+    //   moments/{momentId}      → el momento (foto + texto plano), lo lee
+    //                             quien puede ver los momentos del autor.
+    //   momentIndex/{authorUid} → qué momentos tiene activos cada autor
+    //                             (ids + horas), lo lee cualquier
+    //                             autenticado: MomentsContext.jsx lo
+    //                             escucha entero para armar la tira.
+    // Los momentos ajenos NUNCA se consultan con where(): se leen de a uno
+    // por id (getDoc) a partir de los ids del índice. Así la regla se
+    // evalúa contra el documento real y puede usar get()/exists() sobre
+    // rutas que dependen de resource.data.authorId — en una consulta,
+    // Firestore no podría demostrar esa regla de antemano y la rechazaría
+    // entera.
+    //
+    // Dos políticas TTL (Google Cloud, campo "expireAt") borran solas los
+    // momentos y los índices vencidos; las fotos las borra una regla de
+    // ciclo de vida del bucket (momentImages/, 2 días). Mientras la TTL no
+    // pasa (puede tardar hasta 24 h), la regla de lectura ya no deja leer
+    // un momento vencido.
+    // --------------------------------------------------------------------
+
+    // Visibilidad (decisión del punto 66: "seguidores"): el autor siempre
+    // ve los suyos; los demás, solo si el perfil del autor no es privado
+    // (mismo criterio que isPrivateForMe en UserProfile.jsx — isWallPrivate
+    // NO oculta momentos), si lo siguen (su propio users/{uid}.following) y
+    // si no hay bloqueo en ninguna dirección.
+    function puedeVerMomentosDe(autorUid) {
+      let yo = request.auth.uid;
+      return autorUid == yo || (
+        get(/databases/$(database)/documents/users/$(autorUid)).data.get('isPrivate', false) != true
+        && autorUid in get(/databases/$(database)/documents/users/$(yo)).data.get('following', [])
+        && !exists(/databases/$(database)/documents/blocks/$(autorUid + '_' + yo))
+        && !exists(/databases/$(database)/documents/blocks/$(yo + '_' + autorUid))
+      );
+    }
+
+    // Nadie puede hacer que algo dure más de 24 h: el vencimiento tiene que
+    // caer entre ahora (hora del servidor) y ahora + 24 h, con 5 minutos de
+    // margen para un reloj del cliente algo adelantado (el cliente calcula
+    // Date.now() + 24 h, ver moments.js).
+    function venceDentroDe24h(fecha) {
+      return fecha is timestamp
+        && fecha > request.time
+        && fecha <= request.time + duration.value(24 * 60 + 5, 'm');
+    }
+
+    match /moments/{momentId} {
+      allow read: if estaAutenticado()
+        && resource.data.expireAt > request.time
+        && puedeVerMomentosDe(resource.data.authorId);
+
+      // Se crea en el MISMO writeBatch que actualiza el índice del autor
+      // (publishMoment en moments.js), y se exige que el índice, tal como
+      // queda al terminar el batch, ya lo incluya: así no puede existir un
+      // momento fuera del índice, y el tope de 30 del índice es también el
+      // tope de momentos activos. La foto tiene que estar en la carpeta
+      // del autor con el nombre del momento.
+      allow create: if estaAutenticado()
+        && request.resource.data.keys().hasOnly(['authorId', 'imageURL', 'storagePath', 'caption', 'createdAt', 'expireAt'])
+        && request.resource.data.authorId == request.auth.uid
+        && textoValido(request.resource.data.imageURL, 2000)
+        && request.resource.data.storagePath == 'momentImages/' + request.auth.uid + '/' + momentId + '.jpg'
+        && textoValido(request.resource.data.caption, 600)
+        && request.resource.data.createdAt == request.time
+        && venceDentroDe24h(request.resource.data.expireAt)
+        && momentId in getAfter(/databases/$(database)/documents/momentIndex/$(request.auth.uid)).data.ids;
+
+      // Un momento no se edita: se borra y se publica otro.
+      allow update: if false;
+
+      allow delete: if estaAutenticado()
+        && resource.data.authorId == request.auth.uid;
+    }
+
+    match /momentIndex/{autorUid} {
+      allow read: if estaAutenticado();
+
+      // { ids: [momentId...], times: { momentId: { createdAt, expireAt } }
+      // en milisegundos, expireAt } — "expireAt" es el vencimiento del
+      // momento más nuevo (cuándo la TTL borra el índice entero). Las
+      // reglas no pueden recorrer una lista, así que las horas de "times"
+      // son solo una guía para la interfaz: el vencimiento real de cada
+      // momento lo valida su propio documento (arriba).
+      allow create, update: if esDueno(autorUid)
+        && request.resource.data.keys().hasOnly(['ids', 'times', 'expireAt'])
+        && request.resource.data.ids is list
+        && request.resource.data.ids.size() <= 30
+        && request.resource.data.times is map
+        && request.resource.data.times.size() <= 30
+        && venceDentroDe24h(request.resource.data.expireAt);
+
+      allow delete: if esDueno(autorUid);
+    }
+
+    // --------------------------------------------------------------------
     // Cualquier otra colección o documento no contemplado arriba:
     // denegado por defecto (mínimo permiso).
     // --------------------------------------------------------------------

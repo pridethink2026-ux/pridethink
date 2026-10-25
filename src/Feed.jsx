@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
+import MomentsStrip from "./MomentsStrip";
 import ImageViewer from "./ImageViewer";
 import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
 import { useLanguage } from "./LanguageContext";
@@ -1214,6 +1215,8 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
         <div style={styles.weatherRow}>
           <WeatherWidget />
         </div>
+
+        {!isSpecialTab && <MomentsStrip currentUid={currentUid} myProfile={myProfile} />}
 
         {feedTab !== "explorar" && !isSpecialTab && (
           <form style={styles.composer} onSubmit={handlePost}>
