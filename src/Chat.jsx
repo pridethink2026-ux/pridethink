@@ -25,6 +25,7 @@ import { useAllUsers } from "./Mentions";
 import { playReactionSound } from "./sound";
 import GiftNotification from "./GiftNotification";
 import ImageViewer from "./ImageViewer";
+import ImageEditor from "./ImageEditor";
 
 /*
   Chat
@@ -65,8 +66,9 @@ import ImageViewer from "./ImageViewer";
   (mismo patrón que "postId"/"productId" en Feed.jsx/
   CreateProductScreen.jsx), así que el mensaje se crea con setDoc en vez
   de addDoc. El envío sigue el mismo esqueleto que una nota de voz:
-  elegir el archivo lo redimensiona y lo deja "listo" para confirmar o
-  cancelar (pendingImage), nunca se sube directo — ver
+  elegir el archivo abre ImageEditor.jsx (punto 65: girar/recortar), y
+  "Usar foto" lo deja "listo" para confirmar o cancelar (pendingImage),
+  nunca se sube directo — ver
   handlePickImage/sendPendingImage/cancelPendingImage.
   Todos los tipos de mensaje pueden tener además `reactions: { [uid]: tipo }`
   (ver Reactions.jsx, compartido con Feed.jsx) — como mucho reaccionan las
@@ -201,58 +203,13 @@ function ImageIcon() {
   );
 }
 
-// Validación de tipo/peso y redimensionado con <canvas> (máximo
-// PENDING_IMAGE_MAX_SIZE de lado, manteniendo aspect ratio, JPEG 0.85) —
-// duplicado a propósito de MultiImageUploader.jsx/ImageUploader.jsx en vez
-// de importado: acá la imagen se redimensiona ANTES de mostrar la vista
-// previa (no al tocar "Enviar"), y el resultado se guarda en estado junto
-// con una URL de objeto local para esa vista previa — un flujo un poco
-// distinto al de esos dos componentes (que suben apenas se elige el
-// archivo), así que no comparten la misma función de más arriba.
+// Validación de tipo/peso de la imagen elegida (mismos valores que
+// MultiImageUploader.jsx). El redimensionado (máximo PENDING_IMAGE_MAX_SIZE
+// de lado, JPEG 0.85) ya no vive acá: lo hace ImageEditor.jsx (punto 65)
+// junto con el giro/recorte, y devuelve el Blob final.
 const PENDING_IMAGE_MAX_MB = 10;
 const PENDING_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PENDING_IMAGE_MAX_SIZE = 1024;
-const PENDING_IMAGE_JPEG_QUALITY = 0.85;
-
-function resizeImageKeepingAspect(file, maxSize) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      if (!img.width || !img.height) {
-        reject(new Error("empty"));
-        return;
-      }
-      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      const targetW = Math.round(img.width * scale);
-      const targetH = Math.round(img.height * scale);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("nocontext"));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error("noblob"))),
-        "image/jpeg",
-        PENDING_IMAGE_JPEG_QUALITY
-      );
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("decode"));
-    };
-
-    img.src = objectUrl;
-  });
-}
 
 function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
@@ -985,6 +942,7 @@ export default function Chat({
   // preview usa una URL de objeto local (revocada al cancelar o al
   // terminar de enviar, para no filtrar memoria).
   const [pendingImage, setPendingImage] = useState(null); // { blob, previewUrl } | null
+  const [editingImageFile, setEditingImageFile] = useState(null); // File abierto en ImageEditor (punto 65)
   const [sendingImage, setSendingImage] = useState(false);
   const imageInputRef = useRef(null);
 
@@ -1257,13 +1215,13 @@ export default function Chat({
     }
   };
 
-  // Elegir archivo -> validar -> redimensionar YA (mismo patrón de canvas
-  // que MultiImageUploader.jsx/ImageUploader.jsx, ver el docstring de
-  // resizeImageKeepingAspect más arriba) -> queda "listo" en pendingImage
-  // con una preview local. Recién se sube al tocar "Enviar"
-  // (sendPendingImage) — errores con alert(), mismo criterio que
-  // startRecording()/uploadAudioMessage() en este mismo archivo.
-  const handlePickImage = async (e) => {
+  // Elegir archivo -> validar -> ImageEditor.jsx (punto 65: girar/recortar,
+  // Libre/Cuadrado) -> "Usar foto" lo deja "listo" en pendingImage con una
+  // preview local (handleImageEdited), como antes. Recién se sube al tocar
+  // "Enviar" (sendPendingImage); Cancelar en el editor no deja nada listo.
+  // Errores con alert(), mismo criterio que startRecording()/
+  // uploadAudioMessage() en este mismo archivo.
+  const handlePickImage = (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
     if (!file) return;
@@ -1277,12 +1235,25 @@ export default function Chat({
       return;
     }
 
-    try {
-      const blob = await resizeImageKeepingAspect(file, PENDING_IMAGE_MAX_SIZE);
-      setPendingImage({ blob, previewUrl: URL.createObjectURL(blob) });
-    } catch (err) {
-      alert(t("image.errorRead"));
-    }
+    setEditingImageFile(file);
+  };
+
+  // "Usar foto": el Blob ya viene girado, recortado, reducido a
+  // PENDING_IMAGE_MAX_SIZE y en JPEG 0.85. Si ya había una imagen lista
+  // (no debería: el botón de imagen no se muestra mientras hay una), se
+  // libera su preview antes de reemplazarla.
+  const handleImageEdited = (blob) => {
+    setEditingImageFile(null);
+    setPendingImage((prev) => {
+      if (prev) URL.revokeObjectURL(prev.previewUrl);
+      return { blob, previewUrl: URL.createObjectURL(blob) };
+    });
+  };
+
+  // "decode"/"empty"/"nocontext"/"noblob" de ImageEditor: no se pudo abrir.
+  const handleImageEditorError = () => {
+    setEditingImageFile(null);
+    alert(t("image.errorRead"));
   };
 
   const cancelPendingImage = () => {
@@ -1633,6 +1604,16 @@ export default function Chat({
           </div>
         )}
       </div>
+
+      {editingImageFile && (
+        <ImageEditor
+          file={editingImageFile}
+          maxSize={PENDING_IMAGE_MAX_SIZE}
+          onConfirm={handleImageEdited}
+          onCancel={() => setEditingImageFile(null)}
+          onError={handleImageEditorError}
+        />
+      )}
     </div>
   );
 }
