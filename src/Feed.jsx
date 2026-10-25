@@ -18,6 +18,7 @@ import {
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
 import MomentsStrip from "./MomentsStrip";
+import { useMoments } from "./MomentsContext";
 import ImageViewer from "./ImageViewer";
 import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
 import { useLanguage } from "./LanguageContext";
@@ -619,6 +620,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const { open: pickerOpen, setOpen: setPickerOpen, containerRef: reactionRef, triggerProps: reactionTriggerProps, consumeLongPress } =
     useReactionPicker();
   const allUsers = useAllUsers();
+  const { getMomentState } = useMoments();
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const editMention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
   const commentMention = useMentionAutocomplete(allUsers, currentUid, blockedByMe, blockedMe);
@@ -778,6 +780,10 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           photoURL={author?.photoURL}
           size="md"
           onClick={() => onOpenProfile(post.authorId)}
+          // Punto 66: el destello solo avisa que hay momentos sin ver;
+          // tocar sigue llevando al perfil (se abren desde la tira o
+          // desde el avatar grande del perfil).
+          momentRing={getMomentState(post.authorId) === "unseen" ? "unseen" : null}
         />
         <div style={styles.postHeaderText} onClick={() => onOpenProfile(post.authorId)}>
           <p style={styles.authorName}>

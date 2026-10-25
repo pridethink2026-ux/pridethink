@@ -441,6 +441,7 @@ export const translations = {
     "moments.close": "Cerrar",
     "moments.loading": "Cargando...",
     "moments.imageAlt": "Momento de {name}",
+    "moments.viewProfilePhoto": "Ver foto de perfil",
 
     // Reportar publicaciones/usuarios (ReportButton.jsx)
     "report.action": "Reportar",
@@ -1002,6 +1003,7 @@ export const translations = {
     "moments.close": "Close",
     "moments.loading": "Loading...",
     "moments.imageAlt": "Moment by {name}",
+    "moments.viewProfilePhoto": "View profile photo",
 
     // Reporting posts/users (ReportButton.jsx)
     "report.action": "Report",

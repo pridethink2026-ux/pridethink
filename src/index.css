@@ -40,6 +40,29 @@ code {
   }
 }
 
+/* Destello de Momentos sin ver (Avatar.jsx, prop momentRing="unseen",
+   punto 66). El estilo inline del avatar ya trae el destello fijo; esto
+   solo lo hace "respirar" alternando los dos acentos del tema. Con
+   "reducir movimiento" se apaga la animación y queda el destello fijo. */
+.pt-moment-glow {
+  animation: pt-moment-glow 2.6s ease-in-out infinite;
+}
+
+@keyframes pt-moment-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent2), 0 0 6px 2px var(--accent2-soft-border);
+  }
+  50% {
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent), 0 0 14px 6px var(--accent-soft-border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-moment-glow {
+    animation: none;
+  }
+}
+
 .pt-like-pop {
   display: inline-block;
   animation: pt-like-pop 0.35s ease;

@@ -24,8 +24,9 @@ import { timeAgo } from "./utils";
   - `authorUids` (array): los autores en el orden de la tira.
   - `startIndex` (número): con qué autor empezar.
   - `continueToNext` (booleano): al terminar los momentos de un autor,
-    pasar al siguiente de `authorUids` (abierto desde la tira) o cerrar
-    (abierto desde un perfil).
+    pasar al siguiente de `authorUids` que tenga momentos sin ver
+    (abierto desde la tira) o cerrar (abierto desde un perfil). Empieza
+    siempre por el primer momento sin ver de cada autor.
   - `onClose()` (obligatoria).
 
   Los ids salen de MomentsContext (momentIndex) y cada momento se lee de a
@@ -131,7 +132,7 @@ const styles = {
 
 export default function MomentViewer({ authorUids, startIndex = 0, continueToNext = false, onClose }) {
   const { t } = useLanguage();
-  const { getVisibleMoments } = useMoments();
+  const { getVisibleMoments, getMomentState, getFirstUnseenIndex, markSeen, flushSeen } = useMoments();
   const allUsers = useAllUsersContext();
 
   const [authorPos, setAuthorPos] = useState(startIndex);
@@ -151,8 +152,13 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const current = moments ? moments[momentPos] : null;
   const currentId = current ? current.id : null;
 
+  // Desde la tira: el siguiente autor que todavía tenga algo sin ver.
+  // Desde un perfil (continueToNext false): cerrar.
   const goNextAuthor = () => {
-    if (continueToNext && authorPos < authorUids.length - 1) setAuthorPos(authorPos + 1);
+    const nextPos = continueToNext
+      ? authorUids.findIndex((uid, i) => i > authorPos && getMomentState(uid) === "unseen")
+      : -1;
+    if (nextPos !== -1) setAuthorPos(nextPos);
     else onClose();
   };
 
@@ -177,7 +183,10 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
 
   // Al cambiar de autor: leer sus momentos de a uno por id. Se toma la
   // lista de ids de ESE momento (no se sigue en vivo) para que la
-  // secuencia no cambie mientras se mira.
+  // secuencia no cambie mientras se mira. Cada momento guarda el createdAt
+  // de su entrada del índice (indexCreatedAt), que es con lo que se
+  // marcan los vistos (MomentsContext). Empieza en el primero sin ver.
+  // Al irse de este autor (o cerrar) se guardan los vistos.
   useEffect(() => {
     let cancelled = false;
     setMoments(null);
@@ -186,17 +195,21 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     Promise.all(
       entries.map((e) =>
         getDoc(doc(db, "moments", e.id))
-          .then((snap) => (snap.exists() ? { id: snap.id, ...snap.data() } : null))
+          .then((snap) => (snap.exists() ? { id: snap.id, ...snap.data(), indexCreatedAt: e.createdAt } : null))
           .catch(() => null)
       )
     ).then((docs) => {
       if (cancelled) return;
       const readable = docs.filter(Boolean);
       if (readable.length === 0) actionsRef.current.next();
-      else setMoments(readable);
+      else {
+        setMomentPos(getFirstUnseenIndex(authorUid, readable.map((m) => ({ createdAt: m.indexCreatedAt }))));
+        setMoments(readable);
+      }
     });
     return () => {
       cancelled = true;
+      flushSeen();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authorUid]);
@@ -207,6 +220,12 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     setProgress(0);
     setImgLoaded(false);
   }, [currentId]);
+
+  // Un momento cuenta como visto apenas su foto se muestra.
+  useEffect(() => {
+    if (imgLoaded && current) markSeen(authorUid, current.indexCreatedAt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imgLoaded, currentId]);
 
   // Precarga la foto siguiente para que no haya espera al avanzar.
   useEffect(() => {

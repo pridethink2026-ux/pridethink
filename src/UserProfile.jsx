@@ -18,6 +18,8 @@ import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import ReportButton from "./ReportButton";
 import ImageViewer from "./ImageViewer";
+import MomentViewer from "./MomentViewer";
+import { useMoments } from "./MomentsContext";
 import VerifiedBadge from "./VerifiedBadge";
 import { isEffectivelyOnline, canSeeOnlineStatus } from "./presence";
 import { unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
@@ -123,6 +125,20 @@ const styles = {
   countItem: { cursor: "pointer" },
   countNumber: { fontSize: "17px", fontWeight: 700, margin: 0 },
   countLabel: { fontSize: "12px", color: "var(--text-muted)", margin: "2px 0 0" },
+  // Punto 66: con momentos activos, la foto de perfil en grande se abre
+  // desde acá (tocar el avatar abre los momentos).
+  viewPhotoBtn: (hover) => ({
+    display: "block",
+    margin: "8px auto 0",
+    background: "none",
+    border: "none",
+    padding: "2px 6px",
+    fontSize: "12px",
+    fontFamily: "var(--font-body)",
+    color: hover ? "var(--accent)" : "var(--text-muted)",
+    textDecoration: "underline",
+    cursor: "pointer",
+  }),
   followBtn: (following) => ({
     marginTop: "18px",
     padding: "10px 26px",
@@ -167,6 +183,8 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const [posts, setPosts] = useState([]);
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
+  const [momentsOpen, setMomentsOpen] = useState(false);
+  const [viewPhotoHover, setViewPhotoHover] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
@@ -224,6 +242,11 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   // principal). El dueño del perfil (isMe) siempre ve su propio muro.
   const isWallPrivateForMe = !!profileUser?.isWallPrivate && !isMe;
   const isWallHidden = isPrivateForMe || isWallPrivateForMe;
+  // Punto 66: momentos de este perfil. MomentsContext ya aplica el mismo
+  // criterio que firestore.rules (privado, seguidores, bloqueos), así que
+  // un estado distinto de null siempre se puede abrir.
+  const { getMomentState } = useMoments();
+  const momentState = getMomentState(uid);
 
   useEffect(() => {
     if (!uid || isBlocked || isWallHidden) {
@@ -349,13 +372,29 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
               photoURL={profileUser.photoURL}
               size="lg"
               online={canSeeOnline && isEffectivelyOnline(profileUser)}
+              // Punto 66: con momentos activos, tocar el avatar los abre
+              // (destello si hay alguno sin ver) y la foto en grande pasa
+              // al botón de abajo.
+              momentRing={momentState}
+              onClick={momentState ? () => setMomentsOpen(true) : undefined}
               // Punto 63: tocar la foto la abre en grande — salvo perfil
               // privado ajeno (isPrivateForMe). Con bloqueo este avatar ni
               // se dibuja (return temprano de arriba), y sin foto (o si no
               // cargó) Avatar no llama a onPhotoClick.
-              onPhotoClick={isPrivateForMe ? undefined : () => setPhotoViewerOpen(true)}
+              onPhotoClick={isPrivateForMe || momentState ? undefined : () => setPhotoViewerOpen(true)}
             />
           </div>
+          {momentState && profileUser.photoURL && !isPrivateForMe && (
+            <button
+              type="button"
+              style={styles.viewPhotoBtn(viewPhotoHover)}
+              onClick={() => setPhotoViewerOpen(true)}
+              onMouseEnter={() => setViewPhotoHover(true)}
+              onMouseLeave={() => setViewPhotoHover(false)}
+            >
+              {t("moments.viewProfilePhoto")}
+            </button>
+          )}
           <h1 style={styles.name}>
             {profileUser.displayName}
             {profileUser.isVerified && <VerifiedBadge size="md" />}
@@ -408,6 +447,8 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
           ))
         )}
       </div>
+
+      {momentsOpen && <MomentViewer authorUids={[uid]} onClose={() => setMomentsOpen(false)} />}
 
       {photoViewerOpen && profileUser.photoURL && !isPrivateForMe && (
         <ImageViewer

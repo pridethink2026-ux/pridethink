@@ -871,6 +871,22 @@ service cloud.firestore {
       allow delete: if esDueno(autorUid);
     }
 
+    // momentViews/{viewerUid} → { seen: { authorUid: milisegundos } }
+    // (punto 66, commit 2): hasta qué momento viste de cada autor (el
+    // createdAt del índice del momento más nuevo que viste), para apagar
+    // el destello en todos tus dispositivos. Solo lo lee y escribe su
+    // dueño — no hay lista de "quién vio mi momento". El cliente lo
+    // reescribe entero quitando lo de más de 48 h, así que el mapa no
+    // crece; el tope de 500 es solo el respaldo del servidor.
+    match /momentViews/{viewerUid} {
+      allow read, delete: if esDueno(viewerUid);
+
+      allow create, update: if esDueno(viewerUid)
+        && request.resource.data.keys().hasOnly(['seen'])
+        && request.resource.data.seen is map
+        && request.resource.data.seen.size() <= 500;
+    }
+
     // --------------------------------------------------------------------
     // Cualquier otra colección o documento no contemplado arriba:
     // denegado por defecto (mínimo permiso).

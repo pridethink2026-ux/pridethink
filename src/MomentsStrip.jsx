@@ -15,9 +15,11 @@ import { MAX_ACTIVE_MOMENTS, MomentLimitError, publishMoment } from "./moments";
   - Primero "Tu momento": si no tienes momentos activos, tocarlo publica
     uno; si tienes, tocarlo los muestra, y el "+" chico publica otro.
   - Después, las personas que sigues con momentos activos (MomentsContext
-    ya excluye privados y bloqueados), la más reciente primero. Tocar una
-    abre MomentViewer en esa persona y, al terminar, sigue con las
-    siguientes de la tira.
+    ya excluye privados y bloqueados): primero las que tienen algo sin ver
+    (con destello, Avatar momentRing="unseen"), después las ya vistas (aro
+    fino), y en cada grupo la más reciente primero. Tocar una abre
+    MomentViewer en esa persona y, al terminar, sigue con la siguiente de
+    la tira que tenga algo sin ver.
 
   Publicar: elegir foto (misma validación de tipo y 10 MB que
   MultiImageUploader.jsx) → ImageEditor (girar/recortar, 1080 px de lado
@@ -42,7 +44,8 @@ const styles = {
     display: "flex",
     gap: "14px",
     overflowX: "auto",
-    paddingBottom: "4px",
+    // Margen para que el destello (box-shadow) no lo recorte el scroll.
+    padding: "8px 6px 4px",
   },
   item: {
     display: "flex",
@@ -57,12 +60,10 @@ const styles = {
     cursor: "pointer",
     fontFamily: "var(--font-body)",
   },
-  avatarWrap: (hasMoments) => ({
+  avatarWrap: {
     position: "relative",
-    padding: "3px",
     borderRadius: "50%",
-    border: hasMoments ? "2px solid var(--accent)" : "2px solid transparent",
-  }),
+  },
   addBadge: (hover) => ({
     position: "absolute",
     right: "-2px",
@@ -171,7 +172,7 @@ export default function MomentsStrip({ currentUid, myProfile }) {
       <div style={styles.row}>
         <div style={styles.item}>
           <div
-            style={styles.avatarWrap(hasMine)}
+            style={styles.avatarWrap}
             onClick={hasMine ? () => openViewer(currentUid) : startAdd}
             role="button"
             aria-label={hasMine ? t("moments.viewMine") : t("moments.add")}
@@ -182,6 +183,7 @@ export default function MomentsStrip({ currentUid, myProfile }) {
               identity={myProfile?.identity}
               photoURL={myProfile?.photoURL}
               size="lg"
+              momentRing={hasMine ? "seen" : null}
             />
             <button
               type="button"
@@ -205,13 +207,14 @@ export default function MomentsStrip({ currentUid, myProfile }) {
           const user = allUsers.find((u) => u.uid === a.uid);
           return (
             <button key={a.uid} type="button" style={styles.item} onClick={() => openViewer(a.uid)}>
-              <div style={styles.avatarWrap(true)}>
+              <div style={styles.avatarWrap}>
                 <Avatar
                   uid={a.uid}
                   name={user?.displayName}
                   identity={user?.identity}
                   photoURL={user?.photoURL}
                   size="lg"
+                  momentRing={a.state}
                 />
               </div>
               <span style={styles.label}>{user?.displayName || ""}</span>

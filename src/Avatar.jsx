@@ -60,8 +60,23 @@ import { getIdentityColors } from "./identityStyles";
     (para "recortarlo" del fondo detrás del avatar, que en casi todos los
     lugares donde se usa `Avatar` es justo esa variable).
 
+  `momentRing` (opcional, punto 66): "unseen" dibuja un destello por
+  FUERA del anillo de identidad (no lo reemplaza) — hay momentos que
+  todavía no viste; "seen" un aro fino con el borde del tema — los viste
+  todos (solo lo usan la tira de Momentos y el perfil); null/ausente,
+  nada. Colores de acento del tema (`--accent`/`--accent2` y sus
+  "soft-border"). El destello pulsa con la clase `.pt-moment-glow`
+  (`index.css`, alterna accent2/accent); con "reducir movimiento" del
+  sistema la animación se apaga y queda el destello fijo del estilo
+  inline. Va con box-shadow, así que no cambia el tamaño del avatar.
+
   Tamaños: "sm" (comentarios), "md" (posts, contactos), "lg" (perfil).
 */
+
+const MOMENT_RING_SHADOW = {
+  unseen: "0 0 0 2px var(--surface), 0 0 0 4px var(--accent2), 0 0 10px 4px var(--accent2-soft-border)",
+  seen: "0 0 0 2px var(--surface), 0 0 0 3px var(--border)",
+};
 
 const SIZES = {
   sm: { box: 26, font: 11, ring: 3 },
@@ -95,6 +110,7 @@ export default function Avatar({
   online = false,
   onClick,
   onPhotoClick,
+  momentRing = null,
 }) {
   // Se guarda la URL que falló (no un booleano) para que, si la persona
   // cambia su foto por otra, la nueva se vuelva a intentar sola sin
@@ -134,6 +150,7 @@ export default function Avatar({
     cursor: onClick || photoClickable ? "pointer" : "default",
     userSelect: "none",
     overflow: "hidden",
+    boxShadow: MOMENT_RING_SHADOW[momentRing] || undefined,
   };
 
   const style = {
@@ -173,7 +190,12 @@ export default function Avatar({
   };
 
   return (
-    <div style={ringStyle} onClick={handleClick} title={name || undefined}>
+    <div
+      style={ringStyle}
+      className={momentRing === "unseen" ? "pt-moment-glow" : undefined}
+      onClick={handleClick}
+      title={name || undefined}
+    >
       {showPhoto ? (
         <img
           src={photoURL}
