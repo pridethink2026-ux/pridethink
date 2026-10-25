@@ -13,8 +13,19 @@ import { useLanguage } from "./LanguageContext";
   renderiza sobre contenido propio (isMine/isMe se revisa en cada lugar
   donde se usa, no acá).
 
+  También en `MomentViewer.jsx` (targetType "moment", punto 66), con tres
+  props opcionales:
+  - `extraFields`: campos que se suman al reporte. Un momento vence a las
+    24 h y su foto se borra a los 2 días, así que el reporte guarda una
+    copia (autor, URL de la foto, texto) que firestore.rules compara con
+    el momento real.
+  - `menuButtonStyle`: se mezcla con el estilo del botón "⋮" (en el visor
+    va blanco sobre negro).
+  - `onOpenChange(abierto)`: avisa cuando se abre o cierra el menú o el
+    modal (el visor pausa el tiempo y no cierra con Escape mientras tanto).
+
   Colección en Firestore: "reports/{reportId}"
-    -> { reporterUid, targetType: "post"|"user", targetId, reason, details, createdAt, status: "pending" }
+    -> { reporterUid, targetType: "post"|"user"|"moment", targetId, reason, details, createdAt, status: "pending", ...extraFields }
 
   CÓMO SE EVITA REPORTAR DOS VECES LO MISMO (sin necesitar leer la
   colección "reports" desde el cliente, que las reglas de seguridad NO
@@ -202,7 +213,7 @@ const styles = {
   },
 };
 
-function ReportModal({ targetType, targetId, currentUid, onClose }) {
+function ReportModal({ targetType, targetId, currentUid, extraFields, onClose }) {
   const { t } = useLanguage();
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState("");
@@ -222,6 +233,7 @@ function ReportModal({ targetType, targetId, currentUid, onClose }) {
         details: reason === "other" ? details.trim() : "",
         createdAt: serverTimestamp(),
         status: "pending",
+        ...extraFields,
       });
       setStatus("sent");
     } catch (err) {
@@ -295,11 +307,17 @@ function ReportModal({ targetType, targetId, currentUid, onClose }) {
   );
 }
 
-export default function ReportButton({ targetType, targetId, currentUid }) {
+export default function ReportButton({ targetType, targetId, currentUid, extraFields, menuButtonStyle, onOpenChange }) {
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const wrapperRef = useRef(null);
+  const open = menuOpen || modalOpen;
+
+  useEffect(() => {
+    if (onOpenChange) onOpenChange(open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -317,7 +335,7 @@ export default function ReportButton({ targetType, targetId, currentUid }) {
     <div style={styles.wrapper} ref={wrapperRef}>
       <button
         type="button"
-        style={styles.menuBtn}
+        style={{ ...styles.menuBtn, ...menuButtonStyle }}
         onClick={(e) => {
           e.stopPropagation();
           setMenuOpen((v) => !v);
@@ -345,6 +363,7 @@ export default function ReportButton({ targetType, targetId, currentUid }) {
           targetType={targetType}
           targetId={targetId}
           currentUid={currentUid}
+          extraFields={extraFields}
           onClose={() => setModalOpen(false)}
         />
       )}

@@ -41,6 +41,7 @@ const NOW_TICK_MS = 60 * 1000;
 const SEEN_KEEP_MS = 48 * 60 * 60 * 1000;
 
 const MomentsContext = createContext({
+  currentUid: null,
   myIndex: null,
   myMoments: [],
   authors: [],
@@ -182,6 +183,7 @@ export function MomentsProvider({ children }) {
       });
 
     return {
+      currentUid,
       myIndex: indexes[currentUid] || null,
       myMoments: currentUid ? getActiveEntries(indexes[currentUid], now) : [],
       authors,

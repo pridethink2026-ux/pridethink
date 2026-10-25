@@ -770,6 +770,8 @@ service cloud.firestore {
       // y Firestore trata el intento como "update" en vez de "create" —
       // como acá no hay `allow update`, se rechaza solo, sin necesitar
       // leer la colección para revisar duplicados de antemano.
+      // Los reportes de momentos (targetType "moment") tienen su propio
+      // `allow create` más abajo, junto a las reglas de Momentos.
       allow create: if estaAutenticado()
         && request.resource.data.reporterUid == request.auth.uid
         && request.resource.data.status == "pending"
@@ -885,6 +887,33 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['seen'])
         && request.resource.data.seen is map
         && request.resource.data.seen.size() <= 500;
+    }
+
+    // Reportes de momentos (commit 4). Es un segundo bloque para la misma
+    // ruta que el de reports/{reportId} de arriba: Firestore permite la
+    // operación si CUALQUIERA de los dos la permite, y como ninguno tiene
+    // `allow update`, el truco del id determinista contra reportes
+    // repetidos sigue funcionando. El momento vence a las 24 h y su foto
+    // se borra a los 2 días, así que el reporte guarda una copia (autor,
+    // URL de la foto y texto) que tiene que coincidir con el momento real;
+    // solo puede reportarlo alguien que hoy lo puede ver, y no el autor.
+    function reporteDeMomentoValido(reporte) {
+      let momento = get(/databases/$(database)/documents/moments/$(reporte.targetId)).data;
+      return momento.authorId != request.auth.uid
+        && momento.expireAt > request.time
+        && puedeVerMomentosDe(momento.authorId)
+        && reporte.momentAuthorId == momento.authorId
+        && reporte.momentImageURL == momento.imageURL
+        && reporte.momentCaption == momento.caption;
+    }
+
+    match /reports/{reportId} {
+      allow create: if estaAutenticado()
+        && request.resource.data.keys().hasOnly(['reporterUid', 'targetType', 'targetId', 'reason', 'details', 'createdAt', 'status', 'momentAuthorId', 'momentImageURL', 'momentCaption'])
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.targetType == "moment"
+        && reporteDeMomentoValido(request.resource.data);
     }
 
     // --------------------------------------------------------------------

@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import Avatar from "./Avatar";
+import ReportButton from "./ReportButton";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useMoments } from "./MomentsContext";
-import { MOMENT_DURATION_MS } from "./moments";
+import { MOMENT_DURATION_MS, deleteMoment } from "./moments";
 import { timeAgo } from "./utils";
 
 /*
@@ -19,6 +20,10 @@ import { timeAgo } from "./utils";
   - Mantener presionado (más de HOLD_MS) pausa; soltar sigue.
   - ✕ o Escape cierran; ← / → del teclado retroceden/avanzan.
   - El tiempo corre recién cuando la foto terminó de cargar.
+  - En tus momentos, 🗑 los borra (pide confirmar, moments.js →
+    deleteMoment); en los ajenos, "⋮" los reporta (ReportButton.jsx,
+    targetType "moment"). Mientras está abierta la confirmación o el
+    reporte, el tiempo se detiene y tocar la foto no avanza.
 
   Props:
   - `authorUids` (array): los autores en el orden de la tira.
@@ -93,7 +98,7 @@ const styles = {
     whiteSpace: "nowrap",
   },
   time: { margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.7)" },
-  closeBtn: (hover) => ({
+  iconBtn: (hover) => ({
     width: "40px",
     height: "40px",
     borderRadius: "50%",
@@ -128,11 +133,50 @@ const styles = {
     pointerEvents: "none",
   },
   status: { color: "rgba(255,255,255,0.7)", fontSize: "14px" },
+  reportBtn: {
+    width: "40px",
+    height: "40px",
+    border: "1px solid rgba(255,255,255,0.3)",
+    background: "rgba(0,0,0,0.4)",
+    color: "#fff",
+    fontSize: "20px",
+  },
+  confirm: {
+    position: "absolute",
+    left: "12px",
+    right: "12px",
+    bottom: "16px",
+    padding: "14px",
+    borderRadius: "16px",
+    background: "rgba(20,20,20,0.92)",
+    border: "1px solid rgba(255,255,255,0.2)",
+    color: "#fff",
+    fontSize: "14px",
+    textAlign: "center",
+  },
+  confirmText: { margin: "0 0 12px" },
+  // El botón de borrar y el error usan --accent2, como el resto de los
+  // errores de la app (sobre el panel oscuro fijo de arriba).
+  confirmError: { margin: "0 0 12px", color: "var(--accent2)", fontSize: "13px" },
+  confirmRow: { display: "flex", gap: "10px" },
+  confirmBtn: (danger, hover) => ({
+    flex: 1,
+    padding: "10px",
+    borderRadius: "12px",
+    border: danger ? "none" : "1px solid rgba(255,255,255,0.3)",
+    background: danger ? "var(--accent2)" : hover ? "rgba(255,255,255,0.15)" : "transparent",
+    opacity: danger && hover ? 0.85 : 1,
+    color: danger ? "var(--bg)" : "#fff",
+    fontSize: "14px",
+    fontWeight: 600,
+    cursor: "pointer",
+  }),
 };
 
 export default function MomentViewer({ authorUids, startIndex = 0, continueToNext = false, onClose }) {
   const { t } = useLanguage();
-  const { getVisibleMoments, getMomentState, getFirstUnseenIndex, markSeen, flushSeen } = useMoments();
+  const { currentUid, myIndex, getVisibleMoments, getMomentState, getFirstUnseenIndex, markSeen, flushSeen } =
+    useMoments();
   const allUsers = useAllUsersContext();
 
   const [authorPos, setAuthorPos] = useState(startIndex);
@@ -142,15 +186,26 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [closeHover, setCloseHover] = useState(false);
+  const [deleteHover, setDeleteHover] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
+  const [cancelHover, setCancelHover] = useState(false);
+  const [yesHover, setYesHover] = useState(false);
 
   const elapsedRef = useRef(0);
   const holdTimerRef = useRef(null);
   const heldRef = useRef(false);
+  const blockedRef = useRef(false);
 
   const authorUid = authorUids[authorPos];
   const author = allUsers.find((u) => u.uid === authorUid);
   const current = moments ? moments[momentPos] : null;
   const currentId = current ? current.id : null;
+  const isMine = authorUid === currentUid;
+  // Con la confirmación de borrar o el reporte abiertos, todo se detiene.
+  const dialogOpen = reportOpen || confirmDelete;
 
   // Desde la tira: el siguiente autor que todavía tenga algo sin ver.
   // Desde un perfil (continueToNext false): cerrar.
@@ -178,8 +233,8 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
 
   // Los handlers del teclado y del temporizador viven fuera del render:
   // se leen desde un ref para usar siempre la versión con el estado actual.
-  const actionsRef = useRef({ next, prev, onClose });
-  actionsRef.current = { next, prev, onClose };
+  const actionsRef = useRef({ next, prev, onClose, dialogOpen });
+  actionsRef.current = { next, prev, onClose, dialogOpen };
 
   // Al cambiar de autor: leer sus momentos de a uno por id. Se toma la
   // lista de ids de ESE momento (no se sigue en vivo) para que la
@@ -219,6 +274,8 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     elapsedRef.current = 0;
     setProgress(0);
     setImgLoaded(false);
+    setConfirmDelete(false);
+    setDeleteError(false);
   }, [currentId]);
 
   // Un momento cuenta como visto apenas su foto se muestra.
@@ -235,7 +292,7 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
 
   // Temporizador: corre solo con la foto cargada y sin pausa.
   useEffect(() => {
-    if (!current || !imgLoaded || paused) return;
+    if (!current || !imgLoaded || paused || dialogOpen) return;
     let frame;
     const start = performance.now() - elapsedRef.current;
     const tick = (time) => {
@@ -249,10 +306,11 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [current, imgLoaded, paused]);
+  }, [current, imgLoaded, paused, dialogOpen]);
 
   useEffect(() => {
     const handleKey = (e) => {
+      if (actionsRef.current.dialogOpen) return;
       if (e.key === "Escape") actionsRef.current.onClose();
       else if (e.key === "ArrowLeft") actionsRef.current.prev();
       else if (e.key === "ArrowRight") actionsRef.current.next();
@@ -264,6 +322,9 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   useEffect(() => () => clearTimeout(holdTimerRef.current), []);
 
   const handlePointerDown = () => {
+    // Un toque que cierra el menú de reportar no cuenta como avanzar.
+    blockedRef.current = dialogOpen;
+    if (blockedRef.current) return;
     heldRef.current = false;
     clearTimeout(holdTimerRef.current);
     holdTimerRef.current = setTimeout(() => {
@@ -273,6 +334,10 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   };
 
   const handlePointerUp = (e) => {
+    if (blockedRef.current) {
+      blockedRef.current = false;
+      return;
+    }
     clearTimeout(holdTimerRef.current);
     if (heldRef.current) {
       heldRef.current = false;
@@ -288,6 +353,25 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     clearTimeout(holdTimerRef.current);
     heldRef.current = false;
     setPaused(false);
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError(false);
+    try {
+      await deleteMoment(currentUid, current, myIndex);
+      const rest = moments.filter((m) => m.id !== current.id);
+      setConfirmDelete(false);
+      if (rest.length === 0) goNextAuthor();
+      else {
+        setMoments(rest);
+        setMomentPos(Math.min(momentPos, rest.length - 1));
+      }
+    } catch {
+      setDeleteError(true);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -313,9 +397,37 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
             <p style={styles.name}>{author?.displayName || ""}</p>
             {current && <p style={styles.time}>{timeAgo(current.createdAt, t)}</p>}
           </div>
+          {current && isMine && (
+            <button
+              type="button"
+              style={styles.iconBtn(deleteHover)}
+              onClick={() => setConfirmDelete(true)}
+              onMouseEnter={() => setDeleteHover(true)}
+              onMouseLeave={() => setDeleteHover(false)}
+              aria-label={t("moments.delete")}
+              title={t("moments.delete")}
+            >
+              🗑
+            </button>
+          )}
+          {current && !isMine && (
+            <ReportButton
+              key={current.id}
+              targetType="moment"
+              targetId={current.id}
+              currentUid={currentUid}
+              extraFields={{
+                momentAuthorId: current.authorId,
+                momentImageURL: current.imageURL,
+                momentCaption: current.caption,
+              }}
+              menuButtonStyle={styles.reportBtn}
+              onOpenChange={setReportOpen}
+            />
+          )}
           <button
             type="button"
-            style={styles.closeBtn(closeHover)}
+            style={styles.iconBtn(closeHover)}
             onClick={onClose}
             onMouseEnter={() => setCloseHover(true)}
             onMouseLeave={() => setCloseHover(false)}
@@ -348,6 +460,35 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
             <span style={styles.status}>{t("moments.loading")}</span>
           )}
         </div>
+
+        {confirmDelete && (
+          <div style={styles.confirm} role="alertdialog" aria-label={t("moments.delete")}>
+            <p style={styles.confirmText}>{t("moments.deleteConfirm")}</p>
+            {deleteError && <p style={styles.confirmError}>{t("moments.errorDelete")}</p>}
+            <div style={styles.confirmRow}>
+              <button
+                type="button"
+                style={styles.confirmBtn(false, cancelHover)}
+                onClick={() => setConfirmDelete(false)}
+                onMouseEnter={() => setCancelHover(true)}
+                onMouseLeave={() => setCancelHover(false)}
+                disabled={deleting}
+              >
+                {t("moments.deleteCancel")}
+              </button>
+              <button
+                type="button"
+                style={styles.confirmBtn(true, yesHover)}
+                onClick={handleDelete}
+                onMouseEnter={() => setYesHover(true)}
+                onMouseLeave={() => setYesHover(false)}
+                disabled={deleting}
+              >
+                {deleting ? t("moments.deleting") : t("moments.deleteYes")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

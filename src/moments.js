@@ -91,3 +91,30 @@ export async function publishMoment(uid, blob, myIndex, caption = "") {
     throw err;
   }
 }
+
+// Borra uno de mis momentos antes de las 24 h (commit 4): el documento y
+// su entrada del índice en el mismo batch (el índice se borra entero si
+// era el último), y después la foto. Si borrar la foto falla, la regla de
+// ciclo de vida del bucket la borra igual en 2 días.
+export async function deleteMoment(uid, moment, myIndex) {
+  const remaining = getActiveEntries(myIndex, Date.now()).filter((e) => e.id !== moment.id);
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "moments", moment.id));
+  const indexRef = doc(db, "momentIndex", uid);
+  if (remaining.length === 0) {
+    batch.delete(indexRef);
+  } else {
+    const times = {};
+    remaining.forEach((e) => {
+      times[e.id] = { createdAt: e.createdAt, expireAt: e.expireAt };
+    });
+    batch.set(indexRef, {
+      ids: remaining.map((e) => e.id),
+      times,
+      // El índice vive lo que viva su momento más nuevo que queda.
+      expireAt: Timestamp.fromMillis(Math.max(...remaining.map((e) => e.expireAt))),
+    });
+  }
+  await batch.commit();
+  deleteObject(ref(storage, moment.storagePath)).catch(() => {});
+}
