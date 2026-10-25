@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import Avatar from "./Avatar";
 import ImageEditor from "./ImageEditor";
+import MomentTextEditor from "./MomentTextEditor";
 import MomentViewer from "./MomentViewer";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
@@ -23,7 +24,9 @@ import { MAX_ACTIVE_MOMENTS, MomentLimitError, publishMoment } from "./moments";
 
   Publicar: elegir foto (misma validación de tipo y 10 MB que
   MultiImageUploader.jsx) → ImageEditor (girar/recortar, 1080 px de lado
-  como máximo) → publishMoment (moments.js). Con 30 momentos activos se
+  como máximo) → MomentTextEditor (texto encima, opcional; con perfil
+  privado avisa ahí mismo que solo lo verás tú) → publishMoment
+  (moments.js). Con 30 momentos activos se
   avisa en vez de intentar.
 */
 
@@ -110,6 +113,7 @@ export default function MomentsStrip({ currentUid, myProfile }) {
   const allUsers = useAllUsersContext();
   const fileInputRef = useRef(null);
   const [editingFile, setEditingFile] = useState(null);
+  const [textBlob, setTextBlob] = useState(null); // foto ya recortada, esperando el paso de texto
   const [publishing, setPublishing] = useState(false);
   const [message, setMessage] = useState(null); // { text, isError }
   const [viewer, setViewer] = useState(null); // { authorUids, startIndex }
@@ -143,11 +147,16 @@ export default function MomentsStrip({ currentUid, myProfile }) {
     }
   };
 
-  const handleEdited = async (blob) => {
+  const handleEdited = (blob) => {
     setEditingFile(null);
+    setTextBlob(blob);
+  };
+
+  const handleTextDone = async (blob, caption) => {
+    setTextBlob(null);
     setPublishing(true);
     try {
-      await publishMoment(currentUid, blob, myIndex);
+      await publishMoment(currentUid, blob, myIndex, caption);
       setMessage({
         text: myProfile?.isPrivate ? t("moments.privateNotice") : t("moments.published"),
         isError: !!myProfile?.isPrivate,
@@ -241,6 +250,19 @@ export default function MomentsStrip({ currentUid, myProfile }) {
           onCancel={() => setEditingFile(null)}
           onError={() => {
             setEditingFile(null);
+            setMessage({ text: t("image.errorRead"), isError: true });
+          }}
+        />
+      )}
+
+      {textBlob && (
+        <MomentTextEditor
+          blob={textBlob}
+          isPrivate={!!myProfile?.isPrivate}
+          onConfirm={handleTextDone}
+          onCancel={() => setTextBlob(null)}
+          onError={() => {
+            setTextBlob(null);
             setMessage({ text: t("image.errorRead"), isError: true });
           }}
         />

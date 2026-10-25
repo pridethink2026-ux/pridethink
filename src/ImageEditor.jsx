@@ -95,7 +95,8 @@ function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
 
-function useViewport() {
+// Exportada: la reusa MomentTextEditor.jsx (punto 66).
+export function useViewport() {
   const read = () => ({ w: window.innerWidth, h: window.innerHeight });
   const [vp, setVp] = useState(read);
   useEffect(() => {
@@ -185,7 +186,9 @@ const styles = {
   loading: { color: "#fff", fontFamily: "var(--font-body)", fontSize: "14px" },
 };
 
-function buttonStyle({ hovered, primary, active, disabled }) {
+// Exportada: la reusa MomentTextEditor.jsx (punto 66), para que los dos
+// pasos del editor de Momentos tengan los mismos botones.
+export function buttonStyle({ hovered, primary, active, disabled }) {
   const base = {
     padding: "9px 16px",
     borderRadius: "999px",

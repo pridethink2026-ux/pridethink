@@ -11,8 +11,8 @@ import { db, storage } from "./firebase";
   Datos (ver firestore.rules y storage.rules para las reglas):
   - moments/{momentId} → { authorId, imageURL, storagePath, caption,
     createdAt, expireAt }. "caption" es el texto escrito sobre la foto en
-    texto plano (accesibilidad y reportes); vacío mientras no exista el
-    paso de texto.
+    texto plano (accesibilidad y reportes), lo arma MomentTextEditor.jsx;
+    vacío si no se escribió nada.
   - momentIndex/{authorUid} → { ids, times: { [id]: { createdAt,
     expireAt } } en milisegundos, expireAt }. Es lo que escucha
     MomentsContext.jsx para saber quién tiene momentos activos sin hacer
@@ -28,6 +28,7 @@ import { db, storage } from "./firebase";
 export const MOMENT_TTL_MS = 24 * 60 * 60 * 1000;
 export const MOMENT_DURATION_MS = 17 * 1000;
 export const MAX_ACTIVE_MOMENTS = 30;
+const MAX_CAPTION_LENGTH = 600; // mismo tope que firestore.rules
 
 // Entradas del índice que siguen activas a la hora `now`, de la más vieja
 // a la más nueva: [{ id, createdAt, expireAt }].
@@ -42,10 +43,11 @@ export function getActiveEntries(index, now) {
 
 export class MomentLimitError extends Error {}
 
-// Sube la foto (Blob JPEG que devuelve ImageEditor) y publica el momento.
+// Sube la foto (Blob JPEG que devuelve MomentTextEditor, con el texto ya
+// quemado) y publica el momento con su texto en plano (`caption`).
 // `myIndex` es mi propio momentIndex tal como lo tiene MomentsContext:
 // se reescribe entero, sin las entradas vencidas.
-export async function publishMoment(uid, blob, myIndex) {
+export async function publishMoment(uid, blob, myIndex, caption = "") {
   const now = Date.now();
   const active = getActiveEntries(myIndex, now);
   if (active.length >= MAX_ACTIVE_MOMENTS) throw new MomentLimitError();
@@ -71,7 +73,7 @@ export async function publishMoment(uid, blob, myIndex) {
       authorId: uid,
       imageURL,
       storagePath,
-      caption: "",
+      caption: caption.slice(0, MAX_CAPTION_LENGTH),
       createdAt: serverTimestamp(),
       expireAt: Timestamp.fromMillis(expireAt),
     });

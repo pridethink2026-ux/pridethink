@@ -152,6 +152,26 @@ export const THEMES = {
   },
 };
 
+// Colores del texto que se escribe sobre la foto de un Momento (punto 66,
+// MomentTextEditor.jsx). Fijos a propósito, no del tema: el texto queda
+// "quemado" en la imagen con canvas (que no entiende var(--...)) y tiene
+// que verse igual para quien lo mire, con cualquier tema. Blanco, negro y
+// los colores de la bandera arcoíris y de la trans. "outline" es el
+// contorno que lo hace legible sobre cualquier foto (oscuro para colores
+// claros, claro para colores oscuros).
+export const MOMENT_TEXT_COLORS = [
+  { key: "white", value: "#ffffff", outline: "rgba(0,0,0,0.75)" },
+  { key: "black", value: "#111111", outline: "rgba(255,255,255,0.8)" },
+  { key: "red", value: "#e40303", outline: "rgba(255,255,255,0.8)" },
+  { key: "orange", value: "#ff8c00", outline: "rgba(0,0,0,0.75)" },
+  { key: "yellow", value: "#ffed00", outline: "rgba(0,0,0,0.75)" },
+  { key: "green", value: "#008026", outline: "rgba(255,255,255,0.8)" },
+  { key: "blue", value: "#004dff", outline: "rgba(255,255,255,0.8)" },
+  { key: "violet", value: "#750787", outline: "rgba(255,255,255,0.8)" },
+  { key: "pink", value: "#f5a9b8", outline: "rgba(0,0,0,0.75)" },
+  { key: "lightBlue", value: "#5bcefa", outline: "rgba(0,0,0,0.75)" },
+];
+
 export const ROTATIVO_KEY = "rotativo";
 const STORAGE_KEY = "pridethink-theme";
 
