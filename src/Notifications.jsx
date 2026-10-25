@@ -24,7 +24,7 @@ import { useLanguage } from "./LanguageContext";
 
   Estructura en Firestore:
   - "notifications/{uid}/items/{itemId}"
-      -> { type: 'like' | 'comment' | 'message' | 'follow' | 'mention' | 'newProduct', fromUid, fromName, fromIdentity, createdAt, read, postId?, productId?, productTitle? }
+      -> { type: 'like' | 'comment' | 'message' | 'follow' | 'mention' | 'newProduct' | 'momentLike', fromUid, fromName, fromIdentity, createdAt, read, postId?, productId?, productTitle?, momentId? }
       -> "postId" solo lo trae "mention" (ver utils.notify y Mentions.jsx):
          al tocar esa notificación se navega directo al post en vez de al
          perfil de quien la generó.
@@ -33,6 +33,10 @@ import { useLanguage } from "./LanguageContext";
          seguidor del vendedor cuando un producto pasa de borrador a
          publicado) — al tocar esa notificación se navega directo al
          producto, mismo criterio que "mention" con el post.
+      -> "momentId" solo lo trae "momentLike" (punto 66, commit 6: la
+         primera estrella que alguien le da a uno de tus momentos) — al
+         tocarla se abre ese momento (App.js -> MomentViewer con
+         startMomentId), o el aviso de que ya no está disponible si venció.
       -> "message" no trae ningún campo extra: al tocarla se abre la
          conversación con "fromUid" (App.js -> openChat -> Chat.jsx
          initialContactUid).
@@ -63,6 +67,7 @@ const LABELS = {
   // publicó (no se vuelve a leer el producto en vivo), mismo criterio que
   // "productTitle" en giftShares/{giftId}.
   newProduct: (n, t) => t("notifications.newProduct", { name: n.fromName, title: n.productTitle }),
+  momentLike: (n, t) => t("notifications.momentLike", { name: n.fromName }),
 };
 
 const styles = {
@@ -224,7 +229,7 @@ function usePhotoByUid() {
   }, [allUsers]);
 }
 
-function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduct, onOpenChat, dropdown }) {
+function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduct, onOpenChat, onOpenMoment, dropdown }) {
   const { t } = useLanguage();
   const handleClick = () => {
     // Mensaje nuevo (texto, audio, imagen, sticker, post compartido o
@@ -245,6 +250,10 @@ function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduc
       onOpenProduct(n.productId);
       return;
     }
+    if (n.type === "momentLike" && n.momentId && onOpenMoment) {
+      onOpenMoment(n.momentId);
+      return;
+    }
     if (n.fromUid) onOpenProfile?.(n.fromUid);
   };
   return (
@@ -263,7 +272,7 @@ function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduc
   );
 }
 
-export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct, onOpenChat }) {
+export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct, onOpenChat, onOpenMoment }) {
   const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -316,6 +325,7 @@ export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct
               onOpenPost={onOpenPost}
               onOpenProduct={onOpenProduct}
               onOpenChat={onOpenChat}
+              onOpenMoment={onOpenMoment}
               dropdown
             />
           ))}
@@ -326,7 +336,7 @@ export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct
 }
 
 // Misma lista, como pantalla completa para la barra de navegación inferior en móvil.
-export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct, onOpenChat }) {
+export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct, onOpenChat, onOpenMoment }) {
   const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -368,6 +378,7 @@ export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct, 
             onOpenPost={onOpenPost}
             onOpenProduct={onOpenProduct}
             onOpenChat={onOpenChat}
+            onOpenMoment={onOpenMoment}
             dropdown={false}
           />
         ))}

@@ -33,6 +33,8 @@ export function useIsMobile(breakpoint = 700) {
 // título sin tener que leerlo de nuevo — ver CreateProductScreen.jsx/
 // MyStoreScreen.jsx (quién las crea) y Notifications.jsx (cómo se
 // muestran y a dónde navegan).
+// "momentId" es opcional (solo el tipo "momentLike", punto 66): mismo
+// criterio, sirve para abrir ese momento al tocar la notificación.
 //
 // "expireAt" (punto 64): la política TTL de Firestore sobre el grupo de
 // colecciones "items" borra sola cada notificación cuando llega esa fecha
@@ -46,7 +48,7 @@ const NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function notify(
   targetUid,
-  { type, fromUid, fromName, fromIdentity, postId, productId, productTitle }
+  { type, fromUid, fromName, fromIdentity, postId, productId, productTitle, momentId }
 ) {
   if (!targetUid || targetUid === fromUid) return;
   const data = {
@@ -61,6 +63,7 @@ export async function notify(
   if (postId) data.postId = postId;
   if (productId) data.productId = productId;
   if (productTitle) data.productTitle = productTitle;
+  if (momentId) data.momentId = momentId;
   await addDoc(collection(db, "notifications", targetUid, "items"), data);
 }
 

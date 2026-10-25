@@ -1,4 +1,4 @@
-import { Timestamp, collection, doc, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
+import { Timestamp, collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, storage } from "./firebase";
 
@@ -17,8 +17,10 @@ import { db, storage } from "./firebase";
     expireAt } } en milisegundos, expireAt }. Es lo que escucha
     MomentsContext.jsx para saber quién tiene momentos activos sin hacer
     consultas.
-  - moments/{momentId}/momentViewers/{viewerUid} → { viewedAt, expireAt }:
-    quién vio cada momento, solo lo lee el autor (commit 5).
+  - moments/{momentId}/momentViewers/{viewerUid} → { viewedAt, expireAt,
+    liked?, likedAt?, firstLikedAt? }: quién vio cada momento (commit 5) y
+    quién le dio la estrella (commit 6). Lo lee el autor, y cada persona
+    su propio documento.
   - Storage: momentImages/{uid}/{momentId}.jpg.
 
   "expireAt" lo calcula el cliente (Date.now() + 24 h): firestore.rules
@@ -56,6 +58,35 @@ export function registerView(uid, momentId, expireAt) {
     viewedAt: serverTimestamp(),
     expireAt,
   }).catch(() => {});
+}
+
+// Pone o quita mi estrella en un momento ajeno (commit 6), en el mismo
+// documento de momentViewers. `myView` es ese documento tal como lo tiene
+// el visor (null si todavía no existe). Devuelve true si fue mi PRIMERA
+// estrella en ese momento (firstLikedAt), la única que notifica al autor.
+export async function setMomentLike(uid, moment, liked, myView) {
+  const viewRef = doc(db, "moments", moment.id, "momentViewers", uid);
+  if (!myView) {
+    if (!liked) return false;
+    try {
+      await setDoc(viewRef, {
+        viewedAt: serverTimestamp(),
+        expireAt: moment.expireAt,
+        liked: true,
+        likedAt: serverTimestamp(),
+        firstLikedAt: serverTimestamp(),
+      });
+      return true;
+    } catch {
+      // registerView pudo llegar antes que esto: el documento ya existe
+      // (sin estrella), así que se sigue como una actualización.
+    }
+  }
+  const first = liked && !myView?.firstLikedAt;
+  const data = liked ? { liked: true, likedAt: serverTimestamp() } : { liked: false };
+  if (first) data.firstLikedAt = serverTimestamp();
+  await updateDoc(viewRef, data);
+  return first;
 }
 
 // Sube la foto (Blob JPEG que devuelve MomentTextEditor, con el texto ya

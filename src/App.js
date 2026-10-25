@@ -12,6 +12,7 @@ import PostView from "./PostView";
 import GroupView from "./GroupView";
 import EventView from "./EventView";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
+import MomentViewer from "./MomentViewer";
 import StoreScreen from "./StoreScreen";
 import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
@@ -536,6 +537,10 @@ function App() {
   // notificación de mensaje (Notifications.jsx -> onOpenChat). Chat.jsx lo
   // consume una vez (onConsumeInitialContactUid).
   const [chatContactUid, setChatContactUid] = useState(null);
+  // Momento propio a abrir al tocar una notificación "momentLike" (punto
+  // 66, commit 6). El visor se abre encima de cualquier pantalla, sin
+  // cambiar de pestaña.
+  const [momentToOpen, setMomentToOpen] = useState(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const { unreadCount } = useNotifications(currentUid);
 
@@ -693,6 +698,7 @@ function App() {
         onOpenPost={openPost}
         onOpenProduct={openStoreProduct}
         onOpenChat={openChat}
+        onOpenMoment={setMomentToOpen}
       />
     );
   } else {
@@ -740,6 +746,7 @@ function App() {
               onOpenPost={openPost}
               onOpenProduct={openStoreProduct}
               onOpenChat={openChat}
+              onOpenMoment={setMomentToOpen}
             />
           )}
         </div>
@@ -767,6 +774,15 @@ function App() {
       >
         {content}
       </div>
+
+      {currentUid && momentToOpen && (
+        <MomentViewer
+          key={momentToOpen}
+          authorUids={[currentUid]}
+          startMomentId={momentToOpen}
+          onClose={() => setMomentToOpen(null)}
+        />
+      )}
 
       {isMobile && (
         <BottomNav

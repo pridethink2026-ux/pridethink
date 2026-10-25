@@ -9,8 +9,8 @@ import { isBlockedEitherWay } from "./Blocks";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useMoments } from "./MomentsContext";
-import { MOMENT_DURATION_MS, deleteMoment, registerView } from "./moments";
-import { timeAgo } from "./utils";
+import { MOMENT_DURATION_MS, deleteMoment, registerView, setMomentLike } from "./moments";
+import { notify, timeAgo } from "./utils";
 
 /*
   MomentViewer
@@ -33,6 +33,11 @@ import { timeAgo } from "./utils";
     lista en vivo; N cuenta solo a quienes aparecen en ella (sin bloqueos
     en ninguna dirección). La primera vez que miras un momento ajeno en
     este dispositivo se avisa que el autor puede ver quién lo vio.
+  - Estrella (commit 6): en los momentos ajenos, ⭐ la pone o la quita
+    (moments.js → setMomentLike, sobre tu propio documento de
+    momentViewers, que se escucha en vivo); solo la primera estrella
+    notifica al autor (notify tipo "momentLike"). En tus momentos el botón
+    pasa a "👁 N · ⭐ M", con el mismo filtro de la lista.
 
   Props:
   - `authorUids` (array): los autores en el orden de la tira.
@@ -41,6 +46,9 @@ import { timeAgo } from "./utils";
     pasar al siguiente de `authorUids` que tenga momentos sin ver
     (abierto desde la tira) o cerrar (abierto desde un perfil). Empieza
     siempre por el primer momento sin ver de cada autor.
+  - `startMomentId` (opcional): abrir en ese momento del primer autor (lo
+    usa App.js al tocar una notificación "momentLike"). Si ya no está
+    activo, se muestra "Este momento ya no está disponible".
   - `onClose()` (obligatoria).
 
   Los ids salen de MomentsContext (momentIndex) y cada momento se lee de a
@@ -189,6 +197,20 @@ const styles = {
     padding: "8px 12px 14px",
     minHeight: "40px",
   },
+  likeBtn: (liked, hover) => ({
+    width: "44px",
+    height: "44px",
+    borderRadius: "50%",
+    border: "1px solid rgba(255,255,255,0.3)",
+    background: hover ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.4)",
+    color: "#fff",
+    fontSize: liked ? "22px" : "24px",
+    lineHeight: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+  }),
   viewersBtn: (hover) => ({
     padding: "8px 16px",
     borderRadius: "999px",
@@ -217,7 +239,7 @@ const styles = {
   }),
 };
 
-export default function MomentViewer({ authorUids, startIndex = 0, continueToNext = false, onClose }) {
+export default function MomentViewer({ authorUids, startIndex = 0, continueToNext = false, startMomentId, onClose }) {
   const { t } = useLanguage();
   const {
     currentUid,
@@ -251,11 +273,16 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const [viewersHover, setViewersHover] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeHover, setNoticeHover] = useState(false);
+  const [myView, setMyView] = useState(undefined); // mi documento de momentViewers: undefined = cargando, null = no existe
+  const [likeBusy, setLikeBusy] = useState(false);
+  const [likeHover, setLikeHover] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
 
   const elapsedRef = useRef(0);
   const holdTimerRef = useRef(null);
   const heldRef = useRef(false);
   const blockedRef = useRef(false);
+  const startMomentRef = useRef(startMomentId); // se usa una sola vez, en el primer autor
 
   const authorUid = authorUids[authorPos];
   const author = allUsers.find((u) => u.uid === authorUid);
@@ -277,6 +304,7 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
       .filter((v) => usersMap[v.uid] && !isBlockedEitherWay(blockedByMe, blockedMe, v.uid))
       .map((v) => ({ ...v, user: usersMap[v.uid] }));
   }, [viewerDocs, allUsers, blockedByMe, blockedMe]);
+  const likeCount = viewers.filter((v) => v.liked).length;
 
   // Desde la tira: el siguiente autor que todavía tenga algo sin ver.
   // Desde un perfil (continueToNext false): cerrar.
@@ -327,7 +355,17 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     ).then((docs) => {
       if (cancelled) return;
       const readable = docs.filter(Boolean);
-      if (readable.length === 0) actionsRef.current.next();
+      const wanted = startMomentRef.current;
+      startMomentRef.current = null;
+      if (wanted) {
+        // Desde una notificación: ese momento puntual, o el aviso si venció.
+        const pos = readable.findIndex((m) => m.id === wanted);
+        if (pos === -1) setUnavailable(true);
+        else {
+          setMomentPos(pos);
+          setMoments(readable);
+        }
+      } else if (readable.length === 0) actionsRef.current.next();
       else {
         setMomentPos(getFirstUnseenIndex(authorUid, readable.map((m) => ({ createdAt: m.indexCreatedAt }))));
         setMoments(readable);
@@ -357,7 +395,7 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     const unsub = onSnapshot(
       collection(db, "moments", currentId, "momentViewers"),
       (snap) => {
-        const list = snap.docs.map((d) => ({ uid: d.id, viewedAt: d.data().viewedAt }));
+        const list = snap.docs.map((d) => ({ uid: d.id, viewedAt: d.data().viewedAt, liked: d.data().liked === true }));
         list.sort((a, b) => (b.viewedAt?.toMillis?.() || 0) - (a.viewedAt?.toMillis?.() || 0));
         setViewerDocs(list);
       },
@@ -365,6 +403,19 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     );
     return unsub;
   }, [currentId, isMine]);
+
+  // En momentos ajenos: mi propio documento de momentViewers, para saber
+  // si ya le di la estrella (y si ya existe el documento).
+  useEffect(() => {
+    setMyView(undefined);
+    if (!currentId || isMine || !currentUid) return;
+    const unsub = onSnapshot(
+      doc(db, "moments", currentId, "momentViewers", currentUid),
+      (snap) => setMyView(snap.exists() ? snap.data() : null),
+      () => setMyView(null)
+    );
+    return unsub;
+  }, [currentId, isMine, currentUid]);
 
   // Un momento cuenta como visto apenas su foto se muestra. Si es ajeno y
   // no lo habías visto, además te registra en su lista de quién vio (y la
@@ -448,6 +499,30 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     clearTimeout(holdTimerRef.current);
     heldRef.current = false;
     setPaused(false);
+  };
+
+  const toggleLike = async () => {
+    if (likeBusy || myView === undefined || !current) return;
+    const moment = current;
+    setLikeBusy(true);
+    try {
+      const first = await setMomentLike(currentUid, moment, !myView?.liked, myView);
+      if (first) {
+        const me = allUsers.find((u) => u.uid === currentUid);
+        notify(moment.authorId, {
+          type: "momentLike",
+          fromUid: currentUid,
+          fromName: me?.displayName || "Alguien",
+          fromIdentity: me?.identity || "",
+          momentId: moment.id,
+        }).catch(() => {});
+      }
+    } catch {
+      // Sin permiso (venció o cambió la privacidad o un bloqueo): la
+      // estrella simplemente no cambia.
+    } finally {
+      setLikeBusy(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -552,7 +627,7 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
               onError={next}
             />
           ) : (
-            <span style={styles.status}>{t("moments.loading")}</span>
+            <span style={styles.status}>{unavailable ? t("moments.unavailable") : t("moments.loading")}</span>
           )}
         </div>
 
@@ -564,9 +639,24 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
               onClick={() => setViewersOpen(true)}
               onMouseEnter={() => setViewersHover(true)}
               onMouseLeave={() => setViewersHover(false)}
-              aria-label={t("moments.viewersTitle", { n: viewers.length })}
+              aria-label={`${t("moments.viewersTitle", { n: viewers.length })} · ${t("moments.likesCount", { n: likeCount })}`}
             >
-              👁 {viewers.length}
+              👁 {viewers.length} · ⭐ {likeCount}
+            </button>
+          )}
+          {current && !isMine && (
+            <button
+              type="button"
+              style={styles.likeBtn(!!myView?.liked, likeHover)}
+              onClick={toggleLike}
+              onMouseEnter={() => setLikeHover(true)}
+              onMouseLeave={() => setLikeHover(false)}
+              disabled={likeBusy || myView === undefined}
+              aria-pressed={!!myView?.liked}
+              aria-label={myView?.liked ? t("moments.unlike") : t("moments.like")}
+              title={myView?.liked ? t("moments.unlike") : t("moments.like")}
+            >
+              {myView?.liked ? "⭐" : "☆"}
             </button>
           )}
         </div>

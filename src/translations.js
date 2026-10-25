@@ -408,6 +408,7 @@ export const translations = {
     "notifications.follow": "{name} empezó a seguirte",
     "notifications.mention": "{name} te mencionó",
     "notifications.newProduct": "{name} publicó un nuevo producto: {title}",
+    "notifications.momentLike": "{name} le dio una estrella a tu momento",
     "notifications.generic": "Notificación",
 
     // Errores de Firebase Auth (login/registro/recuperar contraseña)
@@ -454,6 +455,11 @@ export const translations = {
     "moments.viewersNotice": "Quien publica un momento puede ver quién lo vio. Tu nombre aparecerá en esa lista.",
     "moments.viewersNoticeOk": "Entendido",
     "moments.viewersHint": "Podrás ver quién vio tu momento.",
+    "moments.like": "Darle una estrella",
+    "moments.unlike": "Quitar la estrella",
+    "moments.likedBy": "Le dio una estrella",
+    "moments.likesCount": "{n} estrellas",
+    "moments.unavailable": "Este momento ya no está disponible.",
     "momentText.title": "Texto sobre la foto",
     "momentText.placeholder": "Escribe algo...",
     "momentText.add": "Agregar texto",
@@ -1004,6 +1010,7 @@ export const translations = {
     "notifications.follow": "{name} started following you",
     "notifications.mention": "{name} mentioned you",
     "notifications.newProduct": "{name} listed a new product: {title}",
+    "notifications.momentLike": "{name} starred your moment",
     "notifications.generic": "Notification",
 
     // Firebase Auth errors (login/signup/forgot password)
@@ -1049,6 +1056,11 @@ export const translations = {
     "moments.viewersNotice": "Whoever posts a moment can see who viewed it. Your name will appear on that list.",
     "moments.viewersNoticeOk": "Got it",
     "moments.viewersHint": "You'll be able to see who viewed your moment.",
+    "moments.like": "Star this moment",
+    "moments.unlike": "Remove star",
+    "moments.likedBy": "Starred it",
+    "moments.likesCount": "{n} stars",
+    "moments.unavailable": "This moment is no longer available.",
     "momentText.title": "Text on the photo",
     "momentText.placeholder": "Write something...",
     "momentText.add": "Add text",

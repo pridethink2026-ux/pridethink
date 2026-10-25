@@ -13,7 +13,8 @@ import { timeAgo } from "./utils";
   acá.
 
   Props:
-  - `viewers`: [{ uid, viewedAt, user }], el más reciente primero.
+  - `viewers`: [{ uid, viewedAt, liked, user }], el más reciente primero.
+    Quien le dio la estrella (commit 6) lleva ⭐ al lado.
   - `onClose()`.
 
   Usa los colores del tema (es un panel normal, como el de ReportButton),
@@ -86,6 +87,7 @@ const styles = {
     whiteSpace: "nowrap",
   },
   time: { margin: "1px 0 0", fontSize: "12px", color: "var(--text-muted)" },
+  star: { fontSize: "18px", flexShrink: 0 },
   empty: {
     textAlign: "center",
     color: "var(--text-muted)",
@@ -144,6 +146,11 @@ export default function MomentViewersSheet({ viewers, onClose }) {
                 <p style={styles.name}>{v.user.displayName || t("chat.defaultName")}</p>
                 <p style={styles.time}>{timeAgo(v.viewedAt, t)}</p>
               </div>
+              {v.liked && (
+                <span style={styles.star} role="img" aria-label={t("moments.likedBy")} title={t("moments.likedBy")}>
+                  ⭐
+                </span>
+              )}
             </div>
           ))}
         </div>
