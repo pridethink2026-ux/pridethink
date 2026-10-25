@@ -1,6 +1,7 @@
-import { Timestamp, collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { Timestamp, addDoc, collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, storage } from "./firebase";
+import { getChatId } from "./Chat";
 
 /*
   moments.js
@@ -33,6 +34,7 @@ export const MOMENT_TTL_MS = 24 * 60 * 60 * 1000;
 export const MOMENT_DURATION_MS = 17 * 1000;
 export const MAX_ACTIVE_MOMENTS = 30;
 const MAX_CAPTION_LENGTH = 600; // mismo tope que firestore.rules
+export const MAX_REPLY_LENGTH = 1000; // mismo tope que firestore.rules (respuestaAMomentoValida)
 
 // Entradas del índice que siguen activas a la hora `now`, de la más vieja
 // a la más nueva: [{ id, createdAt, expireAt }].
@@ -136,6 +138,26 @@ export async function publishMoment(uid, blob, myIndex, caption = "") {
     deleteObject(fileRef).catch(() => {});
     throw err;
   }
+}
+
+// Responde un momento ajeno por chat (commit 7): mensaje tipo
+// "moment_reply" en la conversación con el autor (mismo chatId y mismo
+// esqueleto que SharePostModal.jsx). Guarda una copia de la miniatura y
+// del vencimiento: Chat.jsx deja de mostrar la foto cuando el momento
+// vence, sin volver a leerlo. firestore.rules (respuestaAMomentoValida)
+// comprueba que la copia coincida y que el momento se pueda ver hoy.
+export async function sendMomentReply(uid, moment, text) {
+  const chatId = getChatId(uid, moment.authorId);
+  await setDoc(doc(db, "chats", chatId), { participants: [uid, moment.authorId] }, { merge: true });
+  await addDoc(collection(db, "chats", chatId, "messages"), {
+    senderId: uid,
+    type: "moment_reply",
+    text: text.slice(0, MAX_REPLY_LENGTH),
+    momentId: moment.id,
+    momentImageURL: moment.imageURL,
+    momentExpireAt: moment.expireAt,
+    createdAt: serverTimestamp(),
+  });
 }
 
 // Borra uno de mis momentos antes de las 24 h (commit 4): el documento y

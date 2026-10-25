@@ -9,7 +9,14 @@ import { isBlockedEitherWay } from "./Blocks";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useMoments } from "./MomentsContext";
-import { MOMENT_DURATION_MS, deleteMoment, registerView, setMomentLike } from "./moments";
+import {
+  MAX_REPLY_LENGTH,
+  MOMENT_DURATION_MS,
+  deleteMoment,
+  registerView,
+  sendMomentReply,
+  setMomentLike,
+} from "./moments";
 import { notify, timeAgo } from "./utils";
 
 /*
@@ -38,6 +45,12 @@ import { notify, timeAgo } from "./utils";
     momentViewers, que se escucha en vivo); solo la primera estrella
     notifica al autor (notify tipo "momentLike"). En tus momentos el botón
     pasa a "👁 N · ⭐ M", con el mismo filtro de la lista.
+  - Responder (commit 7): en los momentos ajenos, el campo de abajo manda
+    la respuesta como mensaje al chat con el autor (moments.js →
+    sendMomentReply, notificación "message"). Mientras el campo tiene el
+    foco o se está enviando, el tiempo se pausa. Con perfil privado se
+    avisa que el autor no podrá contestarte por chat (Chat.jsx no muestra
+    perfiles privados).
 
   Props:
   - `authorUids` (array): los autores en el orden de la tira.
@@ -198,6 +211,7 @@ const styles = {
     minHeight: "40px",
   },
   likeBtn: (liked, hover) => ({
+    flexShrink: 0,
     width: "44px",
     height: "44px",
     borderRadius: "50%",
@@ -210,6 +224,45 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
+  }),
+  replyRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    width: "100%",
+  },
+  replyInput: {
+    flex: 1,
+    minWidth: 0,
+    height: "44px",
+    boxSizing: "border-box",
+    padding: "0 16px",
+    borderRadius: "999px",
+    border: "1px solid rgba(255,255,255,0.4)",
+    background: "rgba(0,0,0,0.4)",
+    color: "#fff",
+    fontSize: "14px",
+    fontFamily: "inherit",
+    outline: "none",
+  },
+  sendBtn: (hover, disabled) => ({
+    height: "44px",
+    padding: "0 16px",
+    borderRadius: "999px",
+    border: "none",
+    background: "var(--accent)",
+    opacity: disabled ? 0.5 : hover ? 0.85 : 1,
+    color: "var(--bg)",
+    fontSize: "14px",
+    fontWeight: 600,
+    cursor: disabled ? "default" : "pointer",
+    flexShrink: 0,
+  }),
+  replyNote: (isError) => ({
+    margin: "0 12px 6px",
+    fontSize: "12px",
+    textAlign: "center",
+    color: isError ? "var(--accent2)" : "rgba(255,255,255,0.8)",
   }),
   viewersBtn: (hover) => ({
     padding: "8px 16px",
@@ -277,11 +330,17 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const [likeBusy, setLikeBusy] = useState(false);
   const [likeHover, setLikeHover] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [replyFocused, setReplyFocused] = useState(false);
+  const [replySending, setReplySending] = useState(false);
+  const [replyStatus, setReplyStatus] = useState(null); // null | "sent" | "error"
+  const [sendHover, setSendHover] = useState(false);
 
   const elapsedRef = useRef(0);
   const holdTimerRef = useRef(null);
   const heldRef = useRef(false);
   const blockedRef = useRef(false);
+  const replyInputRef = useRef(null);
   const startMomentRef = useRef(startMomentId); // se usa una sola vez, en el primer autor
 
   const authorUid = authorUids[authorPos];
@@ -289,9 +348,10 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const current = moments ? moments[momentPos] : null;
   const currentId = current ? current.id : null;
   const isMine = authorUid === currentUid;
-  // Con la confirmación de borrar, el reporte, la lista de quién vio o el
-  // aviso abiertos, todo se detiene.
-  const dialogOpen = reportOpen || confirmDelete || viewersOpen || noticeOpen;
+  const me = allUsers.find((u) => u.uid === currentUid);
+  // Con la confirmación de borrar, el reporte, la lista de quién vio, el
+  // aviso abiertos, o mientras escribes una respuesta, todo se detiene.
+  const dialogOpen = reportOpen || confirmDelete || viewersOpen || noticeOpen || replyFocused || replySending;
 
   // La lista de quién vio, con el mismo filtro que el número del botón:
   // solo personas que existen y sin bloqueo en ninguna dirección.
@@ -386,6 +446,8 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     setConfirmDelete(false);
     setDeleteError(false);
     setViewersOpen(false);
+    setReplyText("");
+    setReplyStatus(null);
   }, [currentId]);
 
   // En mis momentos: quién lo vio, en vivo, el más reciente primero.
@@ -508,7 +570,6 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     try {
       const first = await setMomentLike(currentUid, moment, !myView?.liked, myView);
       if (first) {
-        const me = allUsers.find((u) => u.uid === currentUid);
         notify(moment.authorId, {
           type: "momentLike",
           fromUid: currentUid,
@@ -522,6 +583,32 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
       // estrella simplemente no cambia.
     } finally {
       setLikeBusy(false);
+    }
+  };
+
+  const handleSendReply = async () => {
+    const text = replyText.trim();
+    if (!text || replySending || !current) return;
+    const moment = current;
+    setReplySending(true);
+    setReplyStatus(null);
+    try {
+      await sendMomentReply(currentUid, moment, text);
+      notify(moment.authorId, {
+        type: "message",
+        fromUid: currentUid,
+        fromName: me?.displayName || "Alguien",
+        fromIdentity: me?.identity || "",
+      }).catch(() => {});
+      setReplyText("");
+      setReplyStatus("sent");
+      replyInputRef.current?.blur();
+    } catch {
+      // Venció, se borró o cambió el permiso mientras escribías: el texto
+      // queda en el campo.
+      setReplyStatus("error");
+    } finally {
+      setReplySending(false);
     }
   };
 
@@ -631,6 +718,17 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
           )}
         </div>
 
+        {current && !isMine && replyStatus && (
+          <p style={styles.replyNote(replyStatus === "error")} role="status">
+            {replyStatus === "sent" ? t("moments.replySent") : t("moments.replyError")}
+          </p>
+        )}
+        {current && !isMine && replyFocused && me?.isPrivate && (
+          <p style={styles.replyNote(false)}>
+            {t("moments.replyPrivateNotice", { name: author?.displayName || "" })}
+          </p>
+        )}
+
         <div style={styles.footer}>
           {current && isMine && (
             <button
@@ -645,19 +743,57 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
             </button>
           )}
           {current && !isMine && (
-            <button
-              type="button"
-              style={styles.likeBtn(!!myView?.liked, likeHover)}
-              onClick={toggleLike}
-              onMouseEnter={() => setLikeHover(true)}
-              onMouseLeave={() => setLikeHover(false)}
-              disabled={likeBusy || myView === undefined}
-              aria-pressed={!!myView?.liked}
-              aria-label={myView?.liked ? t("moments.unlike") : t("moments.like")}
-              title={myView?.liked ? t("moments.unlike") : t("moments.like")}
-            >
-              {myView?.liked ? "⭐" : "☆"}
-            </button>
+            <div style={styles.replyRow}>
+              <input
+                ref={replyInputRef}
+                style={styles.replyInput}
+                value={replyText}
+                maxLength={MAX_REPLY_LENGTH}
+                placeholder={t("moments.replyPlaceholder", { name: author?.displayName || "" })}
+                aria-label={t("moments.replyPlaceholder", { name: author?.displayName || "" })}
+                onChange={(e) => {
+                  setReplyText(e.target.value);
+                  if (replyStatus) setReplyStatus(null);
+                }}
+                onFocus={() => setReplyFocused(true)}
+                onBlur={() => setReplyFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSendReply();
+                  } else if (e.key === "Escape") {
+                    e.currentTarget.blur();
+                  }
+                }}
+                disabled={replySending}
+              />
+              {replyText.trim() && (
+                <button
+                  type="button"
+                  style={styles.sendBtn(sendHover, replySending)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleSendReply}
+                  onMouseEnter={() => setSendHover(true)}
+                  onMouseLeave={() => setSendHover(false)}
+                  disabled={replySending}
+                >
+                  {replySending ? t("moments.replySending") : t("moments.replySend")}
+                </button>
+              )}
+              <button
+                type="button"
+                style={styles.likeBtn(!!myView?.liked, likeHover)}
+                onClick={toggleLike}
+                onMouseEnter={() => setLikeHover(true)}
+                onMouseLeave={() => setLikeHover(false)}
+                disabled={likeBusy || myView === undefined}
+                aria-pressed={!!myView?.liked}
+                aria-label={myView?.liked ? t("moments.unlike") : t("moments.like")}
+                title={myView?.liked ? t("moments.unlike") : t("moments.like")}
+              >
+                {myView?.liked ? "⭐" : "☆"}
+              </button>
+            </div>
           )}
         </div>
 

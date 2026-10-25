@@ -88,6 +88,17 @@ import ImageEditor from "./ImageEditor";
   aviso en vez de romperse. Tocar la vista previa llama a onOpenPost(id),
   que en App.js abre PostView.jsx.
 
+  RESPUESTA A UN MOMENTO (punto 66, commit 7, la envía MomentViewer.jsx
+  con moments.js → sendMomentReply): mensaje tipo
+  { senderId, type: "moment_reply", text, momentId, momentImageURL,
+  momentExpireAt, createdAt }. A diferencia del post compartido, SÍ guarda
+  una copia de la miniatura y del vencimiento, porque el momento dura
+  24 h y nadie más que su autor y sus seguidores lo puede leer.
+  MomentReplyPreview muestra la miniatura solo mientras el momento no
+  venció (sin volver a leerlo); después, o si la foto ya no carga (el
+  autor lo borró), muestra "Momento no disponible". El texto de la
+  respuesta se ve siempre.
+
   STICKERS (ver Stickers.jsx para el set de imágenes y la lógica
   compartida): botón nuevo junto al de grabar audio que abre un panel con
   una grilla de 10 stickers propios (SVG empaquetados en
@@ -712,6 +723,27 @@ const styles = {
     margin: 0,
     color: "var(--text-muted)",
   },
+  momentReplyThumb: {
+    display: "block",
+    width: "64px",
+    height: "96px",
+    objectFit: "cover",
+    borderRadius: "8px",
+    margin: "4px 0 6px",
+  },
+  momentReplyUnavailable: {
+    fontSize: "13px",
+    fontStyle: "italic",
+    margin: "4px 0 6px",
+    color: "var(--text-muted)",
+  },
+  momentReplyText: {
+    margin: 0,
+    fontSize: "13px",
+    color: "var(--text)",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  },
 };
 
 function AudioMessage({ src, duration, mine, id }) {
@@ -800,6 +832,35 @@ function SharedPostPreview({ postId, mine, onOpenPost }) {
   );
 }
 
+// Respuesta a un momento (commit 7): miniatura del momento mientras siga
+// activo (momentExpireAt, copia guardada en el mensaje) y el texto. Si ya
+// venció o la foto no carga (se borró antes), "Momento no disponible".
+function MomentReplyPreview({ message, mine }) {
+  const { t } = useLanguage();
+  const [broken, setBroken] = useState(false);
+  const expireMs = message.momentExpireAt?.toMillis ? message.momentExpireAt.toMillis() : 0;
+  const available = !broken && Date.now() < expireMs;
+
+  return (
+    // Misma tarjeta que el post compartido, pero no se toca (no lleva a
+    // ningún lado).
+    <div style={{ ...styles.sharedPostCard(mine), cursor: "default" }}>
+      <p style={styles.sharedPostLabel}>✨ {mine ? t("chat.momentReplyMine") : t("chat.momentReplyTheirs")}</p>
+      {available ? (
+        <img
+          src={message.momentImageURL}
+          alt={t("chat.momentReplyThumbAlt")}
+          style={styles.momentReplyThumb}
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <p style={styles.momentReplyUnavailable}>{t("chat.momentUnavailable")}</p>
+      )}
+      <p style={styles.momentReplyText}>{message.text}</p>
+    </div>
+  );
+}
+
 // Una burbuja de mensaje (texto, nota de voz o post compartido) + su
 // selector de reacciones. Es su propio componente (no un simple .map()
 // inline) porque useReactionPicker() es un hook y cada mensaje necesita su
@@ -864,6 +925,8 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
                 mine={mine}
                 onOpenPost={onOpenPost}
               />
+            ) : message.type === "moment_reply" ? (
+              <MomentReplyPreview message={message} mine={mine} />
             ) : (
               message.text
             )}

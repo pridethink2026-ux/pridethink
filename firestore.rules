@@ -214,6 +214,54 @@ service cloud.firestore {
       return !('expireAt' in datos);
     }
 
+    // Momentos (punto 66) — estos dos ayudantes están acá arriba, y no con
+    // el resto de las reglas de Momentos, porque también los usan los
+    // mensajes de chat (respuesta a un momento, commit 7).
+    //
+    // Visibilidad (decisión del punto 66: "seguidores"): el autor siempre
+    // ve los suyos; los demás, solo si el perfil del autor no es privado
+    // (mismo criterio que isPrivateForMe en UserProfile.jsx — isWallPrivate
+    // NO oculta momentos), si lo siguen (su propio users/{uid}.following) y
+    // si no hay bloqueo en ninguna dirección.
+    function puedeVerMomentosDe(autorUid) {
+      let yo = request.auth.uid;
+      return autorUid == yo || (
+        get(/databases/$(database)/documents/users/$(autorUid)).data.get('isPrivate', false) != true
+        && autorUid in get(/databases/$(database)/documents/users/$(yo)).data.get('following', [])
+        && !exists(/databases/$(database)/documents/blocks/$(autorUid + '_' + yo))
+        && !exists(/databases/$(database)/documents/blocks/$(yo + '_' + autorUid))
+      );
+    }
+
+    // Commits 5 y 6: quién puede registrarse como "vio este momento" o
+    // darle la estrella (ver moments/{momentId}/momentViewers más abajo):
+    // alguien que no es el autor, con el momento sin vencer y que hoy puede
+    // ver los momentos del autor.
+    function puedeInteractuarConMomento(momento) {
+      return momento.authorId != request.auth.uid
+        && momento.expireAt > request.time
+        && puedeVerMomentosDe(momento.authorId);
+    }
+
+    // Respuesta a un momento (commit 7): mensaje de chat
+    // { senderId, type: "moment_reply", text, momentId, momentImageURL,
+    // momentExpireAt, createdAt }. Se exige que el momento siga activo, que
+    // quien responde lo pueda ver hoy (cubre bloqueos y privacidad), que el
+    // autor sea el otro participante del chat, y que la miniatura y el
+    // vencimiento copiados sean los del momento real.
+    function respuestaAMomentoValida(chatId) {
+      let d = request.resource.data;
+      let momento = get(/databases/$(database)/documents/moments/$(d.momentId)).data;
+      return d.keys().hasOnly(['senderId', 'type', 'text', 'momentId', 'momentImageURL', 'momentExpireAt', 'createdAt'])
+        && textoValido(d.text, 1000)
+        && d.text.size() > 0
+        && d.createdAt == request.time
+        && puedeInteractuarConMomento(momento)
+        && momento.authorId in chatId.split('_')
+        && d.momentImageURL == momento.imageURL
+        && d.momentExpireAt == momento.expireAt;
+    }
+
     // --------------------------------------------------------------------
     // users/{uid}
     // Perfil de cada persona: nombre, identidad, privacidad, a quién
@@ -423,7 +471,10 @@ service cloud.firestore {
         allow create: if esParticipanteDelChat(chatId)
           && request.resource.data.senderId == request.auth.uid
           && (!('text' in request.resource.data) || textoValido(request.resource.data.text, 2000))
-          && (!('audioData' in request.resource.data) || textoValido(request.resource.data.audioData, 500000));
+          && (!('audioData' in request.resource.data) || textoValido(request.resource.data.audioData, 500000))
+          // Respuesta a un momento (commit 7): validación extra, ver
+          // respuestaAMomentoValida() arriba. Los demás tipos no cambian.
+          && (request.resource.data.get('type', '') != 'moment_reply' || respuestaAMomentoValida(chatId));
 
         // No se puede editar el contenido de un mensaje ya enviado (texto,
         // audio, remitente), pero cualquiera de los dos participantes
@@ -804,21 +855,6 @@ service cloud.firestore {
     // un momento vencido.
     // --------------------------------------------------------------------
 
-    // Visibilidad (decisión del punto 66: "seguidores"): el autor siempre
-    // ve los suyos; los demás, solo si el perfil del autor no es privado
-    // (mismo criterio que isPrivateForMe en UserProfile.jsx — isWallPrivate
-    // NO oculta momentos), si lo siguen (su propio users/{uid}.following) y
-    // si no hay bloqueo en ninguna dirección.
-    function puedeVerMomentosDe(autorUid) {
-      let yo = request.auth.uid;
-      return autorUid == yo || (
-        get(/databases/$(database)/documents/users/$(autorUid)).data.get('isPrivate', false) != true
-        && autorUid in get(/databases/$(database)/documents/users/$(yo)).data.get('following', [])
-        && !exists(/databases/$(database)/documents/blocks/$(autorUid + '_' + yo))
-        && !exists(/databases/$(database)/documents/blocks/$(yo + '_' + autorUid))
-      );
-    }
-
     // Nadie puede hacer que algo dure más de 24 h: el vencimiento tiene que
     // caer entre ahora (hora del servidor) y ahora + 24 h, con 5 minutos de
     // margen para un reloj del cliente algo adelantado (el cliente calcula
@@ -827,16 +863,6 @@ service cloud.firestore {
       return fecha is timestamp
         && fecha > request.time
         && fecha <= request.time + duration.value(24 * 60 + 5, 'm');
-    }
-
-    // Commits 5 y 6: quién puede registrarse como "vio este momento" o
-    // darle la estrella (ver moments/{momentId}/momentViewers más abajo):
-    // alguien que no es el autor, con el momento sin vencer y que hoy puede
-    // ver los momentos del autor.
-    function puedeInteractuarConMomento(momento) {
-      return momento.authorId != request.auth.uid
-        && momento.expireAt > request.time
-        && puedeVerMomentosDe(momento.authorId);
     }
 
     // Al crear el registro: la vista sola, o la vista con la estrella si
