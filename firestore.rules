@@ -825,6 +825,17 @@ service cloud.firestore {
         && fecha <= request.time + duration.value(24 * 60 + 5, 'm');
     }
 
+    // Commit 5: quién puede registrarse como "vio este momento" (ver
+    // moments/{momentId}/momentViewers más abajo).
+    function vistaDeMomentoValida(momento) {
+      return momento.authorId != request.auth.uid
+        && momento.expireAt > request.time
+        && puedeVerMomentosDe(momento.authorId)
+        && request.resource.data.keys().hasOnly(['viewedAt', 'expireAt'])
+        && request.resource.data.viewedAt == request.time
+        && request.resource.data.expireAt == momento.expireAt;
+    }
+
     match /moments/{momentId} {
       allow read: if estaAutenticado()
         && resource.data.expireAt > request.time
@@ -851,6 +862,31 @@ service cloud.firestore {
 
       allow delete: if estaAutenticado()
         && resource.data.authorId == request.auth.uid;
+
+      // momentViewers/{viewerUid} → { viewedAt, expireAt } (commit 5):
+      // quién vio el momento, para que lo vea SOLO su autor. El id es el
+      // uid de quien lo vio, así que cada persona cuenta una sola vez: un
+      // segundo intento sería un "update", que no está permitido. Solo
+      // cuenta quien hoy puede ver el momento (no el autor). "expireAt" es
+      // copia del del momento: una tercera política TTL (grupo
+      // "momentViewers") los borra, porque la TTL del momento no borra sus
+      // subcolecciones.
+      match /momentViewers/{viewerUid} {
+        allow get: if estaAutenticado()
+          && (viewerUid == request.auth.uid
+            || get(/databases/$(database)/documents/moments/$(momentId)).data.authorId == request.auth.uid);
+
+        // La lista entera solo la consulta el autor. La regla depende de
+        // momentId (la ruta), no de resource, así que la consulta es válida.
+        allow list: if estaAutenticado()
+          && get(/databases/$(database)/documents/moments/$(momentId)).data.authorId == request.auth.uid;
+
+        allow create: if estaAutenticado()
+          && viewerUid == request.auth.uid
+          && vistaDeMomentoValida(get(/databases/$(database)/documents/moments/$(momentId)).data);
+
+        allow update, delete: if false;
+      }
     }
 
     match /momentIndex/{autorUid} {

@@ -1,12 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import Avatar from "./Avatar";
+import MomentViewersSheet from "./MomentViewersSheet";
 import ReportButton from "./ReportButton";
+import { useBlocksContext } from "./BlocksContext";
+import { isBlockedEitherWay } from "./Blocks";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useMoments } from "./MomentsContext";
-import { MOMENT_DURATION_MS, deleteMoment } from "./moments";
+import { MOMENT_DURATION_MS, deleteMoment, registerView } from "./moments";
 import { timeAgo } from "./utils";
 
 /*
@@ -24,6 +27,12 @@ import { timeAgo } from "./utils";
     deleteMoment); en los ajenos, "⋮" los reporta (ReportButton.jsx,
     targetType "moment"). Mientras está abierta la confirmación o el
     reporte, el tiempo se detiene y tocar la foto no avanza.
+  - Quién vio (commit 5): al mostrarse un momento ajeno (no visto antes)
+    te registra en moments/{id}/momentViewers (moments.js →
+    registerView). En tus momentos, "👁 N" abre MomentViewersSheet con la
+    lista en vivo; N cuenta solo a quienes aparecen en ella (sin bloqueos
+    en ninguna dirección). La primera vez que miras un momento ajeno en
+    este dispositivo se avisa que el autor puede ver quién lo vio.
 
   Props:
   - `authorUids` (array): los autores en el orden de la tira.
@@ -46,6 +55,25 @@ import { timeAgo } from "./utils";
 
 const HOLD_MS = 200;
 const PREV_ZONE = 1 / 3;
+const VIEWERS_NOTICE_KEY = "pt-moment-viewers-notice";
+
+// El aviso de "el autor ve quién vio" se muestra una vez por dispositivo.
+// localStorage puede fallar (modo privado): en ese caso se muestra igual.
+function viewersNoticeSeen() {
+  try {
+    return localStorage.getItem(VIEWERS_NOTICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberViewersNotice() {
+  try {
+    localStorage.setItem(VIEWERS_NOTICE_KEY, "1");
+  } catch {
+    // sin almacenamiento: el aviso vuelve a salir la próxima vez
+  }
+}
 
 const styles = {
   overlay: {
@@ -155,6 +183,22 @@ const styles = {
     textAlign: "center",
   },
   confirmText: { margin: "0 0 12px" },
+  footer: {
+    display: "flex",
+    justifyContent: "center",
+    padding: "8px 12px 14px",
+    minHeight: "40px",
+  },
+  viewersBtn: (hover) => ({
+    padding: "8px 16px",
+    borderRadius: "999px",
+    border: "1px solid rgba(255,255,255,0.3)",
+    background: hover ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.4)",
+    color: "#fff",
+    fontSize: "14px",
+    fontWeight: 600,
+    cursor: "pointer",
+  }),
   // El botón de borrar y el error usan --accent2, como el resto de los
   // errores de la app (sobre el panel oscuro fijo de arriba).
   confirmError: { margin: "0 0 12px", color: "var(--accent2)", fontSize: "13px" },
@@ -175,9 +219,18 @@ const styles = {
 
 export default function MomentViewer({ authorUids, startIndex = 0, continueToNext = false, onClose }) {
   const { t } = useLanguage();
-  const { currentUid, myIndex, getVisibleMoments, getMomentState, getFirstUnseenIndex, markSeen, flushSeen } =
-    useMoments();
+  const {
+    currentUid,
+    myIndex,
+    getVisibleMoments,
+    getMomentState,
+    getFirstUnseenIndex,
+    hasSeen,
+    markSeen,
+    flushSeen,
+  } = useMoments();
   const allUsers = useAllUsersContext();
+  const { blockedByMe, blockedMe } = useBlocksContext();
 
   const [authorPos, setAuthorPos] = useState(startIndex);
   const [moments, setMoments] = useState(null); // null = cargando
@@ -193,6 +246,11 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const [deleteError, setDeleteError] = useState(false);
   const [cancelHover, setCancelHover] = useState(false);
   const [yesHover, setYesHover] = useState(false);
+  const [viewerDocs, setViewerDocs] = useState([]); // momentViewers del momento actual (solo los míos)
+  const [viewersOpen, setViewersOpen] = useState(false);
+  const [viewersHover, setViewersHover] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [noticeHover, setNoticeHover] = useState(false);
 
   const elapsedRef = useRef(0);
   const holdTimerRef = useRef(null);
@@ -204,8 +262,21 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const current = moments ? moments[momentPos] : null;
   const currentId = current ? current.id : null;
   const isMine = authorUid === currentUid;
-  // Con la confirmación de borrar o el reporte abiertos, todo se detiene.
-  const dialogOpen = reportOpen || confirmDelete;
+  // Con la confirmación de borrar, el reporte, la lista de quién vio o el
+  // aviso abiertos, todo se detiene.
+  const dialogOpen = reportOpen || confirmDelete || viewersOpen || noticeOpen;
+
+  // La lista de quién vio, con el mismo filtro que el número del botón:
+  // solo personas que existen y sin bloqueo en ninguna dirección.
+  const viewers = useMemo(() => {
+    const usersMap = {};
+    allUsers.forEach((u) => {
+      usersMap[u.uid] = u;
+    });
+    return viewerDocs
+      .filter((v) => usersMap[v.uid] && !isBlockedEitherWay(blockedByMe, blockedMe, v.uid))
+      .map((v) => ({ ...v, user: usersMap[v.uid] }));
+  }, [viewerDocs, allUsers, blockedByMe, blockedMe]);
 
   // Desde la tira: el siguiente autor que todavía tenga algo sin ver.
   // Desde un perfil (continueToNext false): cerrar.
@@ -276,11 +347,35 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     setImgLoaded(false);
     setConfirmDelete(false);
     setDeleteError(false);
+    setViewersOpen(false);
   }, [currentId]);
 
-  // Un momento cuenta como visto apenas su foto se muestra.
+  // En mis momentos: quién lo vio, en vivo, el más reciente primero.
   useEffect(() => {
-    if (imgLoaded && current) markSeen(authorUid, current.indexCreatedAt);
+    setViewerDocs([]);
+    if (!currentId || !isMine) return;
+    const unsub = onSnapshot(
+      collection(db, "moments", currentId, "momentViewers"),
+      (snap) => {
+        const list = snap.docs.map((d) => ({ uid: d.id, viewedAt: d.data().viewedAt }));
+        list.sort((a, b) => (b.viewedAt?.toMillis?.() || 0) - (a.viewedAt?.toMillis?.() || 0));
+        setViewerDocs(list);
+      },
+      () => setViewerDocs([])
+    );
+    return unsub;
+  }, [currentId, isMine]);
+
+  // Un momento cuenta como visto apenas su foto se muestra. Si es ajeno y
+  // no lo habías visto, además te registra en su lista de quién vio (y la
+  // primera vez en este dispositivo, se avisa que el autor la ve).
+  useEffect(() => {
+    if (!imgLoaded || !current) return;
+    if (!isMine) {
+      if (!hasSeen(authorUid, current.indexCreatedAt)) registerView(currentUid, current.id, current.expireAt);
+      if (!viewersNoticeSeen()) setNoticeOpen(true);
+    }
+    markSeen(authorUid, current.indexCreatedAt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imgLoaded, currentId]);
 
@@ -460,6 +555,43 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
             <span style={styles.status}>{t("moments.loading")}</span>
           )}
         </div>
+
+        <div style={styles.footer}>
+          {current && isMine && (
+            <button
+              type="button"
+              style={styles.viewersBtn(viewersHover)}
+              onClick={() => setViewersOpen(true)}
+              onMouseEnter={() => setViewersHover(true)}
+              onMouseLeave={() => setViewersHover(false)}
+              aria-label={t("moments.viewersTitle", { n: viewers.length })}
+            >
+              👁 {viewers.length}
+            </button>
+          )}
+        </div>
+
+        {viewersOpen && <MomentViewersSheet viewers={viewers} onClose={() => setViewersOpen(false)} />}
+
+        {noticeOpen && (
+          <div style={styles.confirm} role="alertdialog" aria-label={t("moments.viewersNoticeTitle")}>
+            <p style={styles.confirmText}>{t("moments.viewersNotice")}</p>
+            <div style={styles.confirmRow}>
+              <button
+                type="button"
+                style={styles.confirmBtn(false, noticeHover)}
+                onClick={() => {
+                  rememberViewersNotice();
+                  setNoticeOpen(false);
+                }}
+                onMouseEnter={() => setNoticeHover(true)}
+                onMouseLeave={() => setNoticeHover(false)}
+              >
+                {t("moments.viewersNoticeOk")}
+              </button>
+            </div>
+          </div>
+        )}
 
         {confirmDelete && (
           <div style={styles.confirm} role="alertdialog" aria-label={t("moments.delete")}>

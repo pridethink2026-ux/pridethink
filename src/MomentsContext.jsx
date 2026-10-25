@@ -48,6 +48,7 @@ const MomentsContext = createContext({
   getVisibleMoments: () => [],
   getMomentState: () => null,
   getFirstUnseenIndex: () => 0,
+  hasSeen: () => false,
   markSeen: () => {},
   flushSeen: () => {},
 });
@@ -171,6 +172,10 @@ export function MomentsProvider({ children }) {
       return i === -1 ? 0 : i;
     };
 
+    // Si ya viste ese momento (por la marca de vistos). MomentViewer lo usa
+    // para no volver a registrarte en momentViewers (commit 5).
+    const hasSeen = (uid, createdAt) => (seen[uid] || 0) >= createdAt;
+
     // Autores ajenos con momentos activos: primero los que tienen algo sin
     // ver, y dentro de cada grupo el más reciente primero.
     const authors = Object.keys(indexes)
@@ -190,6 +195,7 @@ export function MomentsProvider({ children }) {
       getVisibleMoments,
       getMomentState,
       getFirstUnseenIndex,
+      hasSeen,
       markSeen,
       flushSeen,
     };

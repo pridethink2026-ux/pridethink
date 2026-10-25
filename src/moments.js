@@ -1,4 +1,4 @@
-import { Timestamp, collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { Timestamp, collection, doc, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, storage } from "./firebase";
 
@@ -17,6 +17,8 @@ import { db, storage } from "./firebase";
     expireAt } } en milisegundos, expireAt }. Es lo que escucha
     MomentsContext.jsx para saber quién tiene momentos activos sin hacer
     consultas.
+  - moments/{momentId}/momentViewers/{viewerUid} → { viewedAt, expireAt }:
+    quién vio cada momento, solo lo lee el autor (commit 5).
   - Storage: momentImages/{uid}/{momentId}.jpg.
 
   "expireAt" lo calcula el cliente (Date.now() + 24 h): firestore.rules
@@ -42,6 +44,19 @@ export function getActiveEntries(index, now) {
 }
 
 export class MomentLimitError extends Error {}
+
+// Me registra como "vio este momento" (commit 5) en
+// moments/{momentId}/momentViewers/{miUid}, que solo lee el autor.
+// firestore.rules solo acepta la primera vez (repetirlo sería un update,
+// que no está permitido) y solo si hoy puedo ver el momento, así que un
+// rechazo es normal y se ignora. `expireAt` es el del momento (Timestamp),
+// para que la TTL de "momentViewers" lo borre junto con él.
+export function registerView(uid, momentId, expireAt) {
+  return setDoc(doc(db, "moments", momentId, "momentViewers", uid), {
+    viewedAt: serverTimestamp(),
+    expireAt,
+  }).catch(() => {});
+}
 
 // Sube la foto (Blob JPEG que devuelve MomentTextEditor, con el texto ya
 // quemado) y publica el momento con su texto en plano (`caption`).

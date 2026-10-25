@@ -26,7 +26,8 @@ import { MOMENT_TEXT_COLORS } from "./themes";
 
   Props:
   - `blob` (obligatoria): la foto que devolvió ImageEditor.
-  - `isPrivate` (booleano): muestra el aviso de perfil privado.
+  - `isPrivate` (booleano): muestra el aviso de perfil privado; si no es
+    privado, avisa que podrás ver quién vio el momento (commit 5).
   - `onConfirm(blob, caption)`, `onCancel()`, `onError()` (obligatorias).
 
   Colores del texto: MOMENT_TEXT_COLORS de themes.js (fijos, ver allá por
@@ -429,7 +430,11 @@ export default function MomentTextEditor({ blob, isPrivate = false, onConfirm, o
           />
         </div>
 
-        {isPrivate && <p style={styles.notice}>{t("moments.privateNotice")}</p>}
+        {isPrivate ? (
+          <p style={styles.notice}>{t("moments.privateNotice")}</p>
+        ) : (
+          <p style={styles.hint}>{t("moments.viewersHint")}</p>
+        )}
 
         <div style={styles.row}>
           <button
