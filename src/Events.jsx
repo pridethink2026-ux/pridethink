@@ -296,14 +296,19 @@ export default function Events({ onOpenEvent }) {
     return unsub;
   }, []);
 
+  // Solo con sesión (punto 68), mismo motivo que Feed.jsx.
   useEffect(() => {
+    if (!currentUid) {
+      setEvents([]);
+      return;
+    }
     const q = query(collection(db, "events"), orderBy("date", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       setEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
     return unsub;
-  }, []);
+  }, [currentUid]);
 
   // "Próximos primero": se parten en próximos (orden ascendente, el más
   // cercano primero) y pasados (orden descendente, el más reciente

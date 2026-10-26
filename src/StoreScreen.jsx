@@ -373,7 +373,13 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
     return unsub;
   }, [currentUid]);
 
+  // Solo con sesión: firestore.rules exige sesión para leer "products", y
+  // un listener abierto sin ella fallaba y no se volvía a abrir.
   useEffect(() => {
+    if (!currentUid) {
+      setProducts([]);
+      return;
+    }
     const q = query(collection(db, "products"), where("isPublished", "==", true));
     const unsub = onSnapshot(q, (snap) => {
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -381,7 +387,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
       setProducts(list);
     });
     return unsub;
-  }, []);
+  }, [currentUid]);
 
   // Foto de perfil del vendedor (punto 58): el producto guarda
   // sellerName/sellerIdentity como copia, pero la foto se resuelve en vivo

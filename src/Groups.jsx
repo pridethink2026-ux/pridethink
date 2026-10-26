@@ -253,14 +253,19 @@ export default function Groups({ onOpenGroup }) {
     return unsub;
   }, []);
 
+  // Solo con sesión (punto 68), mismo motivo que Feed.jsx.
   useEffect(() => {
+    if (!currentUid) {
+      setGroups([]);
+      return;
+    }
     const q = query(collection(db, "groups"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setGroups(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
     return unsub;
-  }, []);
+  }, [currentUid]);
 
   const search_ = search.trim().toLowerCase();
   const filtered = search_

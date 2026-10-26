@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 
 /*
   AllUsersContext
@@ -26,19 +27,44 @@ import { db } from "./firebase";
   ahí: los datos personales y ajustes privados están en
   users/{uid}/private/data (hallazgo H1, 2026-10-24), que solo lee el
   dueño y que este listener no toca.
+
+  Solo con sesión iniciada (2026-10-26, punto 68): firestore.rules exige
+  sesión para leer "users", así que un listener abierto sin sesión fallaba
+  con permission-denied y moría — y como antes se abría UNA vez al cargar
+  la página, después de iniciar sesión la lista quedaba vacía hasta
+  recargar (el chat abría "sin contactos"). Ahora se abre al iniciar
+  sesión, se cierra y se vacía al cerrarla, mismo patrón que
+  BlocksContext.jsx.
 */
 
 const AllUsersContext = createContext([]);
 
 export function AllUsersProvider({ children }) {
   const [users, setUsers] = useState([]);
+  const [currentUid, setCurrentUid] = useState(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "users"), (snap) => {
-      setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
-    });
+    const unsub = onAuthStateChanged(auth, (user) => setCurrentUid(user ? user.uid : null));
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!currentUid) {
+      setUsers([]);
+      return;
+    }
+    const unsub = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
+        setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
+      },
+      (err) => {
+        console.error("AllUsersContext: no se pudo escuchar users", err.code);
+        setUsers([]);
+      }
+    );
+    return unsub;
+  }, [currentUid]);
 
   return <AllUsersContext.Provider value={users}>{children}</AllUsersContext.Provider>;
 }

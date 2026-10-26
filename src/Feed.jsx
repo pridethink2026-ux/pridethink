@@ -1044,14 +1044,20 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   // aparecerían en la primera. orderBy() no se usa en ninguna de las dos
   // a propósito (evita tener que crear un índice compuesto en Firestore)
   // — el orden por fecha se arma en el cliente, en visiblePosts.
+  // Solo con sesión (punto 68): firestore.rules exige sesión para leer
+  // "posts", y un listener abierto sin ella fallaba y no se volvía a abrir.
   useEffect(() => {
+    if (!currentUid) {
+      setPublicPosts([]);
+      return;
+    }
     const q = query(collection(db, "posts"), where("authorIsPrivate", "==", false));
     const unsub = onSnapshot(q, (snap) => {
       setPublicPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setPostsLoading(false);
     });
     return unsub;
-  }, []);
+  }, [currentUid]);
 
   useEffect(() => {
     if (!currentUid) {

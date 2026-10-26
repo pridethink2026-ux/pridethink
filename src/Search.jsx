@@ -133,13 +133,18 @@ export default function Search({ onOpenProfile }) {
     return unsub;
   }, []);
 
+  // Solo con sesión (punto 68), mismo motivo que Feed.jsx.
   useEffect(() => {
+    if (!currentUid) {
+      setPublicPosts([]);
+      return;
+    }
     const q = query(collection(db, "posts"), where("authorIsPrivate", "==", false));
     const unsub = onSnapshot(q, (snap) => {
       setPublicPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return unsub;
-  }, []);
+  }, [currentUid]);
 
   useEffect(() => {
     if (!currentUid) {
