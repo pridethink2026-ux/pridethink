@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
+import { useUserProfile } from "./AllUsersContext";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { PostCard } from "./Feed";
@@ -74,7 +75,8 @@ const styles = {
 export default function SavedPosts({ onBack, onOpenProfile }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
-  const [myProfile, setMyProfile] = useState(null);
+  // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
+  const myProfile = useUserProfile(currentUid);
   const { savedIds, ready: idsReady } = useSavedPosts();
   const [postsById, setPostsById] = useState({});
 
@@ -82,14 +84,6 @@ export default function SavedPosts({ onBack, onOpenProfile }) {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
     return unsub;
   }, []);
-
-  useEffect(() => {
-    if (!currentUid) return;
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      if (snap.exists()) setMyProfile(snap.data());
-    });
-    return unsub;
-  }, [currentUid]);
 
   // Paso 1 (ids de los posts guardados, más reciente primero): savedIds,
   // de SavedPostsContext.jsx.

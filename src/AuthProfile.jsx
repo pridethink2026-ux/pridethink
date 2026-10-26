@@ -21,6 +21,7 @@ import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import VerifiedBadge from "./VerifiedBadge";
 import { useLanguage } from "./LanguageContext";
+import { useFollowerUids, useUserProfile } from "./AllUsersContext";
 import { markOffline } from "./presence";
 import { unblockUser, useMyBlocks } from "./Blocks";
 import { formatMonthYear, formatLongDate } from "./utils";
@@ -64,14 +65,8 @@ async function syncPostsPrivacyField(uid, fieldName, newValue) {
 
 function BlockedUserRow({ uid, onUnblock }) {
   const { t } = useLanguage();
-  const [profile, setProfile] = useState(null);
-
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "users", uid), (snap) => {
-      setProfile(snap.exists() ? snap.data() : null);
-    });
-    return unsub;
-  }, [uid]);
+  // De AllUsersContext (punto 70, commit 9c), sin un listener por fila.
+  const profile = useUserProfile(uid);
 
   return (
     <div style={styles.blockedRow}>
@@ -107,19 +102,14 @@ function ProfileView({
 }) {
   const { language, setLanguage, t } = useLanguage();
   const { blockedByMe: blockedUsers } = useMyBlocks(uid);
-  const [followersCount, setFollowersCount] = useState(0);
+  // Seguidores = usuarios cuyo "following" contiene tu uid, de
+  // AllUsersContext (punto 70, commit 9c; antes, una consulta propia que
+  // cada latido de presencia de un seguidor volvía a leer).
+  const followersCount = useFollowerUids(uid).length;
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
   const [profileTab, setProfileTab] = useState("info"); // "info" | "posts"
   const [myPosts, setMyPosts] = useState([]);
   const followingCount = (user.following || []).length;
-
-  // Seguidores = usuarios cuyo campo "following" contiene tu uid (en tiempo real)
-  useEffect(() => {
-    if (!uid) return;
-    const q = query(collection(db, "users"), where("following", "array-contains", uid));
-    const unsub = onSnapshot(q, (snap) => setFollowersCount(snap.size));
-    return unsub;
-  }, [uid]);
 
   // Pestaña "Posts": TODOS tus propios posts, sin filtrar por
   // authorIsPrivate/authorIsWallPrivate (sos el dueño, siempre te ves a vos

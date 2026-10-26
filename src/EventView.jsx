@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { useAllUsersContext } from "./AllUsersContext";
 import { collection, doc, deleteDoc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
@@ -129,7 +130,16 @@ export default function EventView({ eventId, onBack, onOpenProfile }) {
   const [currentUid, setCurrentUid] = useState(null);
   const [event, setEvent] = useState(undefined); // undefined: cargando | null: no existe
   const [attendeeUids, setAttendeeUids] = useState([]);
-  const [attendeeProfiles, setAttendeeProfiles] = useState({});
+  // Perfil de cada asistente (avatar/nombre/identidad), de AllUsersContext
+  // (punto 70, commit 9c; antes, un onSnapshot por asistente).
+  const allUsers = useAllUsersContext();
+  const attendeeProfiles = useMemo(() => {
+    const map = {};
+    allUsers.forEach((u) => {
+      map[u.uid] = u;
+    });
+    return map;
+  }, [allUsers]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
@@ -152,22 +162,6 @@ export default function EventView({ eventId, onBack, onOpenProfile }) {
     });
     return unsub;
   }, [eventId]);
-
-  // Resuelve cada uid asistente a su perfil (avatar/nombre/identidad),
-  // igual patrón de dos pasos que SavedPosts.jsx (ids -> documentos completos).
-  useEffect(() => {
-    if (attendeeUids.length === 0) {
-      setAttendeeProfiles({});
-      return;
-    }
-    const unsubs = attendeeUids.map((uid) =>
-      onSnapshot(doc(db, "users", uid), (snap) => {
-        setAttendeeProfiles((prev) => ({ ...prev, [uid]: snap.exists() ? snap.data() : null }));
-      })
-    );
-    return () => unsubs.forEach((u) => u());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attendeeUids.join(",")]);
 
   const isAttending = !!currentUid && attendeeUids.includes(currentUid);
 

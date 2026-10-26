@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
+import { useUserProfile } from "./AllUsersContext";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -198,7 +199,8 @@ const styles = {
 export default function GroupView({ groupId, onBack, onOpenProfile }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
-  const [myProfile, setMyProfile] = useState(null);
+  // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
+  const myProfile = useUserProfile(currentUid);
   const [group, setGroup] = useState(undefined); // undefined: cargando | null: no existe
   const [memberUids, setMemberUids] = useState([]);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -214,14 +216,6 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
     return unsub;
   }, []);
-
-  useEffect(() => {
-    if (!currentUid) return;
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      if (snap.exists()) setMyProfile(snap.data());
-    });
-    return unsub;
-  }, [currentUid]);
 
   useEffect(() => {
     if (!groupId) return;

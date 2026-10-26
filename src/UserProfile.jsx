@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
+import { useAllUsersReady, useFollowerUids, useUserProfile } from "./AllUsersContext";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -176,10 +177,14 @@ const styles = {
 export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
-  const [myProfile, setMyProfile] = useState(null);
-  const [profileUser, setProfileUser] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [followersCount, setFollowersCount] = useState(0);
+  // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
+  const myProfile = useUserProfile(currentUid);
+  // El perfil que se mira y sus seguidores, también de AllUsersContext
+  // (punto 70, commit 9c): antes, un listener sobre users/{uid} y una
+  // consulta de seguidores, que cada latido de presencia volvía a leer.
+  const profileUser = useUserProfile(uid);
+  const profileLoading = !useAllUsersReady();
+  const followersCount = useFollowerUids(uid).length;
   const [posts, setPosts] = useState([]);
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
@@ -190,24 +195,6 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
     return unsub;
   }, []);
-
-  useEffect(() => {
-    if (!currentUid) return;
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      if (snap.exists()) setMyProfile(snap.data());
-    });
-    return unsub;
-  }, [currentUid]);
-
-  useEffect(() => {
-    if (!uid) return;
-    setProfileLoading(true);
-    const unsub = onSnapshot(doc(db, "users", uid), (snap) => {
-      setProfileUser(snap.exists() ? snap.data() : null);
-      setProfileLoading(false);
-    });
-    return unsub;
-  }, [uid]);
 
   // Hallazgo H1: los datos personales viven en users/{uid}/private/data,
   // que solo el dueño puede leer — así que solo se piden si es tu propio
@@ -223,14 +210,6 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
     });
     return unsub;
   }, [uid, currentUid]);
-
-  // Seguidores = usuarios cuyo campo "following" contiene este uid (en tiempo real)
-  useEffect(() => {
-    if (!uid) return;
-    const q = query(collection(db, "users"), where("following", "array-contains", uid));
-    const unsub = onSnapshot(q, (snap) => setFollowersCount(snap.size));
-    return unsub;
-  }, [uid]);
 
   const isMe = uid === currentUid;
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);

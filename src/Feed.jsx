@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { auth, db } from "./firebase";
+import { useUserProfile } from "./AllUsersContext";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -981,7 +982,8 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
 export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
-  const [myProfile, setMyProfile] = useState(null);
+  // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
+  const myProfile = useUserProfile(currentUid);
   // Se separa en dos (auditoría de seguridad, 2026-07-28, hallazgo H2):
   // ver el comentario junto al useEffect que las llena, más abajo.
   const [publicPosts, setPublicPosts] = useState([]);
@@ -1024,15 +1026,6 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     });
     return unsub;
   }, []);
-
-  // Escucha tu propio perfil en tiempo real (para saber a quién bloqueaste y a quién sigues)
-  useEffect(() => {
-    if (!currentUid) return;
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      if (snap.exists()) setMyProfile(snap.data());
-    });
-    return unsub;
-  }, [currentUid]);
 
   // Escucha el feed en tiempo real, en DOS consultas separadas (auditoría
   // de seguridad, 2026-07-28, hallazgo H2): antes era una sola consulta

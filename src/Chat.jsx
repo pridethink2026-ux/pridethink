@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { auth, db } from "./firebase";
+import { useUserProfile } from "./AllUsersContext";
 import { storage } from "./firebaseStorage";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -969,7 +970,8 @@ export default function Chat({
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
-  const [myProfile, setMyProfile] = useState(null);
+  // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
+  const myProfile = useUserProfile(currentUid);
   const [activeContact, setActiveContact] = useState(null);
   // Se llegó desde una notificación de mensaje (initialContactUid) pero esa
   // persona no aparece entre los contactos visibles — ver el efecto que
@@ -1011,15 +1013,6 @@ export default function Chat({
     });
     return unsub;
   }, []);
-
-  // Escucha tu propio perfil en tiempo real (necesario para saber a quién bloqueaste)
-  useEffect(() => {
-    if (!currentUid) return;
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      if (snap.exists()) setMyProfile(snap.data());
-    });
-    return unsub;
-  }, [currentUid]);
 
   // Lista de todos los usuarios registrados en tiempo real (se filtra abajo),
   // del listener único de AllUsersContext (ver Mentions.jsx/AllUsersContext.jsx)

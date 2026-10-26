@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
@@ -35,12 +35,27 @@ import { auth, db } from "./firebase";
   recargar (el chat abría "sin contactos"). Ahora se abre al iniciar
   sesión, se cierra y se vacía al cerrarla, mismo patrón que
   BlocksContext.jsx.
+
+  Perfiles sin listeners propios (punto 70, commit 9c): como esta lista ya
+  trae el documento de cada usuario en vivo, los demás listeners sobre
+  users/{uid} y la consulta de seguidores (where following
+  array-contains) leían otra vez lo mismo — y cada latido de presencia
+  los volvía a disparar (una lectura por minuto por perfil conectado).
+  Ahora salen de acá:
+    - useUserProfile(uid): el perfil de uid (el tuyo u otro), null si
+      todavía no llegó o no existe;
+    - useFollowerUids(uid): uids de quienes siguen a uid, los mismos que
+      devolvía esa consulta;
+    - useAllUsersReady(): ya llegó la primera respuesta (o falló), para
+      distinguir "cargando" de "no existe".
 */
 
 const AllUsersContext = createContext([]);
+const AllUsersReadyContext = createContext(false);
 
 export function AllUsersProvider({ children }) {
   const [users, setUsers] = useState([]);
+  const [ready, setReady] = useState(false);
   const [currentUid, setCurrentUid] = useState(null);
 
   useEffect(() => {
@@ -49,6 +64,7 @@ export function AllUsersProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    setReady(false);
     if (!currentUid) {
       setUsers([]);
       return;
@@ -57,18 +73,41 @@ export function AllUsersProvider({ children }) {
       collection(db, "users"),
       (snap) => {
         setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() })));
+        setReady(true);
       },
       (err) => {
         console.error("AllUsersContext: no se pudo escuchar users", err.code);
         setUsers([]);
+        setReady(true);
       }
     );
     return unsub;
   }, [currentUid]);
 
-  return <AllUsersContext.Provider value={users}>{children}</AllUsersContext.Provider>;
+  return (
+    <AllUsersContext.Provider value={users}>
+      <AllUsersReadyContext.Provider value={ready}>{children}</AllUsersReadyContext.Provider>
+    </AllUsersContext.Provider>
+  );
 }
 
 export function useAllUsersContext() {
   return useContext(AllUsersContext);
+}
+
+export function useAllUsersReady() {
+  return useContext(AllUsersReadyContext);
+}
+
+export function useUserProfile(uid) {
+  const users = useContext(AllUsersContext);
+  return useMemo(() => (uid && users.find((u) => u.uid === uid)) || null, [users, uid]);
+}
+
+export function useFollowerUids(uid) {
+  const users = useContext(AllUsersContext);
+  return useMemo(
+    () => (uid ? users.filter((u) => (u.following || []).includes(uid)).map((u) => u.uid) : []),
+    [users, uid]
+  );
 }

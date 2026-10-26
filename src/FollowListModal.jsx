@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { db } from "./firebase";
-import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
+import React, { useMemo } from "react";
+import { useAllUsersContext, useAllUsersReady, useFollowerUids, useUserProfile } from "./AllUsersContext";
 import Avatar from "./Avatar";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useLanguage } from "./LanguageContext";
@@ -12,14 +11,15 @@ import { useLanguage } from "./LanguageContext";
   reutilizable desde UserProfile.jsx (perfiles públicos) y AuthProfile.jsx
   (tu propio perfil).
 
-  mode="following": lee en tiempo real users/{targetUid}.following (el
-  arreglo de uids que esa persona sigue).
-  mode="followers": consulta en tiempo real users donde
-  "following" array-contains targetUid (quiénes la siguen). Ningún conteo
-  se guarda como número aparte, todo se deriva en vivo de Firestore.
+  mode="following": users/{targetUid}.following (el arreglo de uids que
+  esa persona sigue).
+  mode="followers": los usuarios cuyo "following" contiene targetUid
+  (quiénes la siguen). Ningún conteo se guarda como número aparte, todo se
+  deriva en vivo.
 
-  Cada uid se resuelve a su perfil completo con su propio onSnapshot (mismo
-  patrón que BlockedUserRow en AuthProfile.jsx), y se filtra la lista final
+  Todo sale de AllUsersContext (punto 70, commit 9c): antes, una consulta
+  más un onSnapshot por cada persona de la lista, que leían otra vez
+  documentos que esa lista ya tiene. Se filtra la lista final
   para respetar bloqueos (en cualquier dirección) y perfiles privados, igual
   que en Search.jsx y Chat.jsx.
 */
@@ -97,51 +97,21 @@ const styles = {
 
 export default function FollowListModal({ mode, targetUid, currentUid, onClose, onOpenProfile }) {
   const { t } = useLanguage();
-  const [rawUids, setRawUids] = useState([]);
-  const [uidsReady, setUidsReady] = useState(false);
-  const [profiles, setProfiles] = useState({});
-
-  // Paso 1: obtener la lista de uids (seguidores o seguidos) en tiempo real.
-  useEffect(() => {
-    setUidsReady(false);
-    if (!targetUid) return;
-
-    if (mode === "following") {
-      const unsub = onSnapshot(doc(db, "users", targetUid), (snap) => {
-        setRawUids(snap.exists() ? snap.data().following || [] : []);
-        setUidsReady(true);
-      });
-      return unsub;
-    }
-
-    const q = query(collection(db, "users"), where("following", "array-contains", targetUid));
-    const unsub = onSnapshot(q, (snap) => {
-      setRawUids(snap.docs.map((d) => d.id));
-      setUidsReady(true);
+  const allUsers = useAllUsersContext();
+  const usersReady = useAllUsersReady();
+  const target = useUserProfile(targetUid);
+  const followerUids = useFollowerUids(targetUid);
+  const rawUids = mode === "following" ? target?.following || [] : followerUids;
+  const profiles = useMemo(() => {
+    const map = {};
+    allUsers.forEach((u) => {
+      map[u.uid] = u;
     });
-    return unsub;
-  }, [mode, targetUid]);
-
-  // Paso 2: resolver cada uid a su perfil completo (nombre, identidad, privacidad, bloqueos).
-  useEffect(() => {
-    if (rawUids.length === 0) {
-      setProfiles({});
-      return;
-    }
-    const unsubs = rawUids.map((id) =>
-      onSnapshot(doc(db, "users", id), (snap) => {
-        setProfiles((prev) => ({
-          ...prev,
-          [id]: snap.exists() ? { uid: id, ...snap.data() } : null,
-        }));
-      })
-    );
-    return () => unsubs.forEach((u) => u());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawUids.join(",")]);
+    return map;
+  }, [allUsers]);
 
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
-  const stillResolving = !uidsReady || rawUids.some((id) => !(id in profiles));
+  const stillResolving = !usersReady;
 
   const visible = rawUids
     .map((id) => profiles[id])

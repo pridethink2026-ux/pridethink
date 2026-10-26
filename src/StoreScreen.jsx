@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import Avatar from "./Avatar";
-import { useAllUsersContext } from "./AllUsersContext";
+import { useAllUsersContext, useUserProfile } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useIsMobile } from "./utils";
 import { CATEGORIES, getProductImages } from "./storeData";
@@ -337,7 +337,8 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
   const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [currentUid, setCurrentUid] = useState(null);
-  const [myProfile, setMyProfile] = useState(null);
+  // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
+  const myProfile = useUserProfile(currentUid);
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(null);
@@ -361,17 +362,6 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
     setSubView({ type: "detail", productId: initialProductId });
     onConsumeInitialProductId && onConsumeInitialProductId();
   }, [initialProductId, onConsumeInitialProductId]);
-
-  useEffect(() => {
-    if (!currentUid) {
-      setMyProfile(null);
-      return;
-    }
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      setMyProfile(snap.exists() ? snap.data() : null);
-    });
-    return unsub;
-  }, [currentUid]);
 
   // Solo con sesión: firestore.rules exige sesión para leer "products", y
   // un listener abierto sin ella fallaba y no se volvía a abrir.

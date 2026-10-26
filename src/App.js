@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
-import { auth, db } from "./firebase";
+import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
+import { useUserProfile } from "./AllUsersContext";
 import AuthProfile from "./AuthProfile";
 import Feed from "./Feed";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
@@ -543,7 +543,6 @@ function App() {
   const { t } = useLanguage();
   const [view, setView] = useState("perfil"); // "perfil" | "feed" | "chat" | "buscar" | "notificaciones"
   const [currentUid, setCurrentUid] = useState(null);
-  const [myIdentity, setMyIdentity] = useState("");
   const [viewingProfileUid, setViewingProfileUid] = useState(null);
   const [viewingSaved, setViewingSaved] = useState(false);
   const [viewingPostId, setViewingPostId] = useState(null);
@@ -583,18 +582,10 @@ function App() {
   // las reglas de Firestore).
   useOnlinePresence(currentUid);
 
-  // Se escucha en tiempo real para que el icono de Inicio cambie al
-  // instante si el usuario edita su identidad (AuthProfile.jsx).
-  useEffect(() => {
-    if (!currentUid) {
-      setMyIdentity("");
-      return;
-    }
-    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      setMyIdentity(snap.exists() ? snap.data().identity || "" : "");
-    });
-    return unsub;
-  }, [currentUid]);
+  // En vivo, para que el icono de Inicio cambie al instante si el usuario
+  // edita su identidad (AuthProfile.jsx). Sale de AllUsersContext, sin un
+  // listener propio sobre users/{uid} (punto 70, commit 9c).
+  const myIdentity = useUserProfile(currentUid)?.identity || "";
 
   // Las cinco vistas superpuestas (perfil público, guardados, post
   // individual, grupo, evento) son mutuamente excluyentes: abrir cualquiera
