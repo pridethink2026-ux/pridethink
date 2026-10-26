@@ -7,22 +7,30 @@ import { BlocksProvider } from './BlocksContext';
 import { AllUsersProvider } from './AllUsersContext';
 import { SoundProvider } from './SoundContext';
 import { MomentsProvider } from './MomentsContext';
+import { ThemeProvider } from './ThemeContext';
+import { initTheme } from './themes';
 import reportWebVitals from './reportWebVitals';
+
+// El tema (colores y fuentes) se aplica antes del primer render, así la
+// primera pantalla ya sale con él — ver ThemeContext.jsx.
+initTheme();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <LanguageProvider>
-      <AllUsersProvider>
-        <BlocksProvider>
-          <MomentsProvider>
-            <SoundProvider>
-              <App />
-            </SoundProvider>
-          </MomentsProvider>
-        </BlocksProvider>
-      </AllUsersProvider>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AllUsersProvider>
+          <BlocksProvider>
+            <MomentsProvider>
+              <SoundProvider>
+                <App />
+              </SoundProvider>
+            </MomentsProvider>
+          </BlocksProvider>
+        </AllUsersProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
 

@@ -65,10 +65,11 @@ import { getIdentityColors } from "./identityStyles";
   todavía no viste; "seen" un aro fino con el borde del tema — los viste
   todos (solo lo usan la tira de Momentos y el perfil); null/ausente,
   nada. Colores de acento del tema (`--accent`/`--accent2` y sus
-  "soft-border"). El destello pulsa con la clase `.pt-moment-glow`
-  (`index.css`, alterna accent2/accent); con "reducir movimiento" del
-  sistema la animación se apaga y queda el destello fijo del estilo
-  inline. Va con box-shadow, así que no cambia el tamaño del avatar.
+  "soft-border"). El destello fijo (accent2) va en el estilo inline del
+  aro; encima, una capa hermana con el destello en accent pulsa cambiando
+  solo su opacidad (`.pt-moment-glow` en `index.css`). Con "reducir
+  movimiento" del sistema queda solo el destello fijo. Va con box-shadow,
+  así que no cambia el tamaño del avatar.
 
   Tamaños: "sm" (comentarios), "md" (posts, contactos), "lg" (perfil).
 */
@@ -76,6 +77,25 @@ import { getIdentityColors } from "./identityStyles";
 const MOMENT_RING_SHADOW = {
   unseen: "0 0 0 2px var(--surface), 0 0 0 4px var(--accent2), 0 0 10px 4px var(--accent2-soft-border)",
   seen: "0 0 0 2px var(--surface), 0 0 0 3px var(--border)",
+};
+
+// Capa del destello que pulsa (momentRing="unseen"): el envoltorio tiene
+// el tamaño del avatar y la capa lo cubre, con el destello en accent.
+const glowWrapStyle = (box) => ({
+  position: "relative",
+  width: `${box}px`,
+  height: `${box}px`,
+  minWidth: `${box}px`,
+  flexShrink: 0,
+});
+
+const glowLayerStyle = {
+  position: "absolute",
+  inset: 0,
+  borderRadius: "50%",
+  boxShadow: "0 0 0 2px var(--surface), 0 0 0 4px var(--accent), 0 0 14px 6px var(--accent-soft-border)",
+  pointerEvents: "none",
+  opacity: 0,
 };
 
 const SIZES = {
@@ -189,13 +209,8 @@ export default function Avatar({
     boxSizing: "border-box",
   };
 
-  return (
-    <div
-      style={ringStyle}
-      className={momentRing === "unseen" ? "pt-moment-glow" : undefined}
-      onClick={handleClick}
-      title={name || undefined}
-    >
+  const avatar = (
+    <div style={ringStyle} onClick={handleClick} title={name || undefined}>
       {showPhoto ? (
         <img
           src={photoURL}
@@ -207,6 +222,19 @@ export default function Avatar({
         <div style={style}>{getInitials(name)}</div>
       )}
       {online && <span style={onlineDotStyle} />}
+    </div>
+  );
+
+  if (momentRing !== "unseen") return avatar;
+
+  // Destello que "respira" (punto 68): una capa hermana del aro, del mismo
+  // tamaño, con el destello en accent; la clase .pt-moment-glow (index.css)
+  // solo le cambia la opacidad. No va adentro del aro porque su
+  // overflow: hidden la recortaría.
+  return (
+    <div style={glowWrapStyle(box)}>
+      {avatar}
+      <span className="pt-moment-glow" style={glowLayerStyle} aria-hidden="true" />
     </div>
   );
 }

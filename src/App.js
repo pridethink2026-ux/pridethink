@@ -18,13 +18,8 @@ import HomeIcon from "./HomeNavIcon";
 import { useIsMobile } from "./utils";
 import { useOnlinePresence } from "./presence";
 import { useLanguage } from "./LanguageContext";
-import {
-  THEMES,
-  ROTATIVO_KEY,
-  applyTheme,
-  saveThemePreference,
-  initTheme,
-} from "./themes";
+import { THEMES, ROTATIVO_KEY } from "./themes";
+import { useTheme } from "./ThemeContext";
 import { playThemeSound } from "./themeSounds";
 
 /*
@@ -365,14 +360,10 @@ const THEME_ICON_ANIM_CLASS = {
 
 function ThemeMenu() {
   const { t } = useLanguage();
+  const { themeKey: selected, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState("noche");
   const [splashing, setSplashing] = useState(false);
   const panelRef = useRef(null);
-
-  useEffect(() => {
-    setSelected(initTheme());
-  }, []);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -385,9 +376,7 @@ function ThemeMenu() {
   }, [open]);
 
   const handleSelect = (key) => {
-    setSelected(key);
-    saveThemePreference(key);
-    applyTheme(key);
+    setTheme(key);
     // Suena UNA sola vez al confirmar (nunca en hover ni en loop) — si key
     // es ROTATIVO_KEY, playThemeSound reconoce el tick neutro por su
     // propia clave ("rotativo"), sin importar qué tema resuelva ese día.

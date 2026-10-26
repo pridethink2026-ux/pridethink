@@ -188,12 +188,27 @@ export function getRotativeThemeKey() {
   return keys[dayOfYear % keys.length];
 }
 
+// Duración del fundido al cambiar de tema: la de las transiciones de
+// .pt-theme-transition en index.css, con un poco de margen.
+const THEME_TRANSITION_MS = 400;
+let transitionTimer = null;
+
 // Aplica un tema (o resuelve "rotativo" al tema del día) seteando las
 // variables CSS en document.documentElement, disponibles para toda la app.
-export function applyTheme(key) {
+// Con `animate`, los colores cambian con un fundido: la clase
+// .pt-theme-transition (index.css) activa las transiciones en todos los
+// elementos solo mientras dura el cambio. Sin ella no hay transiciones
+// globales, así que el primer pintado (initTheme) y el resto del uso de
+// la app no animan nada de más.
+export function applyTheme(key, { animate = false } = {}) {
   const resolvedKey = key === ROTATIVO_KEY ? getRotativeThemeKey() : key;
   const theme = THEMES[resolvedKey] || THEMES.noche;
   const root = document.documentElement;
+  if (animate) {
+    root.classList.add("pt-theme-transition");
+    clearTimeout(transitionTimer);
+    transitionTimer = setTimeout(() => root.classList.remove("pt-theme-transition"), THEME_TRANSITION_MS);
+  }
   Object.entries(theme.vars).forEach(([prop, value]) => {
     root.style.setProperty(prop, value);
   });
@@ -202,16 +217,27 @@ export function applyTheme(key) {
   });
 }
 
+// localStorage puede no estar disponible (ventana privada, datos del
+// sitio bloqueados): en ese caso no se guarda y se usa "noche".
 export function saveThemePreference(key) {
-  localStorage.setItem(STORAGE_KEY, key);
+  try {
+    localStorage.setItem(STORAGE_KEY, key);
+  } catch {
+    // sin caché local: el tema vale solo para esta visita
+  }
 }
 
 export function loadThemePreference() {
-  return localStorage.getItem(STORAGE_KEY) || "noche";
+  try {
+    return localStorage.getItem(STORAGE_KEY) || "noche";
+  } catch {
+    return "noche";
+  }
 }
 
-// Carga la preferencia guardada (o "noche" por defecto) y la aplica.
-// Devuelve la clave cargada para que la UI sepa qué mostrar como seleccionado.
+// Carga la preferencia guardada (o "noche" por defecto) y la aplica, sin
+// fundido. La llama index.js antes del primer render (ver ThemeContext.jsx).
+// Devuelve la clave cargada.
 export function initTheme() {
   const pref = loadThemePreference();
   applyTheme(pref);

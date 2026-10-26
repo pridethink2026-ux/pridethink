@@ -5,6 +5,9 @@ body {
     sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Fondo del tema también detrás de toda la página (sin destello blanco
+     al cargar ni al hacer scroll de más). */
+  background: var(--bg);
 }
 
 code {
@@ -41,25 +44,21 @@ code {
 }
 
 /* Destello de Momentos sin ver (Avatar.jsx, prop momentRing="unseen",
-   punto 66). El estilo inline del avatar ya trae el destello fijo; esto
-   solo lo hace "respirar" alternando los dos acentos del tema. Con
-   "reducir movimiento" se apaga la animación y queda el destello fijo. */
+   punto 66). El estilo inline del avatar ya trae el destello fijo
+   (accent2); encima, una capa propia con el destello en accent "respira"
+   cambiando solo su opacidad (punto 68: antes se animaba box-shadow, que
+   el navegador no puede delegar a la GPU). Con "reducir movimiento" queda
+   el destello fijo (regla global al final del archivo). */
 .pt-moment-glow {
   animation: pt-moment-glow 2.6s ease-in-out infinite;
 }
 
 @keyframes pt-moment-glow {
   0%, 100% {
-    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent2), 0 0 6px 2px var(--accent2-soft-border);
+    opacity: 0;
   }
   50% {
-    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent), 0 0 14px 6px var(--accent-soft-border);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pt-moment-glow {
-    animation: none;
+    opacity: 1;
   }
 }
 
@@ -83,49 +82,79 @@ code {
   }
 }
 
+/* Esqueleto de carga: el brillo es una franja (::after) que se mueve con
+   transform, que el navegador anima en la GPU (punto 68: antes se
+   animaba background-position, que repinta en cada cuadro). */
 .pt-skeleton {
-  background: linear-gradient(90deg, var(--surface-alt) 25%, var(--border) 50%, var(--surface-alt) 75%);
-  background-size: 200% 100%;
-  animation: pt-shimmer 1.4s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-alt);
   border-radius: 8px;
+}
+
+.pt-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  transform: translateX(-100%);
+  animation: pt-shimmer 1.4s ease-in-out infinite;
 }
 
 @keyframes pt-shimmer {
   0% {
-    background-position: 200% 0;
+    transform: translateX(-100%);
   }
   100% {
-    background-position: -200% 0;
+    transform: translateX(100%);
   }
 }
 
+/* Brillo del banner motivacional (App.js): mismo criterio que el
+   esqueleto, una franja que cruza con transform. Pasa 3 veces y queda
+   quieto (antes era infinito y animaba background-position). La tarjeta
+   del banner tiene overflow: hidden, así que la franja no se ve afuera. */
 .pt-banner-shine {
+  overflow: hidden;
+}
+
+.pt-banner-shine::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
   background-image: linear-gradient(
     100deg,
-    rgba(255, 255, 255, 0) 35%,
+    rgba(255, 255, 255, 0) 0%,
     rgba(255, 255, 255, 0.3) 50%,
-    rgba(255, 255, 255, 0) 65%
+    rgba(255, 255, 255, 0) 100%
   );
-  background-size: 250% 100%;
-  animation: pt-banner-shine 3.5s ease-in-out infinite;
+  transform: translateX(-100%);
+  animation: pt-banner-shine 3.5s ease-in-out 3;
 }
 
 @keyframes pt-banner-shine {
   0% {
-    background-position: 200% 0;
+    transform: translateX(-100%);
   }
   100% {
-    background-position: -200% 0;
+    transform: translateX(250%);
   }
 }
 
-/* Transición global de tema (crossfade): applyTheme() (themes.js) solo
-   pisa las variables CSS en :root — el fundido en sí lo hace el navegador
-   solo, con una propiedad transicionable (background-color, color, etc.)
-   que recalcula su valor computado al cambiar la variable que usa. */
-*,
-*::before,
-*::after {
+/* Fundido al cambiar de tema (crossfade): applyTheme() (themes.js) solo
+   pisa las variables CSS en :root — el fundido lo hace el navegador con
+   una propiedad transicionable que recalcula su valor al cambiar la
+   variable. Punto 68: solo mientras <html> tiene .pt-theme-transition
+   (applyTheme con animate: true, ~400 ms). Antes la regla valía siempre
+   para todos los elementos, y al aplicar el tema después del primer
+   pintado todo animaba a la vez. */
+.pt-theme-transition,
+.pt-theme-transition *,
+.pt-theme-transition *::before,
+.pt-theme-transition *::after {
   transition: background-color 0.35s ease, color 0.35s ease,
     border-color 0.35s ease, box-shadow 0.35s ease;
 }
@@ -284,5 +313,19 @@ code {
   }
   100% {
     transform: rotate(360deg);
+  }
+}
+
+/* "Reducir movimiento" del sistema (punto 68): ninguna animación ni
+   transición se reproduce; cada elemento queda en su estado final (el
+   destello de Momentos queda fijo, el banner sin brillo). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
