@@ -41,6 +41,7 @@ const MIN_SIZE = 0.04;
 const MAX_SIZE = 0.16;
 const DEFAULT_SIZE = 0.08;
 const JPEG_QUALITY = 0.85;
+const FONT_WAIT_MS = 3000;
 const CONTROLS_HEIGHT = 300; // alto aproximado de los controles, en px
 // Misma familia que --font-display (themes.js), escrita a mano porque el
 // canvas no entiende var(--...). Sora 700 ya se carga en public/index.html.
@@ -303,8 +304,12 @@ export default function MomentTextEditor({ blob, isPrivate = false, onConfirm, o
     setBusy(true);
     try {
       // El canvas dibuja con la fuente que ya esté cargada: se espera a Sora
-      // para no quemar el texto con la de reserva.
-      await document.fonts.load(`${TEXT_WEIGHT} 40px Sora`).catch(() => {});
+      // para no quemar el texto con la de reserva, pero como máximo
+      // FONT_WAIT_MS (con red lenta podía dejar "Publicando…" esperando).
+      await Promise.race([
+        document.fonts.load(`${TEXT_WEIGHT} 40px Sora`).catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, FONT_WAIT_MS)),
+      ]);
       const canvas = document.createElement("canvas");
       canvas.width = image.width;
       canvas.height = image.height;

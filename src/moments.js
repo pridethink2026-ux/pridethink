@@ -1,5 +1,5 @@
 import { Timestamp, addDoc, collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { db, storage } from "./firebase";
 import { getChatId } from "./Chat";
 
@@ -48,6 +48,63 @@ export function getActiveEntries(index, now) {
 }
 
 export class MomentLimitError extends Error {}
+
+// Tiempos límite al publicar (punto 68). Sin ellos, con datos móviles
+// inestables "Publicando…" podía quedar trabado: Storage reintenta una
+// subida hasta 10 minutos, y un commit de Firestore sin red no falla,
+// espera a que vuelva la conexión.
+const UPLOAD_STALL_MS = 30 * 1000; // la subida no avanza en este tiempo
+const STEP_TIMEOUT_MS = 30 * 1000; // pedir la URL o guardar el momento
+
+// `stage` es "upload" (la foto no se subió: se puede reintentar ya) o
+// "save" (la foto subió pero el guardado no confirmó a tiempo: puede
+// terminar solo cuando vuelva la conexión, así que la foto NO se borra).
+export class MomentTimeoutError extends Error {
+  constructor(stage) {
+    super(`moment ${stage} timeout`);
+    this.stage = stage;
+  }
+}
+
+// Sube la foto y cancela si pasa UPLOAD_STALL_MS sin avanzar (no un
+// tiempo total: en una red lenta pero viva la subida sigue).
+function uploadWithStallTimeout(fileRef, blob) {
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(fileRef, blob, { contentType: "image/jpeg" });
+    let timer;
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        task.cancel();
+        reject(new MomentTimeoutError("upload"));
+      }, UPLOAD_STALL_MS);
+    };
+    arm();
+    task.on(
+      "state_changed",
+      arm,
+      (err) => {
+        clearTimeout(timer);
+        reject(err); // si ya se rechazó por tiempo, esto no cambia nada
+      },
+      () => {
+        clearTimeout(timer);
+        resolve();
+      }
+    );
+  });
+}
+
+// Espera `promise` como máximo `ms`; si no llega, rechaza con
+// MomentTimeoutError(stage). La operación original sigue su curso.
+function withTimeout(promise, ms, stage) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new MomentTimeoutError(stage)), ms);
+  });
+  promise.catch(() => {}); // si falla después del tiempo límite, ya se avisó
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 // Me registra como "vio este momento" (commit 5) en
 // moments/{momentId}/momentViewers/{miUid}, que solo lee el autor.
@@ -103,10 +160,10 @@ export async function publishMoment(uid, blob, myIndex, caption = "") {
   const momentRef = doc(collection(db, "moments"));
   const storagePath = `momentImages/${uid}/${momentRef.id}.jpg`;
   const fileRef = ref(storage, storagePath);
-  await uploadBytes(fileRef, blob, { contentType: "image/jpeg" });
+  await uploadWithStallTimeout(fileRef, blob);
 
   try {
-    const imageURL = await getDownloadURL(fileRef);
+    const imageURL = await withTimeout(getDownloadURL(fileRef), STEP_TIMEOUT_MS, "upload");
     const expireAt = now + MOMENT_TTL_MS;
     const entries = [...active, { id: momentRef.id, createdAt: now, expireAt }];
     const times = {};
@@ -130,12 +187,16 @@ export async function publishMoment(uid, blob, myIndex, caption = "") {
       times,
       expireAt: Timestamp.fromMillis(expireAt),
     });
-    await batch.commit();
+    await withTimeout(batch.commit(), STEP_TIMEOUT_MS, "save");
   } catch (err) {
     // La foto ya subió pero el momento no se creó: se borra para no dejar
     // un archivo suelto (si esto también falla, la regla de ciclo de vida
-    // del bucket la borra igual en 2 días).
-    deleteObject(fileRef).catch(() => {});
+    // del bucket la borra igual en 2 días). Salvo si el guardado solo
+    // tardó: Firestore lo sigue intentando y puede terminar después, y
+    // entonces el momento necesita su foto.
+    if (!(err instanceof MomentTimeoutError && err.stage === "save")) {
+      deleteObject(fileRef).catch(() => {});
+    }
     throw err;
   }
 }

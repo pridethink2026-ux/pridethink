@@ -442,6 +442,9 @@ export const translations = {
     "moments.limitReached": "Ya tienes {max} momentos activos, que es el máximo. Espera a que venza alguno para publicar otro.",
     "moments.errorPublish":
       "No se pudo publicar el momento. Revisa tu conexión y que la hora de tu dispositivo esté bien, y prueba de nuevo.",
+    "moments.errorSlowUpload": "La conexión está muy lenta y la foto no se pudo subir. Prueba de nuevo.",
+    "moments.errorSlowSave":
+      "La conexión está lenta: tu momento puede tardar en aparecer. Si en unos minutos no está, prueba de nuevo.",
     "moments.viewerLabel": "Momentos",
     "moments.close": "Cerrar",
     "moments.loading": "Cargando...",
@@ -1053,6 +1056,9 @@ export const translations = {
     "moments.limitReached": "You already have {max} active moments, which is the maximum. Wait for one to expire to post another.",
     "moments.errorPublish":
       "The moment could not be posted. Check your connection and that your device's clock is correct, then try again.",
+    "moments.errorSlowUpload": "The connection is too slow and the photo could not be uploaded. Try again.",
+    "moments.errorSlowSave":
+      "The connection is slow: your moment may take a while to show up. If it's not there in a few minutes, try again.",
     "moments.viewerLabel": "Moments",
     "moments.close": "Close",
     "moments.loading": "Loading...",

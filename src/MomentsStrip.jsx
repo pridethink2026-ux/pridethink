@@ -6,7 +6,7 @@ import MomentViewer from "./MomentViewer";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useMoments } from "./MomentsContext";
-import { MAX_ACTIVE_MOMENTS, MomentLimitError, publishMoment } from "./moments";
+import { MAX_ACTIVE_MOMENTS, MomentLimitError, MomentTimeoutError, publishMoment } from "./moments";
 
 /*
   MomentsStrip
@@ -162,13 +162,17 @@ export default function MomentsStrip({ currentUid, myProfile }) {
         isError: !!myProfile?.isPrivate,
       });
     } catch (err) {
-      setMessage({
-        text:
-          err instanceof MomentLimitError
-            ? t("moments.limitReached", { max: MAX_ACTIVE_MOMENTS })
-            : t("moments.errorPublish"),
-        isError: true,
-      });
+      let text;
+      if (err instanceof MomentLimitError) {
+        text = t("moments.limitReached", { max: MAX_ACTIVE_MOMENTS });
+      } else if (err instanceof MomentTimeoutError) {
+        text = err.stage === "save" ? t("moments.errorSlowSave") : t("moments.errorSlowUpload");
+      } else {
+        text = t("moments.errorPublish");
+      }
+      // Queda en la consola para diagnosticar reportes desde el celular.
+      console.error("No se pudo publicar el momento:", err?.code || err?.message || err);
+      setMessage({ text, isError: true });
     } finally {
       setPublishing(false);
     }
