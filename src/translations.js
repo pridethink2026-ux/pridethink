@@ -32,6 +32,8 @@ export const translations = {
   es: {
     // Genérico, usado en más de una pantalla
     "common.loading": "Cargando...",
+    "common.connectFailed": "No pudimos conectar",
+    "common.retry": "Reintentar",
     "verified.badge": "Cuenta verificada",
 
     // Tiempo relativo (timeAgo()/formatLastSeen() en utils.js/presence.js),
@@ -100,6 +102,7 @@ export const translations = {
 
     // Registro, paso 2: Datos personales (PersonalDataForm)
     "personal.back": "← Atrás",
+    "personal.exit": "← Salir",
     "personal.eyebrow": "Paso 2 de 3",
     "personal.title": "Cuéntanos un poco de ti",
     "personal.subtitle":
@@ -660,6 +663,8 @@ export const translations = {
   en: {
     // Generic, used across more than one screen
     "common.loading": "Loading...",
+    "common.connectFailed": "We couldn't connect",
+    "common.retry": "Try again",
     "verified.badge": "Verified account",
 
     // Relative time (timeAgo()/formatLastSeen() in utils.js/presence.js),
@@ -727,6 +732,7 @@ export const translations = {
 
     // Signup, step 2: Personal data (PersonalDataForm)
     "personal.back": "← Back",
+    "personal.exit": "← Sign out",
     "personal.eyebrow": "Step 2 of 3",
     "personal.title": "Tell us a bit about yourself",
     "personal.subtitle":

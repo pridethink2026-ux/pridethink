@@ -1,12 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './App';
+import Root from './Root';
 import { LanguageProvider } from './LanguageContext';
-import { BlocksProvider } from './BlocksContext';
-import { AllUsersProvider } from './AllUsersContext';
-import { SoundProvider } from './SoundContext';
-import { MomentsProvider } from './MomentsContext';
 import { ThemeProvider } from './ThemeContext';
 import { initTheme } from './themes';
 import reportWebVitals from './reportWebVitals';
@@ -15,20 +11,14 @@ import reportWebVitals from './reportWebVitals';
 // primera pantalla ya sale con él — ver ThemeContext.jsx.
 initTheme();
 
+// Los proveedores que solo sirven con sesión (usuarios, bloqueos,
+// momentos, sonidos) los monta Root.jsx junto con la app.
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <ThemeProvider>
       <LanguageProvider>
-        <AllUsersProvider>
-          <BlocksProvider>
-            <MomentsProvider>
-              <SoundProvider>
-                <App />
-              </SoundProvider>
-            </MomentsProvider>
-          </BlocksProvider>
-        </AllUsersProvider>
+        <Root />
       </LanguageProvider>
     </ThemeProvider>
   </React.StrictMode>

@@ -1,12 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { auth, db } from "./firebase";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-} from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import {
   doc,
   setDoc,
@@ -27,19 +21,21 @@ import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import VerifiedBadge from "./VerifiedBadge";
 import { useLanguage } from "./LanguageContext";
-import { MIN_SIGNUP_AGE, getCountryOptions, LANGUAGE_OPTIONS, getGenderOptions, calculateAge } from "./profileFields";
 import { markOffline } from "./presence";
 import { unblockUser, useMyBlocks } from "./Blocks";
 import { formatMonthYear, formatLongDate } from "./utils";
+import { authStyles as styles, IdentityForm } from "./AuthForms";
 
 /*
   AuthProfile
   -----------
-  Flujo: Login/Registro -> Elegir identidad libre -> Perfil guardado.
+  Tu perfil (pestaña "Perfil") y editar tu identidad. Entrar y registrarse
+  viven aparte, en AuthScreen.jsx (punto 68, commit 7): Root.jsx solo
+  muestra la app, y por lo tanto este perfil, con sesión y perfil creado.
 
   YA CONECTADO A FIREBASE (Auth + Firestore reales):
-  - Auth real -> createUserWithEmailAndPassword / signInWithEmailAndPassword
-  - Firestore write -> setDoc(doc(db, "users", uid), perfil) + private/data (registro)
+  - Auth real -> signOut (crear cuenta y entrar: AuthScreen.jsx)
+  - Firestore write -> setDoc(doc(db, "users", uid), perfil) al editar
   - Firestore read  -> getDoc de users/{uid} y users/{uid}/private/data (loadOwnProfile)
 
   Ahora los datos SÍ persisten al recargar la página, y dos personas
@@ -64,804 +60,6 @@ async function syncPostsPrivacyField(uid, fieldName, newValue) {
     chunk.forEach((d) => batch.update(d.ref, { [fieldName]: newValue }));
     await batch.commit();
   }
-}
-
-// Sugerencias de identidad: se muestran traducidas (son solo ideas para
-// inspirar, parte de la interfaz), pero una vez que alguien toca una, ESE
-// texto (en el idioma que se le mostró) pasa a ser su identidad libre —
-// contenido suyo desde ese momento, ya no se vuelve a traducir.
-function getIdentitySuggestions(t) {
-  return [
-    t("identity.suggestion.cat"),
-    t("identity.suggestion.squirrel"),
-    t("identity.suggestion.free"),
-    t("identity.suggestion.king"),
-    t("identity.suggestion.queen"),
-    t("identity.suggestion.creator"),
-    t("identity.suggestion.fox"),
-    t("identity.suggestion.phoenix"),
-  ];
-}
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "var(--bg)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px",
-    fontFamily: "var(--font-body)",
-    color: "var(--text)",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "var(--surface)",
-    borderRadius: "24px",
-    border: "1px solid var(--border)",
-    boxShadow: "0 12px 36px rgba(0,0,0,0.25)",
-    padding: "34px 28px",
-    boxSizing: "border-box",
-  },
-  logo: {
-    display: "block",
-    width: "72px",
-    height: "72px",
-    borderRadius: "18px",
-    margin: "0 auto 20px",
-  },
-  eyebrow: {
-    fontSize: "12px",
-    letterSpacing: "0.14em",
-    textTransform: "uppercase",
-    color: "var(--accent2)",
-    fontWeight: 500,
-    margin: "0 0 8px",
-  },
-  title: {
-    fontFamily: "var(--font-display)",
-    fontSize: "26px",
-    fontWeight: 700,
-    margin: "0 0 4px",
-    lineHeight: 1.2,
-  },
-  subtitle: {
-    fontSize: "14px",
-    color: "var(--text-muted)",
-    margin: "0 0 28px",
-    lineHeight: 1.5,
-  },
-  label: {
-    display: "block",
-    fontSize: "13px",
-    color: "var(--text-muted)",
-    margin: "0 0 6px",
-    fontWeight: 500,
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    background: "var(--surface-alt)",
-    border: "1px solid var(--border)",
-    borderRadius: "12px",
-    padding: "11px 14px",
-    fontSize: "15px",
-    color: "var(--text)",
-    marginBottom: "18px",
-    outline: "none",
-  },
-  select: {
-    width: "100%",
-    boxSizing: "border-box",
-    background: "var(--surface-alt)",
-    border: "1px solid var(--border)",
-    borderRadius: "12px",
-    padding: "11px 14px",
-    fontSize: "15px",
-    color: "var(--text)",
-    marginBottom: "18px",
-    outline: "none",
-  },
-  textarea: {
-    width: "100%",
-    boxSizing: "border-box",
-    background: "var(--surface-alt)",
-    border: "1px solid var(--border)",
-    borderRadius: "12px",
-    padding: "11px 14px",
-    fontSize: "15px",
-    color: "var(--text)",
-    marginBottom: "4px",
-    outline: "none",
-    resize: "none",
-    minHeight: "70px",
-    fontFamily: "inherit",
-  },
-  // backLink/link/forgotLink van en <button type="button"> (antes <span>
-  // con onClick, sin teclado ni lector de pantalla): sin fondo, borde ni
-  // relleno, con la fuente del texto que los rodea.
-  backLink: {
-    display: "block",
-    background: "none",
-    border: "none",
-    padding: 0,
-    font: "inherit",
-    color: "var(--text-muted)",
-    fontSize: "13px",
-    fontWeight: 500,
-    cursor: "pointer",
-    margin: "0 0 14px",
-  },
-  checkboxRow: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "10px",
-    marginBottom: "20px",
-  },
-  checkboxInput: {
-    width: "18px",
-    height: "18px",
-    marginTop: "2px",
-    flexShrink: 0,
-    accentColor: "var(--accent2)",
-    cursor: "pointer",
-  },
-  checkboxLabel: {
-    fontSize: "13px",
-    color: "var(--text-muted)",
-    lineHeight: 1.4,
-    cursor: "pointer",
-  },
-  button: {
-    width: "100%",
-    padding: "13px",
-    borderRadius: "12px",
-    border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
-    color: "var(--bg)",
-    fontSize: "15px",
-    fontWeight: 600,
-    cursor: "pointer",
-    marginTop: "6px",
-  },
-  buttonGhost: {
-    width: "100%",
-    padding: "11px",
-    borderRadius: "12px",
-    border: "1px solid var(--border)",
-    background: "transparent",
-    color: "var(--text)",
-    fontSize: "14px",
-    fontWeight: 500,
-    cursor: "pointer",
-    marginTop: "10px",
-  },
-  switchRow: {
-    textAlign: "center",
-    fontSize: "13px",
-    color: "var(--text-muted)",
-    marginTop: "18px",
-  },
-  link: {
-    background: "none",
-    border: "none",
-    padding: 0,
-    font: "inherit",
-    color: "var(--accent2)",
-    cursor: "pointer",
-    fontWeight: 500,
-  },
-  forgotLink: {
-    display: "block",
-    background: "none",
-    border: "none",
-    padding: 0,
-    font: "inherit",
-    color: "var(--text-muted)",
-    fontSize: "12px",
-    fontWeight: 500,
-    cursor: "pointer",
-    margin: "-10px 0 18px auto",
-  },
-  chipRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    marginBottom: "20px",
-  },
-  chip: (active) => ({
-    padding: "7px 14px",
-    borderRadius: "999px",
-    border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
-    background: active ? "var(--accent2-soft)" : "var(--surface-alt)",
-    color: active ? "var(--accent2)" : "var(--text-muted)",
-    fontFamily: "inherit",
-    fontSize: "13px",
-    fontWeight: 500,
-    cursor: "pointer",
-    userSelect: "none",
-  }),
-  error: {
-    background: "var(--accent2-softer)",
-    border: "1px solid var(--accent2-soft-border)",
-    color: "var(--accent2)",
-    fontSize: "13px",
-    borderRadius: "8px",
-    padding: "10px 12px",
-    marginBottom: "16px",
-  },
-  success: {
-    background: "var(--accent-softer)",
-    border: "1px solid var(--accent-soft-border)",
-    color: "var(--accent)",
-    fontSize: "13px",
-    lineHeight: 1.5,
-    borderRadius: "8px",
-    padding: "12px 14px",
-    marginBottom: "16px",
-  },
-  profileHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "14px",
-    marginBottom: "18px",
-  },
-  photoUploaderRow: {
-    marginBottom: "18px",
-  },
-  tabsRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    marginBottom: "18px",
-  },
-  tabBtn: (active) => ({
-    padding: "7px 16px",
-    borderRadius: "999px",
-    border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
-    background: active ? "var(--accent2-soft)" : "transparent",
-    color: active ? "var(--accent2)" : "var(--text-muted)",
-    fontSize: "13px",
-    fontWeight: 600,
-    cursor: "pointer",
-  }),
-  bioText: {
-    fontSize: "13px",
-    color: "var(--text)",
-    lineHeight: 1.4,
-    margin: "6px 0 0",
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
-  },
-  bioCounter: {
-    fontSize: "11px",
-    color: "var(--text-muted)",
-    textAlign: "right",
-    margin: "0 0 18px",
-  },
-  countsRow: {
-    display: "flex",
-    gap: "28px",
-    marginBottom: "24px",
-  },
-  countItem: { cursor: "pointer" },
-  countNumber: { fontSize: "16px", fontWeight: 700, margin: 0 },
-  countLabel: { fontSize: "12px", color: "var(--text-muted)", margin: "2px 0 0" },
-  fieldRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: "12px 0",
-    borderBottom: "1px solid var(--border)",
-    fontSize: "14px",
-  },
-  fieldLabel: { color: "var(--text-muted)" },
-  fieldValue: { fontWeight: 500 },
-  privacyRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "14px 0",
-    borderBottom: "1px solid var(--border)",
-  },
-  privacyText: { fontSize: "13px" },
-  privacyHint: { fontSize: "11px", color: "var(--text-muted)", margin: "2px 0 0" },
-  toggle: (on) => ({
-    width: "44px",
-    height: "24px",
-    borderRadius: "999px",
-    background: on ? "var(--accent2)" : "var(--surface-alt)",
-    border: `1px solid ${on ? "var(--accent2)" : "var(--border)"}`,
-    position: "relative",
-    boxSizing: "content-box",
-    padding: 0,
-    cursor: "pointer",
-    flexShrink: 0,
-    transition: "background 0.15s",
-  }),
-  toggleDot: (on) => ({
-    width: "18px",
-    height: "18px",
-    borderRadius: "50%",
-    background: "#fff",
-    position: "absolute",
-    top: "2px",
-    left: on ? "23px" : "2px",
-    transition: "left 0.15s",
-  }),
-  sectionTitle: {
-    fontSize: "13px",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    fontWeight: 700,
-    fontFamily: "var(--font-display)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
-    WebkitBackgroundClip: "text",
-    backgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    color: "transparent",
-    margin: "24px 0 10px",
-    display: "inline-block",
-  },
-  blockedEmpty: {
-    fontSize: "13px",
-    color: "var(--text-muted)",
-    margin: "0 0 4px",
-  },
-  blockedRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "10px 0",
-    borderBottom: "1px solid var(--border)",
-  },
-  blockedInfo: { flex: 1, minWidth: 0 },
-  blockedName: { fontSize: "13px", fontWeight: 600, margin: 0 },
-  blockedIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: "1px 0 0" },
-  unblockBtn: {
-    padding: "6px 14px",
-    borderRadius: "999px",
-    border: "1px solid var(--border)",
-    background: "transparent",
-    color: "var(--text-muted)",
-    fontSize: "12px",
-    fontWeight: 600,
-    cursor: "pointer",
-    flexShrink: 0,
-  },
-};
-
-function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, initialValues }) {
-  const { t } = useLanguage();
-  const [email, setEmail] = useState(initialValues?.email || "");
-  const [password, setPassword] = useState(initialValues?.password || "");
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit({ email, password });
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <p style={styles.eyebrow}>
-        {mode === "login" ? t("login.eyebrowBack") : t("login.eyebrowSignupStep1")}
-      </p>
-      <h1 style={styles.title}>
-        {mode === "login" ? t("login.titleLogin") : t("login.titleSignup")}
-      </h1>
-      <p style={styles.subtitle}>
-        {mode === "login" ? t("login.subtitleLogin") : t("login.subtitleSignup")}
-      </p>
-
-      {error && <div role="alert" style={styles.error}>{error}</div>}
-
-      <label style={styles.label} htmlFor="email">
-        {t("login.emailLabel")}
-      </label>
-      <input
-        id="email"
-        style={styles.input}
-        type="email"
-        autoComplete="email"
-        placeholder={t("login.emailPlaceholder")}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-      />
-
-      <label style={styles.label} htmlFor="password">
-        {t("login.passwordLabel")}
-      </label>
-      <input
-        id="password"
-        style={styles.input}
-        type="password"
-        autoComplete={mode === "login" ? "current-password" : "new-password"}
-        placeholder={t("login.passwordPlaceholder")}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        minLength={6}
-        required
-      />
-
-      {mode === "login" && (
-        <button
-          type="button"
-          style={styles.forgotLink}
-          onClick={() => onForgotPassword(email)}
-        >
-          {t("login.forgotPassword")}
-        </button>
-      )}
-
-      <button type="submit" style={styles.button} disabled={loading}>
-        {loading
-          ? t("login.submitWait")
-          : mode === "login"
-          ? t("login.submitLogin")
-          : t("login.submitSignup")}
-      </button>
-
-      <p style={styles.switchRow}>
-        {mode === "login" ? (
-          <>
-            {t("login.noAccount")}{" "}
-            <button type="button" style={styles.link} onClick={() => setMode("signup")}>
-              {t("login.signupLink")}
-            </button>
-          </>
-        ) : (
-          <>
-            {t("login.hasAccount")}{" "}
-            <button type="button" style={styles.link} onClick={() => setMode("login")}>
-              {t("login.loginLink")}
-            </button>
-          </>
-        )}
-      </p>
-    </form>
-  );
-}
-
-function ResetPasswordForm({ initialEmail, onBack }) {
-  const { t } = useLanguage();
-  const [email, setEmail] = useState(initialEmail || "");
-  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setStatus("sending");
-    setErrorMsg("");
-    try {
-      await sendPasswordResetEmail(auth, email.trim());
-      setStatus("sent");
-    } catch (err) {
-      setStatus("error");
-      setErrorMsg(traducirErrorReset(err.code, t));
-    }
-  };
-
-  return (
-    <div>
-      <p style={styles.eyebrow}>{t("reset.eyebrow")}</p>
-      <h1 style={styles.title}>{t("reset.title")}</h1>
-      <p style={styles.subtitle}>{t("reset.subtitle")}</p>
-
-      {status === "sent" ? (
-        <div style={styles.success}>{t("reset.success")}</div>
-      ) : (
-        <form onSubmit={handleSubmit}>
-          {status === "error" && <div role="alert" style={styles.error}>{errorMsg}</div>}
-
-          <label style={styles.label} htmlFor="resetEmail">
-            {t("login.emailLabel")}
-          </label>
-          <input
-            id="resetEmail"
-            style={styles.input}
-            type="email"
-            autoComplete="email"
-            placeholder={t("login.emailPlaceholder")}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-
-          <button type="submit" style={styles.button} disabled={status === "sending"}>
-            {status === "sending" ? t("reset.sending") : t("reset.submit")}
-          </button>
-        </form>
-      )}
-
-      <p style={styles.switchRow}>
-        <button type="button" style={styles.link} onClick={onBack}>
-          {t("reset.backLink")}
-        </button>
-      </p>
-    </div>
-  );
-}
-
-const TODAY_ISO = new Date().toISOString().slice(0, 10);
-
-function PersonalDataForm({ onSubmit, onBack, loading, error }) {
-  const { language, setLanguage, t } = useLanguage();
-  const [fullName, setFullName] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [country, setCountry] = useState("");
-  const [gender, setGender] = useState("");
-  const [genderOther, setGenderOther] = useState("");
-  const [accepted, setAccepted] = useState(false);
-
-  // El selector de país e idioma usan directamente el idioma activo de la
-  // interfaz (LanguageContext): elegir un idioma acá cambia la UI al
-  // instante, y el valor ya queda listo para guardarse al terminar el
-  // registro (ver handleSubmit).
-  const countryOptions = useMemo(() => getCountryOptions(language), [language]);
-  const genderOptions = getGenderOptions(t);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit({
-      fullName: fullName.trim(),
-      birthDate,
-      country,
-      language,
-      gender,
-      genderOther: gender === "otro" ? genderOther.trim() : "",
-    });
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <button type="button" style={styles.backLink} onClick={onBack}>
-        {t("personal.back")}
-      </button>
-      <p style={styles.eyebrow}>{t("personal.eyebrow")}</p>
-      <h1 style={styles.title}>{t("personal.title")}</h1>
-      <p style={styles.subtitle}>{t("personal.subtitle")}</p>
-
-      {error && <div role="alert" style={styles.error}>{error}</div>}
-
-      <label style={styles.label} htmlFor="fullName">
-        {t("personal.fullNameLabel")}
-      </label>
-      <input
-        id="fullName"
-        style={styles.input}
-        type="text"
-        placeholder={t("personal.fullNamePlaceholder")}
-        value={fullName}
-        onChange={(e) => setFullName(e.target.value)}
-        required
-      />
-
-      <label style={styles.label} htmlFor="birthDate">
-        {t("personal.birthDateLabel")}
-      </label>
-      <input
-        id="birthDate"
-        style={styles.input}
-        type="date"
-        value={birthDate}
-        max={TODAY_ISO}
-        onChange={(e) => setBirthDate(e.target.value)}
-        required
-      />
-
-      <label style={styles.label} htmlFor="country">
-        {t("personal.countryLabel")}
-      </label>
-      <select
-        id="country"
-        style={styles.select}
-        value={country}
-        onChange={(e) => setCountry(e.target.value)}
-        required
-      >
-        <option value="" disabled>
-          {t("personal.countryPlaceholder")}
-        </option>
-        {countryOptions.map((c) => (
-          <option key={c.code} value={c.code}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-
-      <label style={styles.label} htmlFor="language">
-        {t("personal.languageLabel")}
-      </label>
-      <select
-        id="language"
-        style={styles.select}
-        value={language}
-        onChange={(e) => setLanguage(e.target.value)}
-        required
-      >
-        {LANGUAGE_OPTIONS.map((l) => (
-          <option key={l.value} value={l.value}>
-            {l.label}
-          </option>
-        ))}
-      </select>
-
-      <label style={styles.label} htmlFor="gender">
-        {t("personal.genderLabel")}
-      </label>
-      <select
-        id="gender"
-        style={styles.select}
-        value={gender}
-        onChange={(e) => setGender(e.target.value)}
-        required
-      >
-        <option value="" disabled>
-          {t("personal.genderPlaceholder")}
-        </option>
-        {genderOptions.map((g) => (
-          <option key={g.value} value={g.value}>
-            {g.label}
-          </option>
-        ))}
-      </select>
-
-      {gender === "otro" && (
-        <>
-          <label style={styles.label} htmlFor="genderOther">
-            {t("personal.genderOtherLabel")}
-          </label>
-          <input
-            id="genderOther"
-            style={styles.input}
-            type="text"
-            placeholder={t("personal.genderOtherPlaceholder")}
-            value={genderOther}
-            onChange={(e) => setGenderOther(e.target.value)}
-            required
-          />
-        </>
-      )}
-
-      <div style={styles.checkboxRow}>
-        <input
-          id="acceptedTerms"
-          style={styles.checkboxInput}
-          type="checkbox"
-          checked={accepted}
-          onChange={(e) => setAccepted(e.target.checked)}
-          required
-        />
-        <label style={styles.checkboxLabel} htmlFor="acceptedTerms">
-          {t("personal.termsCheckbox")}
-        </label>
-      </div>
-
-      <button type="submit" style={styles.button} disabled={loading}>
-        {loading ? t("personal.submitWait") : t("personal.submit")}
-      </button>
-    </form>
-  );
-}
-
-function IdentityForm({ onSubmit, loading, initialValues, isEdit, error }) {
-  const { t } = useLanguage();
-  const [displayName, setDisplayName] = useState(initialValues?.displayName || "");
-  const [identity, setIdentity] = useState(initialValues?.identity || "");
-  const [bio, setBio] = useState(initialValues?.bio || "");
-  const [datingPreference, setDatingPreference] = useState(initialValues?.datingPreference || "");
-  const [validationError, setValidationError] = useState("");
-  const suggestions = getIdentitySuggestions(t);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Antes este chequeo cortaba en silencio, sin ningún aviso: "identity"
-    // tiene el atributo HTML "required", pero eso solo exige que el campo
-    // no esté vacío, no que tenga contenido real — un valor de solo
-    // espacios pasa la validación nativa del navegador igual, y después
-    // .trim() lo trata como vacío acá. Ahora se avisa en vez de no hacer
-    // nada (bug reportado en producción, 2026-07-28).
-    if (!identity.trim()) {
-      setValidationError(t("identity.emptyIdentity"));
-      return;
-    }
-    setValidationError("");
-    onSubmit({
-      displayName: displayName.trim() || "Sin nombre",
-      identity: identity.trim(),
-      bio: bio.trim(),
-      datingPreference: datingPreference.trim(),
-    });
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <p style={styles.eyebrow}>
-        {isEdit ? t("identity.eyebrowEdit") : t("identity.eyebrowSignupStep3")}
-      </p>
-      <h1 style={styles.title}>{isEdit ? t("identity.titleEdit") : t("identity.titleSignup")}</h1>
-      <p style={styles.subtitle}>
-        {isEdit ? t("identity.subtitleEdit") : t("identity.subtitleSignup")}
-      </p>
-      {(validationError || error) && (
-        <div role="alert" style={styles.error}>{validationError || error}</div>
-      )}
-
-      <label style={styles.label} htmlFor="displayName">
-        {t("identity.displayNameLabel")}
-      </label>
-      <input
-        id="displayName"
-        style={styles.input}
-        type="text"
-        placeholder={t("identity.displayNamePlaceholder")}
-        value={displayName}
-        onChange={(e) => setDisplayName(e.target.value)}
-      />
-
-      <label style={styles.label} htmlFor="identity">
-        {t("identity.identityLabel")} {isEdit ? t("identity.identityLabelToday") : ""}
-      </label>
-      <input
-        id="identity"
-        style={styles.input}
-        type="text"
-        placeholder={t("identity.identityPlaceholder")}
-        value={identity}
-        onChange={(e) => setIdentity(e.target.value)}
-        required
-        autoFocus={isEdit}
-      />
-
-      <div style={styles.chipRow}>
-        {suggestions.map((s) => (
-          <button
-            type="button"
-            key={s}
-            style={styles.chip(identity === s)}
-            aria-pressed={identity === s}
-            onClick={() => setIdentity(s)}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      <label style={styles.label} htmlFor="bio">
-        {t("identity.bioLabel")}
-      </label>
-      <textarea
-        id="bio"
-        style={styles.textarea}
-        placeholder={t("identity.bioPlaceholder")}
-        value={bio}
-        onChange={(e) => setBio(e.target.value.slice(0, 150))}
-        maxLength={150}
-      />
-      <p style={styles.bioCounter}>{bio.length}/150</p>
-
-      <label style={styles.label} htmlFor="datingPreference">
-        {t("identity.datingPreferenceLabel")}
-      </label>
-      <input
-        id="datingPreference"
-        style={styles.input}
-        type="text"
-        placeholder={t("identity.datingPreferencePlaceholder")}
-        value={datingPreference}
-        onChange={(e) => setDatingPreference(e.target.value)}
-      />
-
-      <button type="submit" style={styles.button} disabled={loading}>
-        {loading
-          ? t("identity.submitSaving")
-          : isEdit
-          ? t("identity.submitUpdate")
-          : t("identity.submitSave")}
-      </button>
-    </form>
-  );
 }
 
 function BlockedUserRow({ uid, onUnblock }) {
@@ -1195,167 +393,42 @@ async function loadOwnProfile(uid) {
 
 export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   const { t } = useLanguage();
-  // login | signup | signupPersonal | identity | profile | reset
-  const [step, setStep] = useState("login");
+  // profile | identity (editar)
+  const [step, setStep] = useState("profile");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [pendingUid, setPendingUid] = useState(null);
   const [user, setUser] = useState(null);
-  const [resetEmailPrefill, setResetEmailPrefill] = useState("");
-  // Datos de registro que se van juntando entre los pasos "Cuenta" y "Datos
-  // personales" ANTES de crear nada en Firebase, para poder bloquear el
-  // registro completo (ni cuenta de Auth ni documento en Firestore) si la
-  // persona resulta ser menor de edad.
-  const [signupDraft, setSignupDraft] = useState({});
 
-  // Al cargar la página, revisa si Firebase ya tiene una sesión activa guardada.
-  // Si la hay, salta directo al perfil (o a "identity" si aún no tiene perfil).
+  // Carga tu perfil (público + privado). Root.jsx ya garantiza que hay
+  // sesión y que users/{uid} existe.
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const profile = await loadOwnProfile(firebaseUser.uid);
-        if (profile) {
-          setUser(profile);
-          setStep("profile");
-        } else {
-          setPendingUid(firebaseUser.uid);
-          setStep("identity");
-        }
-      }
-      setCheckingSession(false);
+      if (!firebaseUser) return;
+      const profile = await loadOwnProfile(firebaseUser.uid);
+      if (profile) setUser(profile);
     });
     return unsub;
   }, []);
 
-  const handleAuthSubmit = async ({ email, password }) => {
-    setError("");
-    if (step === "signup") {
-      // Todavía NO se toca Firebase acá: solo se guarda el borrador y se
-      // pasa al paso de datos personales, donde se verifica la edad ANTES
-      // de crear la cuenta de verdad (ver handlePersonalSubmit).
-      setSignupDraft({ email, password });
-      setStep("signupPersonal");
-      return;
-    }
-    setLoading(true);
-    try {
-      // FIREBASE: auth (real) - inicia sesión con Firebase Authentication
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-
-      // FIREBASE: firestore read (real) - revisa si ya tiene perfil guardado
-      const profile = await loadOwnProfile(cred.user.uid);
-      if (profile) {
-        setUser(profile);
-        setStep("profile");
-      } else {
-        setPendingUid(cred.user.uid);
-        setStep("identity");
-      }
-    } catch (err) {
-      setError(traducirErrorFirebase(err.code, t));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = (emailTyped) => {
-    setResetEmailPrefill(emailTyped || "");
-    setError("");
-    setStep("reset");
-  };
-
-  // Paso "Datos personales": valida la edad ANTES de crear cualquier cosa
-  // en Firebase. Si es menor de edad, bloquea acá mismo y no llega a
-  // createUserWithEmailAndPassword ni a Firestore.
-  const handlePersonalSubmit = async (personalData) => {
-    setError("");
-    const age = calculateAge(personalData.birthDate);
-    if (age === null) {
-      setError(t("personal.invalidBirthDate"));
-      return;
-    }
-    if (age < MIN_SIGNUP_AGE) {
-      setError(t("personal.underage"));
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // FIREBASE: auth (real) - recién ahora se crea la cuenta, ya
-      // confirmada la mayoría de edad
-      const cred = await createUserWithEmailAndPassword(
-        auth,
-        signupDraft.email,
-        signupDraft.password
-      );
-      setPendingUid(cred.user.uid);
-      setSignupDraft((prev) => ({ ...prev, ...personalData }));
-      setStep("identity");
-    } catch (err) {
-      setError(traducirErrorFirebase(err.code, t));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleIdentitySubmit = async ({ displayName, identity, bio, datingPreference }) => {
     setLoading(true);
     setError("");
-    const uid = pendingUid || auth.currentUser?.uid;
-    const isNewSignup = !user;
-
-    // En un registro nuevo se guardan también los datos personales
-    // juntados en los pasos anteriores — en users/{uid}/private/data, no
-    // en el documento público (hallazgo H1, ver loadOwnProfile). Al EDITAR
-    // (isNewSignup === false) no se reenvían: no tocarlos deja intactos
-    // los que ya están guardados (país, fecha de nacimiento, etc.).
-    const privateFields = isNewSignup
-      ? {
-          fullName: signupDraft.fullName || "",
-          birthDate: signupDraft.birthDate
-            ? Timestamp.fromDate(new Date(signupDraft.birthDate))
-            : null,
-          country: signupDraft.country || "",
-          language: signupDraft.language || "es",
-          gender: signupDraft.gender || "",
-          genderOther: signupDraft.gender === "otro" ? signupDraft.genderOther || "" : "",
-        }
-      : {};
-    const personalFields = isNewSignup
-      ? {
-          isPrivate: false,
-          isWallPrivate: false,
-          following: [],
-          // Timestamp de Firestore, NUNCA un string ya formateado — así se
-          // puede mostrar en el idioma activo al vuelo (formatMonthYear en
-          // utils.js), en vez de quedar congelado en el idioma que estaba
-          // activo el día del registro. Mismo criterio que birthDate.
-          joinedAt: serverTimestamp(),
-        }
-      : {};
-
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    // Al editar no se reenvían los datos personales: no tocarlos deja
+    // intactos los que ya están guardados (país, fecha de nacimiento, etc.).
     const profileUpdate = {
-      ...personalFields,
       displayName,
       identity,
       bio: bio || "",
       datingPreference: datingPreference || "",
-      // Mismo motivo que joinedAt de arriba: Timestamp, no string.
+      // Timestamp, no string (ver joinedAt en AuthScreen.jsx).
       identityUpdatedAt: serverTimestamp(),
     };
 
     try {
       // FIREBASE: firestore write (real) - guarda el perfil en Firestore.
-      // En el registro, público y privado van en el MISMO batch: la regla
-      // de create de users/{uid} mira la fecha de nacimiento de
-      // private/data tal como queda al terminar el batch (getAfter).
-      const batch = writeBatch(db);
-      batch.set(doc(db, "users", uid), profileUpdate, { merge: true });
-      if (isNewSignup) {
-        batch.set(doc(db, "users", uid, "private", "data"), privateFields, { merge: true });
-      }
-      await batch.commit();
+      await setDoc(doc(db, "users", uid), profileUpdate, { merge: true });
       // serverTimestamp() escribe bien en Firestore, pero devuelve un
       // sentinel (FieldValue) sin .toDate() — reflejarlo tal cual en el
       // estado local deja a formatMonthYear/formatLongDate sin nada que
@@ -1363,15 +436,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       // (recién en el siguiente login/recarga). Timestamp.now() sí es un
       // Timestamp real con .toDate(), usado SOLO para esta actualización
       // optimista local — lo que se escribió en Firestore no cambia.
-      const optimisticNow = Timestamp.now();
-      setUser({
-        ...(user || {}),
-        ...privateFields,
-        ...profileUpdate,
-        identityUpdatedAt: optimisticNow,
-        ...(isNewSignup ? { joinedAt: optimisticNow } : {}),
-      });
-      setSignupDraft({});
+      setUser({ ...user, ...profileUpdate, identityUpdatedAt: Timestamp.now() });
       setStep("profile");
     } catch (err) {
       setError(t("errors.profileSaveFailed"));
@@ -1455,16 +520,12 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     // escritura ya no pasaría las reglas de Firestore (exigen estar
     // autenticado) — ver presence.js.
     await markOffline(auth.currentUser?.uid);
-    // FIREBASE: auth (real) - cierra la sesión
+    // FIREBASE: auth (real) - cierra la sesión. Root.jsx ve que ya no hay
+    // sesión y vuelve a la pantalla de entrada.
     await signOut(auth);
-    setUser(null);
-    setPendingUid(null);
-    setSignupDraft({});
-    setStep("login");
-    setError("");
   };
 
-  if (checkingSession) {
+  if (!user) {
     return (
       <div style={styles.page}>
         <div style={{ ...styles.card, textAlign: "center", color: "var(--text-muted)" }}>
@@ -1477,50 +538,16 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        {(step === "login" || step === "signup") && (
-          <>
-            <img src="/logo-icon.webp" alt="Pridethink" width="72" height="72" style={styles.logo} />
-            <LoginForm
-              mode={step}
-              setMode={setStep}
-              onSubmit={handleAuthSubmit}
-              error={error}
-              loading={loading}
-              onForgotPassword={handleForgotPassword}
-              initialValues={step === "signup" ? signupDraft : undefined}
-            />
-          </>
-        )}
-        {step === "reset" && (
-          <>
-            <img src="/logo-icon.webp" alt="Pridethink" width="72" height="72" style={styles.logo} />
-            <ResetPasswordForm
-              initialEmail={resetEmailPrefill}
-              onBack={() => setStep("login")}
-            />
-          </>
-        )}
-        {step === "signupPersonal" && (
-          <PersonalDataForm
-            onSubmit={handlePersonalSubmit}
-            onBack={() => {
-              setError("");
-              setStep("signup");
-            }}
-            loading={loading}
-            error={error}
-          />
-        )}
         {step === "identity" && (
           <IdentityForm
             onSubmit={handleIdentitySubmit}
             loading={loading}
             initialValues={user}
-            isEdit={!!user}
+            isEdit
             error={error}
           />
         )}
-        {step === "profile" && user && (
+        {step === "profile" && (
           <ProfileView
             user={user}
             uid={auth.currentUser?.uid}
@@ -1537,34 +564,4 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       </div>
     </div>
   );
-}
-
-// Traduce los códigos de error de Firebase a un mensaje entendible, en el
-// idioma activo (t viene de useLanguage()).
-const KNOWN_AUTH_ERROR_CODES = [
-  "auth/email-already-in-use",
-  "auth/invalid-email",
-  "auth/weak-password",
-  "auth/user-not-found",
-  "auth/wrong-password",
-  "auth/invalid-credential",
-  "auth/too-many-requests",
-];
-
-function traducirErrorFirebase(code, t) {
-  return KNOWN_AUTH_ERROR_CODES.includes(code) ? t(`errors.${code}`) : t("errors.generic");
-}
-
-// Traduce los códigos de error de sendPasswordResetEmail, en el idioma activo.
-const KNOWN_RESET_ERROR_CODES = [
-  "auth/invalid-email",
-  "auth/missing-email",
-  "auth/user-not-found",
-  "auth/too-many-requests",
-];
-
-function traducirErrorReset(code, t) {
-  return KNOWN_RESET_ERROR_CODES.includes(code)
-    ? t(`errors.reset.${code}`)
-    : t("errors.reset.generic");
 }

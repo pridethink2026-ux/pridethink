@@ -152,6 +152,31 @@ export const THEMES = {
   },
 };
 
+// Paleta fija de marca para la pantalla de entrada (AuthScreen.jsx, punto
+// 68, commit 7): la entrada tiene su propio estilo, siempre el mismo, sin
+// importar el tema que cada persona eligió dentro de la app. Mismas
+// variables que un tema; AuthScreen las pone en su contenedor, así que
+// solo valen ahí adentro y el resto de la app sigue con el tema elegido.
+// Hoy los valores coinciden con "noche" (morado y rosa, los del logo),
+// pero son una copia aparte a propósito: cambiar "noche" no cambia la
+// entrada.
+export const ENTRY_THEME_VARS = {
+  "--bg": "#150b33",
+  "--surface": "#2a1a5c",
+  "--surface-alt": "#35216e",
+  "--accent": "#9b6bff",
+  "--accent2": "#ff5fae",
+  "--text": "#f5f3ff",
+  "--text-muted": "#b8adf0",
+  "--border": "rgba(155, 107, 255, 0.25)",
+  "--accent2-soft": "rgba(255, 95, 174, 0.15)",
+  "--accent2-softer": "rgba(255, 95, 174, 0.12)",
+  "--accent2-soft-border": "rgba(255, 95, 174, 0.4)",
+  "--accent-soft": "rgba(155, 107, 255, 0.15)",
+  "--accent-softer": "rgba(155, 107, 255, 0.12)",
+  "--accent-soft-border": "rgba(155, 107, 255, 0.4)",
+};
+
 // Colores del texto que se escribe sobre la foto de un Momento (punto 66,
 // MomentTextEditor.jsx). Fijos a propósito, no del tema: el texto queda
 // "quemado" en la imagen con canvas (que no entiende var(--...)) y tiene
