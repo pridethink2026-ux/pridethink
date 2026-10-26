@@ -39,9 +39,9 @@ import {
   getTrendingHashtags,
   buildAuthorHashtagMap,
   getPeopleSuggestions,
-  useCommentCounts,
   rankByPopularity,
 } from "./Explore";
+import { setCommentCount, useCommentCount, useCommentCounts } from "./commentCounts";
 import Groups from "./Groups";
 import Events from "./Events";
 import VerifiedBadge from "./VerifiedBadge";
@@ -655,19 +655,27 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
     }
   };
 
-  // Escucha los comentarios SIEMPRE (no solo al abrir), así el número junto
-  // al ícono de comentarios siempre es exacto, sin depender de que alguien
-  // haga clic para "activar" el conteo correcto.
+  // Los comentarios se escuchan solo mientras están abiertos (punto 70,
+  // commit 9b); cerrados, el número sale de commentCounts.js (un conteo
+  // por post, sin listener). Abiertos, cada cambio actualiza esa caché,
+  // así el número queda exacto al cerrarlos.
+  const commentCount = useCommentCount(post.id);
   useEffect(() => {
+    if (!commentsOpen) {
+      setComments([]);
+      return;
+    }
     const q = query(
       collection(db, "posts", post.id, "comments"),
       orderBy("createdAt", "asc")
     );
     const unsub = onSnapshot(q, (snap) => {
       setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      // Una respuesta de la caché local (sin red) puede estar incompleta.
+      if (!snap.metadata.fromCache) setCommentCount(post.id, snap.size);
     });
     return unsub;
-  }, [post.id]);
+  }, [post.id, commentsOpen]);
 
   const setMyReaction = async (type) => {
     const postRef = doc(db, "posts", post.id);
@@ -898,7 +906,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
           style={styles.actionBtn(commentsOpen)}
           onClick={() => setCommentsOpen((v) => !v)}
         >
-          💬 {comments.length > 0 ? comments.length : t("feed.comment")}
+          💬 {commentCount > 0 ? commentCount : t("feed.comment")}
         </button>
         <button
           style={{ ...styles.actionBtn(false), marginLeft: "auto" }}

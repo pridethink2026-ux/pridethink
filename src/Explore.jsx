@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { collection, doc, updateDoc, arrayUnion, getCountFromServer } from "firebase/firestore";
+import React from "react";
+import { doc, updateDoc, arrayUnion } from "firebase/firestore";
 import { db } from "./firebase";
 import { notify } from "./utils";
 import { normalizeIdentityText } from "./identityStyles";
@@ -29,8 +29,9 @@ import Avatar from "./Avatar";
   Se ordena por popularidad: reacciones + comentarios (rankByPopularity).
   Los comentarios no se cuentan con un listener en tiempo real (sería un
   onSnapshot por publicación solo para ordenar) sino con una consulta de
-  conteo puntual (getCountFromServer) al entrar a la pantalla — más liviano,
-  y sigue sin guardar nada acumulado.
+  conteo puntual (getCountFromServer, useCommentCounts de
+  commentCounts.js, con caché compartida) — más liviano, y sigue sin
+  guardar nada acumulado.
 
   SUGERENCIAS DE PERSONAS (getPeopleSuggestions): usuarios que no seguís,
   con un puntaje simple = palabras en común entre tu identidad libre y la
@@ -123,35 +124,9 @@ export function getPeopleSuggestions(
   return scored.slice(0, limitCount).map((s) => s.user);
 }
 
-// Cuenta de comentarios por post, con una consulta de conteo puntual
-// (getCountFromServer) en vez de un listener en tiempo real — solo se
-// recalcula cuando cambia la lista de ids (mismo patrón de "unir ids con
-// una coma" que ya usa SavedPosts.jsx para su propio efecto).
-export function useCommentCounts(postIds) {
-  const [counts, setCounts] = useState({});
-  const key = (postIds || []).join(",");
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!postIds || postIds.length === 0) {
-      setCounts({});
-      return;
-    }
-    Promise.all(
-      postIds.map((id) =>
-        getCountFromServer(collection(db, "posts", id, "comments")).then((snap) => [id, snap.data().count])
-      )
-    ).then((pairs) => {
-      if (!cancelled) setCounts(Object.fromEntries(pairs));
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-
-  return counts;
-}
+// La cuenta de comentarios por post (useCommentCounts) vive en
+// commentCounts.js (punto 70, commit 9b): misma caché que el número de
+// cada PostCard, así un post no se cuenta dos veces.
 
 export function rankByPopularity(posts, commentCounts) {
   return [...(posts || [])].sort((a, b) => {
