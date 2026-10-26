@@ -308,9 +308,22 @@ export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct
 
   return (
     <div style={styles.wrapper} ref={panelRef}>
-      <button style={styles.bellBtn} onClick={handleToggle}>
-        🔔
-        {unreadCount > 0 && <span style={styles.badge}>{unreadCount}</span>}
+      <button
+        style={styles.bellBtn}
+        aria-label={
+          unreadCount > 0
+            ? t("nav.alertsUnread", { n: unreadCount })
+            : t("notifications.title")
+        }
+        aria-expanded={open}
+        onClick={handleToggle}
+      >
+        <span aria-hidden="true">🔔</span>
+        {unreadCount > 0 && (
+          <span style={styles.badge} aria-hidden="true">
+            {unreadCount}
+          </span>
+        )}
       </button>
 
       {open && (

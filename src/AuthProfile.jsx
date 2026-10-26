@@ -178,8 +178,15 @@ const styles = {
     minHeight: "70px",
     fontFamily: "inherit",
   },
+  // backLink/link/forgotLink van en <button type="button"> (antes <span>
+  // con onClick, sin teclado ni lector de pantalla): sin fondo, borde ni
+  // relleno, con la fuente del texto que los rodea.
   backLink: {
-    display: "inline-block",
+    display: "block",
+    background: "none",
+    border: "none",
+    padding: 0,
+    font: "inherit",
     color: "var(--text-muted)",
     fontSize: "13px",
     fontWeight: 500,
@@ -237,18 +244,25 @@ const styles = {
     marginTop: "18px",
   },
   link: {
+    background: "none",
+    border: "none",
+    padding: 0,
+    font: "inherit",
     color: "var(--accent2)",
     cursor: "pointer",
     fontWeight: 500,
   },
   forgotLink: {
     display: "block",
-    textAlign: "right",
+    background: "none",
+    border: "none",
+    padding: 0,
+    font: "inherit",
     color: "var(--text-muted)",
     fontSize: "12px",
     fontWeight: 500,
     cursor: "pointer",
-    margin: "-10px 0 18px",
+    margin: "-10px 0 18px auto",
   },
   chipRow: {
     display: "flex",
@@ -262,6 +276,7 @@ const styles = {
     border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
     background: active ? "var(--accent2-soft)" : "var(--surface-alt)",
     color: active ? "var(--accent2)" : "var(--text-muted)",
+    fontFamily: "inherit",
     fontSize: "13px",
     fontWeight: 500,
     cursor: "pointer",
@@ -358,6 +373,8 @@ const styles = {
     background: on ? "var(--accent2)" : "var(--surface-alt)",
     border: `1px solid ${on ? "var(--accent2)" : "var(--border)"}`,
     position: "relative",
+    boxSizing: "content-box",
+    padding: 0,
     cursor: "pointer",
     flexShrink: 0,
     transition: "background 0.15s",
@@ -436,7 +453,7 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, 
         {mode === "login" ? t("login.subtitleLogin") : t("login.subtitleSignup")}
       </p>
 
-      {error && <div style={styles.error}>{error}</div>}
+      {error && <div role="alert" style={styles.error}>{error}</div>}
 
       <label style={styles.label} htmlFor="email">
         {t("login.emailLabel")}
@@ -445,6 +462,7 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, 
         id="email"
         style={styles.input}
         type="email"
+        autoComplete="email"
         placeholder={t("login.emailPlaceholder")}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -458,6 +476,7 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, 
         id="password"
         style={styles.input}
         type="password"
+        autoComplete={mode === "login" ? "current-password" : "new-password"}
         placeholder={t("login.passwordPlaceholder")}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -466,12 +485,13 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, 
       />
 
       {mode === "login" && (
-        <span
+        <button
+          type="button"
           style={styles.forgotLink}
           onClick={() => onForgotPassword(email)}
         >
           {t("login.forgotPassword")}
-        </span>
+        </button>
       )}
 
       <button type="submit" style={styles.button} disabled={loading}>
@@ -486,16 +506,16 @@ function LoginForm({ onSubmit, mode, setMode, error, loading, onForgotPassword, 
         {mode === "login" ? (
           <>
             {t("login.noAccount")}{" "}
-            <span style={styles.link} onClick={() => setMode("signup")}>
+            <button type="button" style={styles.link} onClick={() => setMode("signup")}>
               {t("login.signupLink")}
-            </span>
+            </button>
           </>
         ) : (
           <>
             {t("login.hasAccount")}{" "}
-            <span style={styles.link} onClick={() => setMode("login")}>
+            <button type="button" style={styles.link} onClick={() => setMode("login")}>
               {t("login.loginLink")}
-            </span>
+            </button>
           </>
         )}
       </p>
@@ -532,7 +552,7 @@ function ResetPasswordForm({ initialEmail, onBack }) {
         <div style={styles.success}>{t("reset.success")}</div>
       ) : (
         <form onSubmit={handleSubmit}>
-          {status === "error" && <div style={styles.error}>{errorMsg}</div>}
+          {status === "error" && <div role="alert" style={styles.error}>{errorMsg}</div>}
 
           <label style={styles.label} htmlFor="resetEmail">
             {t("login.emailLabel")}
@@ -541,6 +561,7 @@ function ResetPasswordForm({ initialEmail, onBack }) {
             id="resetEmail"
             style={styles.input}
             type="email"
+            autoComplete="email"
             placeholder={t("login.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -554,9 +575,9 @@ function ResetPasswordForm({ initialEmail, onBack }) {
       )}
 
       <p style={styles.switchRow}>
-        <span style={styles.link} onClick={onBack}>
+        <button type="button" style={styles.link} onClick={onBack}>
           {t("reset.backLink")}
-        </span>
+        </button>
       </p>
     </div>
   );
@@ -594,14 +615,14 @@ function PersonalDataForm({ onSubmit, onBack, loading, error }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <span style={styles.backLink} onClick={onBack}>
+      <button type="button" style={styles.backLink} onClick={onBack}>
         {t("personal.back")}
-      </span>
+      </button>
       <p style={styles.eyebrow}>{t("personal.eyebrow")}</p>
       <h1 style={styles.title}>{t("personal.title")}</h1>
       <p style={styles.subtitle}>{t("personal.subtitle")}</p>
 
-      {error && <div style={styles.error}>{error}</div>}
+      {error && <div role="alert" style={styles.error}>{error}</div>}
 
       <label style={styles.label} htmlFor="fullName">
         {t("personal.fullNameLabel")}
@@ -764,7 +785,7 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit, error }) {
         {isEdit ? t("identity.subtitleEdit") : t("identity.subtitleSignup")}
       </p>
       {(validationError || error) && (
-        <div style={styles.error}>{validationError || error}</div>
+        <div role="alert" style={styles.error}>{validationError || error}</div>
       )}
 
       <label style={styles.label} htmlFor="displayName">
@@ -795,13 +816,15 @@ function IdentityForm({ onSubmit, loading, initialValues, isEdit, error }) {
 
       <div style={styles.chipRow}>
         {suggestions.map((s) => (
-          <span
+          <button
+            type="button"
             key={s}
             style={styles.chip(identity === s)}
+            aria-pressed={identity === s}
             onClick={() => setIdentity(s)}
           >
             {s}
-          </span>
+          </button>
         ))}
       </div>
 
@@ -1006,12 +1029,16 @@ function ProfileView({
                   {user.isPrivate ? t("profile.privateOn") : t("profile.privateOff")}
                 </p>
               </div>
-              <div
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!user.isPrivate}
+                aria-label={t("profile.privateProfile")}
                 style={styles.toggle(!!user.isPrivate)}
                 onClick={() => onTogglePrivacy(!user.isPrivate)}
               >
-                <div style={styles.toggleDot(!!user.isPrivate)} />
-              </div>
+                <span style={styles.toggleDot(!!user.isPrivate)} />
+              </button>
             </div>
 
             <div style={styles.privacyRow}>
@@ -1021,12 +1048,16 @@ function ProfileView({
                 </p>
                 <p style={styles.privacyHint}>{t("profile.privateWallHint")}</p>
               </div>
-              <div
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!user.isWallPrivate}
+                aria-label={t("profile.privateWall")}
                 style={styles.toggle(!!user.isWallPrivate)}
                 onClick={() => onToggleWallPrivacy(!user.isWallPrivate)}
               >
-                <div style={styles.toggleDot(!!user.isWallPrivate)} />
-              </div>
+                <span style={styles.toggleDot(!!user.isWallPrivate)} />
+              </button>
             </div>
 
             <div style={styles.privacyRow}>
@@ -1038,12 +1069,16 @@ function ProfileView({
                   {user.soundMuted ? t("profile.muteSoundsOn") : t("profile.muteSoundsOff")}
                 </p>
               </div>
-              <div
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!user.soundMuted}
+                aria-label={t("profile.muteSounds")}
                 style={styles.toggle(!!user.soundMuted)}
                 onClick={() => onToggleSoundMuted(!user.soundMuted)}
               >
-                <div style={styles.toggleDot(!!user.soundMuted)} />
-              </div>
+                <span style={styles.toggleDot(!!user.soundMuted)} />
+              </button>
             </div>
 
             <div style={styles.privacyRow}>
@@ -1051,12 +1086,22 @@ function ProfileView({
                 {t("profile.language")}
               </p>
               <div style={{ display: "flex", gap: "8px" }}>
-                <span style={styles.chip(language === "es")} onClick={() => setLanguage("es")}>
+                <button
+                  type="button"
+                  style={styles.chip(language === "es")}
+                  aria-pressed={language === "es"}
+                  onClick={() => setLanguage("es")}
+                >
                   ES
-                </span>
-                <span style={styles.chip(language === "en")} onClick={() => setLanguage("en")}>
+                </button>
+                <button
+                  type="button"
+                  style={styles.chip(language === "en")}
+                  aria-pressed={language === "en"}
+                  onClick={() => setLanguage("en")}
+                >
                   EN
-                </span>
+                </button>
               </div>
             </div>
           </div>

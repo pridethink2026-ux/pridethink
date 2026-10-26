@@ -56,6 +56,9 @@ export const translations = {
     "nav.themeRotating": "Rotativo",
     "nav.motivationalBanner": "Pridethink: tú puedes ser lo que quieras ser",
     "nav.closeBanner": "Cerrar",
+    "nav.main": "Navegación principal",
+    "nav.theme": "Cambiar tema",
+    "nav.alertsUnread": "Avisos: {n} sin leer",
 
     // Nombres de temas visuales (themes.js -> THEMES.<key>.labelKey)
     "theme.noche": "Noche Violeta",
@@ -681,6 +684,9 @@ export const translations = {
     "nav.themeRotating": "Rotating",
     "nav.motivationalBanner": "Pridethink: you can be whoever you want to be",
     "nav.closeBanner": "Close",
+    "nav.main": "Main navigation",
+    "nav.theme": "Change theme",
+    "nav.alertsUnread": "Alerts: {n} unread",
 
     // Visual theme names (themes.js -> THEMES.<key>.labelKey)
     "theme.noche": "Violet Night",

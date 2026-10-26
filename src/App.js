@@ -185,10 +185,16 @@ const themeStyles = {
     zIndex: 20,
     boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
   },
+  // Cada opción es un <button>: ancho completo, sin borde y con la
+  // fuente de la app (los botones no la heredan solos).
   option: (active) => ({
     display: "flex",
     alignItems: "center",
     gap: "8px",
+    width: "100%",
+    border: "none",
+    fontFamily: "inherit",
+    textAlign: "left",
     padding: "10px 12px",
     borderRadius: "10px",
     background: active ? "var(--accent2-soft)" : "transparent",
@@ -311,7 +317,7 @@ const bottomNavStyles = {
 // derivar de las 2 variables --accent/--accent2 del tema activo.
 function PaintDropIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24">
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
       <defs>
         <linearGradient id="paint-drop-gradient" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#ff4d9e" />
@@ -371,8 +377,17 @@ function ThemeMenu() {
         setOpen(false);
       }
     }
-    if (open) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [open]);
 
   const handleSelect = (key) => {
@@ -388,6 +403,8 @@ function ThemeMenu() {
     <div style={themeStyles.wrapper} ref={panelRef}>
       <button
         style={themeStyles.themeBtn}
+        aria-label={t("nav.theme")}
+        aria-expanded={open}
         onClick={() => {
           setOpen((v) => {
             const willOpen = !v;
@@ -408,6 +425,7 @@ function ThemeMenu() {
           SPLASH_DOTS.map((d, i) => (
             <span
               key={i}
+              aria-hidden="true"
               className="pt-paint-splash-dot"
               style={{ background: d.color, "--tx": d.tx, "--ty": d.ty }}
             />
@@ -416,26 +434,38 @@ function ThemeMenu() {
       {open && (
         <div style={themeStyles.panel}>
           {Object.entries(THEMES).map(([key, theme]) => (
-            <div
+            <button
+              type="button"
               key={key}
               style={themeStyles.option(selected === key)}
+              aria-pressed={selected === key}
               onClick={() => handleSelect(key)}
             >
-              <span className={THEME_ICON_ANIM_CLASS[key]} style={themeStyles.animatedIcon}>
+              <span
+                className={THEME_ICON_ANIM_CLASS[key]}
+                style={themeStyles.animatedIcon}
+                aria-hidden="true"
+              >
                 {theme.emoji}
               </span>
               <span>{t(theme.labelKey)}</span>
-            </div>
+            </button>
           ))}
-          <div
+          <button
+            type="button"
             style={themeStyles.option(selected === ROTATIVO_KEY)}
+            aria-pressed={selected === ROTATIVO_KEY}
             onClick={() => handleSelect(ROTATIVO_KEY)}
           >
-            <span className="pt-theme-icon-rotativo" style={themeStyles.animatedIcon}>
+            <span
+              className="pt-theme-icon-rotativo"
+              style={themeStyles.animatedIcon}
+              aria-hidden="true"
+            >
               🔄
             </span>{" "}
             {t("nav.themeRotating")}
-          </div>
+          </button>
         </div>
       )}
     </div>
@@ -445,16 +475,19 @@ function ThemeMenu() {
 function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
   const { t } = useLanguage();
   return (
-    <div style={bottomNavStyles.bar}>
+    <nav style={bottomNavStyles.bar} aria-label={t("nav.main")}>
       {getBottomTabs(t).map((tab) => {
         const isActive = active === tab.key;
+        const hasUnread = tab.key === "notificaciones" && unreadCount > 0;
         return (
           <button
             key={tab.key}
             style={bottomNavStyles.btn(isActive)}
+            aria-current={isActive ? "page" : undefined}
+            aria-label={hasUnread ? t("nav.alertsUnread", { n: unreadCount }) : undefined}
             onClick={() => onNavigate(tab.key)}
           >
-            <span style={bottomNavStyles.iconWrap}>
+            <span style={bottomNavStyles.iconWrap} aria-hidden="true">
               {tab.key === "feed" ? (
                 <HomeIcon identityText={myIdentity} active={isActive} size={19} />
               ) : tab.key === "tienda" ? (
@@ -462,15 +495,13 @@ function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
               ) : (
                 tab.icon
               )}
-              {tab.key === "notificaciones" && unreadCount > 0 && (
-                <span style={bottomNavStyles.dot} />
-              )}
+              {hasUnread && <span style={bottomNavStyles.dot} />}
             </span>
             <span style={bottomNavStyles.label}>{tab.label}</span>
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
@@ -702,19 +733,21 @@ function App() {
 
   return (
     <div style={{ paddingBottom: isMobile ? "62px" : 0 }}>
-      <div style={navStyles.bar}>
+      <header style={navStyles.bar}>
         <div style={navStyles.logoSlot}>
-          <img src="/logo-icon.webp" alt="Pridethink" width="30" height="30" style={navStyles.logoImg} />
+          {/* alt vacío: el nombre ya está escrito al lado */}
+          <img src="/logo-icon.webp" alt="" width="30" height="30" style={navStyles.logoImg} />
           <span style={navStyles.logoText}>Pridethink</span>
         </div>
         {!isMobile && (
-          <div style={navStyles.buttonsGroup}>
+          <nav style={navStyles.buttonsGroup} aria-label={t("nav.main")}>
             {getDesktopTabs(t).map((tab) => {
               const active = !anyOverlayOpen && view === tab.key;
               return (
                 <button
                   key={tab.key}
                   style={navStyles.button(active)}
+                  aria-current={active ? "page" : undefined}
                   onClick={() => navigate(tab.key)}
                 >
                   {tab.key === "feed" && (
@@ -725,7 +758,7 @@ function App() {
                 </button>
               );
             })}
-          </div>
+          </nav>
         )}
         <div style={navStyles.actionsSlot}>
           <ThemeMenu />
@@ -739,13 +772,13 @@ function App() {
             />
           )}
         </div>
-      </div>
+      </header>
 
       {currentUid && !bannerDismissed && (
         <MotivationalBanner onClose={() => setBannerDismissed(true)} t={t} />
       )}
 
-      <div
+      <main
         key={
           viewingPostId
             ? `post-${viewingPostId}`
@@ -762,7 +795,7 @@ function App() {
         className="pt-view-fade"
       >
         {content}
-      </div>
+      </main>
 
       {currentUid && momentToOpen && (
         <MomentViewer

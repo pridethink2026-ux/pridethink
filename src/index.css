@@ -10,6 +10,13 @@ body {
   background: var(--bg);
 }
 
+/* Anillo de foco solo al navegar con teclado (no al tocar o hacer clic).
+   Los campos de texto llevan outline: none inline y no lo muestran. */
+:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 2px;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
