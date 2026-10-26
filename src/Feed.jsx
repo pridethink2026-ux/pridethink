@@ -19,6 +19,7 @@ import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
 import MomentsStrip from "./MomentsStrip";
 import { useMoments } from "./MomentsContext";
+import { useSavedPosts } from "./SavedPostsContext";
 import ImageViewer from "./ImageViewer";
 import { notify, timeAgo, extractHashtags, splitTextWithHashtags } from "./utils";
 import { useLanguage } from "./LanguageContext";
@@ -609,7 +610,6 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(post.text);
   const [likePop, setLikePop] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   // Punto 61: fotos del post (siempre un array, [] si no tiene ninguna) y
   // el visor de imagen completa — cada PostCard maneja el suyo, así los
@@ -640,16 +640,11 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   const reactionSummary = getReactionSummary(post.reactions);
   const isMine = post.authorId === currentUid;
 
-  // Escucha si el post ya está en savedPosts/{miUid}/items/{postId} — el
-  // id del documento es el propio id del post, así que "está guardado" es
-  // solo que el documento exista.
-  useEffect(() => {
-    if (!currentUid) return;
-    const unsub = onSnapshot(doc(db, "savedPosts", currentUid, "items", post.id), (snap) => {
-      setSaved(snap.exists());
-    });
-    return unsub;
-  }, [currentUid, post.id]);
+  // "Está guardado" = existe savedPosts/{miUid}/items/{postId} (el id del
+  // documento es el propio id del post). Sale del único listener de
+  // SavedPostsContext.jsx (punto 70, commit 9a), no de uno por post.
+  const { isSaved } = useSavedPosts();
+  const saved = isSaved(post.id);
 
   const toggleSave = async () => {
     const ref = doc(db, "savedPosts", currentUid, "items", post.id);

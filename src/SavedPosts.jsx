@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { PostCard } from "./Feed";
 import { useLanguage } from "./LanguageContext";
+import { useSavedPosts } from "./SavedPostsContext";
 
 /*
   SavedPosts
@@ -14,9 +15,10 @@ import { useLanguage } from "./LanguageContext";
 
   savedPosts/{uid}/items/{postId} guarda SOLO una referencia (el id del
   post es el propio id del documento; no se copia texto ni autor). Mismo
-  patrón de dos pasos que FollowListModal.jsx: primero se escucha la
-  subcolección para obtener la lista de ids guardados (ordenada por
-  savedAt, más reciente primero), después se resuelve cada id a su post
+  patrón de dos pasos que FollowListModal.jsx: primero la lista de ids
+  guardados (ordenada por savedAt, más reciente primero; sale de
+  SavedPostsContext.jsx, el mismo listener que usa cada PostCard, punto
+  70, commit 9a), después se resuelve cada id a su post
   completo con su propio onSnapshot — así la lista de posts guardados
   siempre refleja el contenido actual (si editaste un post guardado, se ve
   editado; si lo borraste, desaparece solo de esta lista).
@@ -73,8 +75,7 @@ export default function SavedPosts({ onBack, onOpenProfile }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
-  const [savedIds, setSavedIds] = useState([]);
-  const [idsReady, setIdsReady] = useState(false);
+  const { savedIds, ready: idsReady } = useSavedPosts();
   const [postsById, setPostsById] = useState({});
 
   useEffect(() => {
@@ -90,17 +91,8 @@ export default function SavedPosts({ onBack, onOpenProfile }) {
     return unsub;
   }, [currentUid]);
 
-  // Paso 1: ids de los posts guardados, más reciente primero.
-  useEffect(() => {
-    if (!currentUid) return;
-    setIdsReady(false);
-    const q = query(collection(db, "savedPosts", currentUid, "items"), orderBy("savedAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setSavedIds(snap.docs.map((d) => d.id));
-      setIdsReady(true);
-    });
-    return unsub;
-  }, [currentUid]);
+  // Paso 1 (ids de los posts guardados, más reciente primero): savedIds,
+  // de SavedPostsContext.jsx.
 
   // Paso 2: resuelve cada id a su post completo (o null si ya no existe).
   useEffect(() => {
