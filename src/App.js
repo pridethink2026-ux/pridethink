@@ -1,20 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import AuthProfile from "./AuthProfile";
-import Chat from "./Chat";
 import Feed from "./Feed";
-import Search from "./Search";
-import UserProfile from "./UserProfile";
-import SavedPosts from "./SavedPosts";
-import PostView from "./PostView";
-import GroupView from "./GroupView";
-import EventView from "./EventView";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import MomentViewer from "./MomentViewer";
-import StoreScreen from "./StoreScreen";
 import HomeIcon from "./HomeNavIcon";
+import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
 import { useOnlinePresence } from "./presence";
 import { useLanguage } from "./LanguageContext";
@@ -44,6 +37,19 @@ import { playThemeSound } from "./themeSounds";
   al volver, sin perder en qué pestaña estabas. Las cinco son mutuamente
   excluyentes: abrir una cierra las otras cuatro.
 */
+
+// Pantallas que bajan aparte, recién al abrirlas (punto 68, commit 8).
+// Perfil y Muro quedan en el archivo de la app: son la primera pantalla
+// (Perfil) y la que más se usa, y el perfil ya trae el muro (PostCard).
+// MomentViewer también, porque lo usa la tira de Momentos del muro.
+const Chat = lazyWithReload(() => import(/* webpackChunkName: "chat" */ "./Chat"));
+const Search = lazyWithReload(() => import(/* webpackChunkName: "search" */ "./Search"));
+const StoreScreen = lazyWithReload(() => import(/* webpackChunkName: "store" */ "./StoreScreen"));
+const UserProfile = lazyWithReload(() => import(/* webpackChunkName: "user-profile" */ "./UserProfile"));
+const SavedPosts = lazyWithReload(() => import(/* webpackChunkName: "saved" */ "./SavedPosts"));
+const PostView = lazyWithReload(() => import(/* webpackChunkName: "post" */ "./PostView"));
+const GroupView = lazyWithReload(() => import(/* webpackChunkName: "group" */ "./GroupView"));
+const EventView = lazyWithReload(() => import(/* webpackChunkName: "event" */ "./EventView"));
 
 // Las etiquetas de las pestañas dependen del idioma activo (LanguageContext),
 // así que se arman con "t" en vez de ser un arreglo fijo a nivel de módulo.
@@ -794,7 +800,11 @@ function App() {
         }
         className="pt-view-fade"
       >
-        {content}
+        {/* Dentro de <main> con su key: al cambiar de pantalla se vuelven a
+            montar, así un error en una no deja trabadas las demás. */}
+        <LoadErrorBoundary>
+          <Suspense fallback={<ScreenLoading />}>{content}</Suspense>
+        </LoadErrorBoundary>
       </main>
 
       {currentUid && momentToOpen && (

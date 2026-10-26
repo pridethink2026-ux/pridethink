@@ -140,3 +140,11 @@ export function extractHashtags(text) {
   const matches = (text || "").match(HASHTAG_RE) || [];
   return Array.from(new Set(matches.map((h) => h.slice(1).toLowerCase())));
 }
+
+// Id de la conversación entre dos personas (el mismo sin importar quién
+// escribe primero). Vive acá y no en Chat.jsx para que quien solo necesita
+// el id (moments.js, SharePostModal.jsx, GiftFriendModal.jsx) no arrastre
+// el chat entero al mismo archivo de JavaScript (punto 68, commit 8).
+export function getChatId(uidA, uidB) {
+  return [uidA, uidB].sort().join("_");
+}

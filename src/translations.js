@@ -34,6 +34,8 @@ export const translations = {
     "common.loading": "Cargando...",
     "common.connectFailed": "No pudimos conectar",
     "common.retry": "Reintentar",
+    "common.loadFailed": "No se pudo cargar esta pantalla.",
+    "common.reload": "Recargar",
     "verified.badge": "Cuenta verificada",
 
     // Tiempo relativo (timeAgo()/formatLastSeen() en utils.js/presence.js),
@@ -665,6 +667,8 @@ export const translations = {
     "common.loading": "Loading...",
     "common.connectFailed": "We couldn't connect",
     "common.retry": "Try again",
+    "common.loadFailed": "This screen couldn't be loaded.",
+    "common.reload": "Reload",
     "verified.badge": "Verified account",
 
     // Relative time (timeAgo()/formatLastSeen() in utils.js/presence.js),

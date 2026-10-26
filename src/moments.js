@@ -1,7 +1,8 @@
 import { Timestamp, addDoc, collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { db, storage } from "./firebase";
-import { getChatId } from "./Chat";
+import { db } from "./firebase";
+import { storage } from "./firebaseStorage";
+import { getChatId } from "./utils";
 
 /*
   moments.js

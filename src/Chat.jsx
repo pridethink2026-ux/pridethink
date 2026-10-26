@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import { auth, db, storage } from "./firebase";
+import { auth, db } from "./firebase";
+import { storage } from "./firebaseStorage";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -15,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Avatar from "./Avatar";
-import { notify, useIsMobile } from "./utils";
+import { notify, useIsMobile, getChatId } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
 import { isEffectivelyOnline, formatLastSeen } from "./presence";
@@ -130,12 +131,6 @@ import ImageEditor from "./ImageEditor";
 const MAX_RECORD_SECONDS = 60;
 const AUDIO_MIME_TYPE = "audio/webm;codecs=opus";
 const MAX_AUDIO_BASE64_LENGTH = 900000; // margen de seguridad bajo el límite de 1MB por documento de Firestore
-
-// Exportada porque SharePostModal.jsx también necesita armar el mismo
-// chatId al compartir una publicación por chat.
-export function getChatId(uidA, uidB) {
-  return [uidA, uidB].sort().join("_");
-}
 
 function formatDuration(totalSeconds) {
   const s = Math.max(0, Math.round(totalSeconds || 0));

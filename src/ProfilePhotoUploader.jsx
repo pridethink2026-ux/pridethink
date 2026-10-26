@@ -1,7 +1,8 @@
 import React, { useRef, useState } from "react";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { doc, updateDoc } from "firebase/firestore";
-import { db, storage } from "./firebase";
+import { db } from "./firebase";
+import { storage } from "./firebaseStorage";
 import { useLanguage } from "./LanguageContext";
 import ImageEditor from "./ImageEditor";
 

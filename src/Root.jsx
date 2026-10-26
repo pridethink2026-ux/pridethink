@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
-import App from "./App";
 import AuthScreen from "./AuthScreen";
 import { useLanguage } from "./LanguageContext";
-import { AllUsersProvider } from "./AllUsersContext";
-import { BlocksProvider } from "./BlocksContext";
-import { MomentsProvider } from "./MomentsContext";
-import { SoundProvider } from "./SoundContext";
+import { lazyWithReload, LoadErrorBoundary } from "./lazyLoad";
+
+// La app con sesión baja aparte (punto 68, commit 8): la pantalla de
+// entrada no la necesita.
+const LoggedInApp = lazyWithReload(() => import(/* webpackChunkName: "app" */ "./LoggedInApp"));
 
 /*
   Root
@@ -19,7 +19,9 @@ import { SoundProvider } from "./SoundContext";
       registro a medias) -> la pantalla de entrada (AuthScreen.jsx) sola,
       sin la barra, las pestañas ni las conexiones de la app;
     - con sesión y perfil -> la app con sus proveedores (usuarios,
-      bloqueos, momentos, sonidos), que solo tienen sentido con sesión.
+      bloqueos, momentos, sonidos), que solo tienen sentido con sesión
+      (LoggedInApp.jsx, cargada diferida; mientras baja, la misma
+      pantalla de carga).
   Tema e idioma quedan por fuera (index.js): la entrada también los usa.
 
   Si a los LOADING_TIMEOUT_MS todavía no se sabe (sin red no llega la
@@ -79,6 +81,12 @@ export default function Root() {
     );
   }, [uid, attempt]);
 
+  // Con sesión, la app empieza a bajar ya, en paralelo con la lectura del
+  // perfil (si falla, el error se maneja cuando LoggedInApp la pide).
+  useEffect(() => {
+    if (uid) import(/* webpackChunkName: "app" */ "./LoggedInApp").catch(() => {});
+  }, [uid]);
+
   const checkingProfile = !!uid && hasProfile === undefined;
   const showLoading = authUser === undefined || (checkingProfile && !sawLoggedOut);
 
@@ -98,15 +106,11 @@ export default function Root() {
   }
 
   return (
-    <AllUsersProvider>
-      <BlocksProvider>
-        <MomentsProvider>
-          <SoundProvider>
-            <App />
-          </SoundProvider>
-        </MomentsProvider>
-      </BlocksProvider>
-    </AllUsersProvider>
+    <LoadErrorBoundary>
+      <Suspense fallback={<LoadingScreen />}>
+        <LoggedInApp />
+      </Suspense>
+    </LoadErrorBoundary>
   );
 }
 

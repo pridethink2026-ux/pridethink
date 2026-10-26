@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { storage } from "./firebase";
+import { storage } from "./firebaseStorage";
 import { useLanguage } from "./LanguageContext";
 import ImageEditor from "./ImageEditor";
 

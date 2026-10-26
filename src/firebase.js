@@ -6,7 +6,6 @@ import {
   browserSessionPersistence,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCDondNdyUJqqERZkxa0XkNsr132Vs0j4Q",
@@ -17,7 +16,8 @@ const firebaseConfig = {
   appId: "1:796269545095:web:660430210bb2701e391a22",
 };
 
-const app = initializeApp(firebaseConfig);
+// Exportada para firebaseStorage.js.
+export const app = initializeApp(firebaseConfig);
 
 // initializeAuth en vez de getAuth: misma persistencia que getAuth (la
 // sesión guardada sigue valiendo), pero sin popupRedirectResolver, que al
@@ -29,4 +29,3 @@ export const auth = initializeAuth(app, {
   persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
 });
 export const db = getFirestore(app);
-export const storage = getStorage(app);

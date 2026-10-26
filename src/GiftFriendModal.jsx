@@ -2,9 +2,8 @@ import React, { useMemo, useState } from "react";
 import { db } from "./firebase";
 import { addDoc, collection, doc, increment, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import Avatar from "./Avatar";
-import { notify } from "./utils";
+import { notify, getChatId } from "./utils";
 import { useLanguage } from "./LanguageContext";
-import { getChatId } from "./Chat";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
 
