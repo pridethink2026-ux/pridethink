@@ -198,10 +198,19 @@ export const MOMENT_TEXT_COLORS = [
 ];
 
 export const ROTATIVO_KEY = "rotativo";
+// Tema de una cuenta que todavía no eligió ninguno.
+export const DEFAULT_THEME_KEY = "noche";
 const STORAGE_KEY = "pridethink-theme";
 
 export function getThemeKeys() {
   return Object.keys(THEMES);
+}
+
+// Claves que se pueden elegir: los temas y "rotativo". Misma lista que
+// acepta firestore.rules para private/data.theme: un tema nuevo necesita
+// publicar las reglas antes, o no se podrá guardar en la cuenta.
+export function isThemeKey(key) {
+  return key === ROTATIVO_KEY || Object.prototype.hasOwnProperty.call(THEMES, key);
 }
 
 // Elige un tema distinto cada día del año, en un ciclo fijo entre los 4 temas.
@@ -242,26 +251,38 @@ export function applyTheme(key, { animate = false } = {}) {
   });
 }
 
-// localStorage puede no estar disponible (ventana privada, datos del
-// sitio bloqueados): en ese caso no se guarda y se usa "noche".
+// localStorage es solo una caché del tema de la cuenta con sesión, para el
+// primer pintado (el que manda es private/data.theme, ver
+// ThemeContext.jsx); al cerrar sesión se borra. Puede no estar disponible
+// (ventana privada, datos del sitio bloqueados): en ese caso no se guarda
+// y el primer pintado sale con "noche".
 export function saveThemePreference(key) {
   try {
     localStorage.setItem(STORAGE_KEY, key);
   } catch {
-    // sin caché local: el tema vale solo para esta visita
+    // sin caché local: el primer pintado sale con "noche"
+  }
+}
+
+export function clearThemePreference() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // sin caché local: no había nada que borrar
   }
 }
 
 export function loadThemePreference() {
   try {
-    return localStorage.getItem(STORAGE_KEY) || "noche";
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return isThemeKey(saved) ? saved : DEFAULT_THEME_KEY;
   } catch {
-    return "noche";
+    return DEFAULT_THEME_KEY;
   }
 }
 
-// Carga la preferencia guardada (o "noche" por defecto) y la aplica, sin
-// fundido. La llama index.js antes del primer render (ver ThemeContext.jsx).
+// Carga la caché (o "noche" por defecto) y la aplica, sin fundido. La
+// llama index.js antes del primer render (ver ThemeContext.jsx).
 // Devuelve la clave cargada.
 export function initTheme() {
   const pref = loadThemePreference();
