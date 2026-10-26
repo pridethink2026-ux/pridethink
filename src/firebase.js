@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -14,6 +19,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+// initializeAuth en vez de getAuth: misma persistencia que getAuth (la
+// sesión guardada sigue valiendo), pero sin popupRedirectResolver, que al
+// cargar la página baja el iframe /__/auth/iframe de firebaseapp.com. Solo
+// hace falta para iniciar sesión con ventana emergente o redirección
+// (Google, etc.); la app usa solo correo y contraseña. Si algún día se
+// agrega, pasar browserPopupRedirectResolver a la llamada que lo use.
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
+});
 export const db = getFirestore(app);
 export const storage = getStorage(app);
