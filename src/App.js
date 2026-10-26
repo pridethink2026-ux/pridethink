@@ -715,7 +715,7 @@ function App() {
     <div style={{ paddingBottom: isMobile ? "62px" : 0 }}>
       <div style={navStyles.bar}>
         <div style={navStyles.logoSlot}>
-          <img src="/logo-icon.png" alt="Pridethink" style={navStyles.logoImg} />
+          <img src="/logo-icon.webp" alt="Pridethink" width="30" height="30" style={navStyles.logoImg} />
           <span style={navStyles.logoText}>Pridethink</span>
         </div>
         {!isMobile && (

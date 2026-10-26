@@ -1434,7 +1434,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       <div style={styles.card}>
         {(step === "login" || step === "signup") && (
           <>
-            <img src="/logo-icon.png" alt="Pridethink" style={styles.logo} />
+            <img src="/logo-icon.webp" alt="Pridethink" width="72" height="72" style={styles.logo} />
             <LoginForm
               mode={step}
               setMode={setStep}
@@ -1448,7 +1448,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
         )}
         {step === "reset" && (
           <>
-            <img src="/logo-icon.png" alt="Pridethink" style={styles.logo} />
+            <img src="/logo-icon.webp" alt="Pridethink" width="72" height="72" style={styles.logo} />
             <ResetPasswordForm
               initialEmail={resetEmailPrefill}
               onBack={() => setStep("login")}
