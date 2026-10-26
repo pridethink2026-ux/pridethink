@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, addDoc, setDoc, onSnapshot, orderBy, query, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  addDoc,
+  setDoc,
+  getCountFromServer,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "firebase/firestore";
 import { useLanguage } from "./LanguageContext";
 
 /*
@@ -24,8 +34,9 @@ import { useLanguage } from "./LanguageContext";
   Estructura en Firestore:
   - "groups/{groupId}" -> { name, description, createdBy, createdAt }
   - "groups/{groupId}/members/{uid}" -> { joinedAt }
-    El número de miembros NUNCA se guarda como campo aparte: se escucha la
-    subcolección en tiempo real y se cuenta directo (mismo principio que
+    El número de miembros NUNCA se guarda como campo aparte: en la lista
+    se pide con un conteo (getCountFromServer, punto 70, commit 9d) y
+    dentro del grupo se escucha la subcolección (mismo principio que
     comentarios/seguidores en el resto de la app) — ver GroupRow más abajo.
 
   Los posts de cada grupo viven en la MISMA colección "posts" de siempre
@@ -167,11 +178,21 @@ function GroupRow({ group, onOpen }) {
   const { t } = useLanguage();
   const [memberCount, setMemberCount] = useState(0);
 
+  // Un conteo al mostrar la fila (punto 70, commit 9d): 1 lectura, sin
+  // listener. Antes se escuchaban TODOS los miembros de cada grupo de la
+  // lista solo para el número. Al volver de un grupo la lista se monta de
+  // nuevo (App.js reemplaza el contenido), así que el número se vuelve a
+  // pedir y refleja si te uniste o saliste.
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "groups", group.id, "members"), (snap) => {
-      setMemberCount(snap.size);
-    });
-    return unsub;
+    let cancelled = false;
+    getCountFromServer(collection(db, "groups", group.id, "members"))
+      .then((snap) => {
+        if (!cancelled) setMemberCount(snap.data().count);
+      })
+      .catch((err) => console.error("Groups: no se pudo contar los miembros", err.code));
+    return () => {
+      cancelled = true;
+    };
   }, [group.id]);
 
   return (

@@ -34,12 +34,12 @@ import { useMyBlocks } from "./Blocks";
   publicaciones del grupo (reutiliza PostCard de Feed.jsx tal cual).
 
   Los posts del grupo viven en la colección "posts" de siempre (con un
-  campo "groupId" nuevo) — se escucha la colección filtrando SOLO por
-  authorIsPrivate == false (auditoría de seguridad, 2026-07-28, hallazgo
-  H2 — ver el docstring de Feed.jsx) y se filtra por groupId en el
-  cliente, para no necesitar un índice compuesto nuevo en Firestore
-  (habría hecho falta uno para combinar where("groupId","==",...) con
-  where("authorIsPrivate","==",...)/orderBy("createdAt")). Los posts de
+  campo "groupId" nuevo) — se escuchan con where("groupId","==",...) y
+  where("authorIsPrivate","==",false) (auditoría de seguridad,
+  2026-07-28, hallazgo H2 — ver el docstring de Feed.jsx; punto 70,
+  commit 9d: antes se filtraba por groupId en el cliente, bajando todos
+  los posts públicos). Sin orderBy("createdAt"), que pediría un índice
+  compuesto: se ordena en el cliente. Los posts de
   grupo SIEMPRE tienen authorIsPrivate/authorIsWallPrivate en false sin
   importar la privacidad real del autor (ver handlePost más abajo): los
   grupos son públicos por diseño, la privacidad personal de perfil no se
@@ -234,21 +234,32 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
     return unsub;
   }, [groupId]);
 
-  // Se escucha la colección filtrando por authorIsPrivate == false (ver
-  // docstring de arriba, hallazgo H2) y se filtra por groupId en el
-  // cliente.
+  // Solo los posts de este grupo (punto 70, commit 9d): antes se
+  // escuchaban TODOS los posts públicos de la app y se filtraba por
+  // groupId acá. authorIsPrivate == false sigue en la consulta para que
+  // sea demostrable ante firestore.rules (hallazgo H2). Dos filtros de
+  // igualdad sin orderBy no necesitan índice compuesto.
   useEffect(() => {
-    const q = query(collection(db, "posts"), where("authorIsPrivate", "==", false));
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((p) => p.groupId === groupId);
-      // orderBy() ya no viene de la consulta (ver comentario de arriba) —
-      // el orden por fecha se arma acá.
-      list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-      setPosts(list);
-      setPostsLoading(false);
-    });
+    const q = query(
+      collection(db, "posts"),
+      where("groupId", "==", groupId),
+      where("authorIsPrivate", "==", false)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Sin orderBy() en la consulta (necesitaría un índice compuesto) —
+        // el orden por fecha se arma acá.
+        list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        setPosts(list);
+        setPostsLoading(false);
+      },
+      (err) => {
+        console.error("GroupView: no se pudo escuchar los posts del grupo", err.code, err);
+        setPostsLoading(false);
+      }
+    );
     return unsub;
   }, [groupId]);
 

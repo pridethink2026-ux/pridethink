@@ -4,6 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   addDoc,
+  getCountFromServer,
   onSnapshot,
   orderBy,
   query,
@@ -31,10 +32,11 @@ import { translate } from "./translations";
   Estructura en Firestore:
   - "events/{eventId}" -> { title, description, date (Timestamp), location, createdBy, createdAt }
   - "events/{eventId}/attendees/{uid}" -> { respondedAt }
-    El número de asistentes NUNCA se guarda como campo aparte: se escucha
-    la subcolección en tiempo real y se cuenta directo (mismo principio
-    que comentarios/seguidores/miembros de grupo en el resto de la app) —
-    ver useAttendeeCount más abajo. El id del documento ES el uid de quien
+    El número de asistentes NUNCA se guarda como campo aparte: en la
+    lista se pide con un conteo (getCountFromServer, punto 70, commit 9d)
+    y dentro del evento se escucha la subcolección (mismo principio que
+    comentarios/seguidores/miembros de grupo en el resto de la app) — ver
+    useAttendeeCount más abajo. El id del documento ES el uid de quien
     responde (no autogenerado), así que "¿voy a asistir?" es simplemente
     "¿existe el documento?" — el botón "Asistiré"/"No asistiré" es un
     setDoc/deleteDoc sobre ese mismo id (ver EventView.jsx).
@@ -56,16 +58,25 @@ export function formatEventDateTime(dateTimestamp, language) {
   });
 }
 
-// Cuenta de asistentes en vivo (subcolección "attendees") — usado tanto
-// acá (EventRow) como en EventView.jsx.
-export function useAttendeeCount(eventId) {
+// Cuenta de asistentes para la lista (EventRow): un conteo al mostrar la
+// fila (punto 70, commit 9d), 1 lectura y sin listener. Antes se
+// escuchaban TODOS los asistentes de cada evento de la lista solo para el
+// número. Al volver de un evento la lista se monta de nuevo (App.js
+// reemplaza el contenido), así que refleja si confirmaste o no.
+// EventView.jsx escucha los asistentes en vivo por su cuenta.
+function useAttendeeCount(eventId) {
   const [count, setCount] = useState(0);
   useEffect(() => {
     if (!eventId) return;
-    const unsub = onSnapshot(collection(db, "events", eventId, "attendees"), (snap) => {
-      setCount(snap.size);
-    });
-    return unsub;
+    let cancelled = false;
+    getCountFromServer(collection(db, "events", eventId, "attendees"))
+      .then((snap) => {
+        if (!cancelled) setCount(snap.data().count);
+      })
+      .catch((err) => console.error("Events: no se pudo contar los asistentes", err.code));
+    return () => {
+      cancelled = true;
+    };
   }, [eventId]);
   return count;
 }
