@@ -11,7 +11,7 @@
 
   Interruptor general ("Silenciar sonidos", AuthProfile.jsx): este módulo
   guarda un flag interno (setSoundMuted/isSoundMuted) que SoundContext.jsx
-  mantiene sincronizado con users/{uid}.soundMuted en Firestore. Las 3
+  mantiene sincronizado con users/{uid}/private/data.soundMuted en Firestore. Las 3
   funciones "públicas" (playThemeSound acá abajo en themeSounds.js,
   playReactionSound y playCommentSound acá mismo) lo consultan como
   primera línea — así "silenciar todo" queda garantizado en un solo

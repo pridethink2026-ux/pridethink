@@ -106,6 +106,15 @@ service cloud.firestore {
         && (!('soundMuted' in datos) || datos.soundMuted is bool);
     }
 
+    // Hallazgo H1, fase B: campos que ya no pueden estar en users/{uid}.
+    // Los 7 de private/data más los dos heredados que ya no usa nadie
+    // (email y blockedUsers, ver Blocks.js). Misma lista que
+    // SENSITIVE_FIELDS de scripts/migrate-private-profile.js.
+    function camposSensiblesDePerfil() {
+      return ['fullName', 'birthDate', 'gender', 'genderOther', 'country',
+        'language', 'soundMuted', 'email', 'blockedUsers'];
+    }
+
     // Auditoría de seguridad (2026-07-28, hallazgo M1): antes, la ÚNICA
     // validación de tipo en todo este archivo era la fecha de nacimiento
     // de arriba — ningún campo de texto exigía ser string ni tenía límite
@@ -289,16 +298,20 @@ service cloud.firestore {
       // la consola usa el SDK de administrador, que no pasa por estas
       // reglas, así que sigue pudiendo activarlo/desactivarlo sin problema.
       //
-      // Hallazgo H1, fase A (transición): se acepta la fecha de nacimiento
-      // en el documento público (código viejo, todavía en caché en alguna
-      // pestaña) O en private/data (código nuevo, ver
-      // privadoEsDeMayorDeEdad arriba).
+      // Hallazgo H1, fase B: los datos personales solo viven en
+      // private/data. El registro tiene que traer ahí la fecha de
+      // nacimiento (privadoEsDeMayorDeEdad arriba) y el documento público
+      // no puede crearse con ningún campo sensible. Al editar se mira solo
+      // lo que cambia (diff), así un documento viejo que todavía tuviera
+      // alguno de esos campos sigue pudiendo actualizar lo demás.
       allow create: if esDueno(uid)
         && !('isVerified' in request.resource.data)
-        && (esMayorDeEdad() || privadoEsDeMayorDeEdad(uid))
+        && !request.resource.data.keys().hasAny(camposSensiblesDePerfil())
+        && privadoEsDeMayorDeEdad(uid)
         && camposDePerfilValidos(request.resource.data);
       allow update: if esDueno(uid)
         && request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposSensiblesDePerfil())
         && camposDePerfilValidos(request.resource.data);
 
       // Nadie borra perfiles desde la app.

@@ -59,32 +59,19 @@ export function LanguageProvider({ children }) {
   // real). También se refleja en localStorage para que, si cierras sesión,
   // las pantallas de login/registro recuerden el último idioma usado.
   //
-  // Hallazgo H1: "language" vive en users/{uid}/private/data. Mientras dure
-  // la migración, si ahí todavía no está, se usa el valor viejo del
-  // documento público (se escuchan los dos; lo privado manda).
+  // Hallazgo H1: "language" vive solo en users/{uid}/private/data (el
+  // documento público ya no lo tiene y firestore.rules no deja escribirlo
+  // ahí).
   useEffect(() => {
     if (!uid) return;
-    let privateLang;
-    let publicLang;
-    const apply = () => {
-      const lang = privateLang ?? publicLang;
+    const unsub = onSnapshot(doc(db, "users", uid, "private", "data"), (snap) => {
+      const lang = snap.data()?.language;
       if (isSupportedLanguage(lang)) {
         setLanguageState(lang);
         localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
       }
-    };
-    const unsubPrivate = onSnapshot(doc(db, "users", uid, "private", "data"), (snap) => {
-      privateLang = snap.data()?.language;
-      apply();
     });
-    const unsubPublic = onSnapshot(doc(db, "users", uid), (snap) => {
-      publicLang = snap.data()?.language;
-      apply();
-    });
-    return () => {
-      unsubPrivate();
-      unsubPublic();
-    };
+    return unsub;
   }, [uid]);
 
   const setLanguage = useCallback(

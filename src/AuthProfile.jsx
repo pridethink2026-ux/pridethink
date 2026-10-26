@@ -1135,9 +1135,9 @@ function repairJoinedAtIfLegacy(uid, data) {
 // ajustes privados viven en users/{uid}/private/data (solo el dueño los
 // lee), no en users/{uid}. Tu propio perfil necesita los dos documentos
 // juntos (ProfileAbout, interruptor de sonidos), así que se leen los dos
-// y se mezclan en el estado local "user" — lo privado pisa a lo público.
-// Mientras dure la migración, una cuenta todavía sin migrar no tiene
-// private/data y sus campos siguen saliendo del documento público.
+// y se mezclan en el estado local "user". Los campos no se repiten: las
+// cuentas viejas se migraron con scripts/migrate-private-profile.js y
+// firestore.rules no deja volver a escribirlos en el documento público.
 async function loadOwnProfile(uid) {
   const [publicSnap, privateSnap] = await Promise.all([
     getDoc(doc(db, "users", uid)),

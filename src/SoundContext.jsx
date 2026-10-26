@@ -29,24 +29,13 @@ export function SoundProvider({ children }) {
       setSoundMuted(false);
       return;
     }
-    // Hallazgo H1: soundMuted vive en users/{uid}/private/data. Mientras
-    // dure la migración, si ahí todavía no está, se usa el valor viejo del
-    // documento público (se escuchan los dos; lo privado manda).
-    let privateValue;
-    let publicValue;
-    const apply = () => setSoundMuted(!!(privateValue ?? publicValue));
-    const unsubPrivate = onSnapshot(doc(db, "users", currentUid, "private", "data"), (snap) => {
-      privateValue = snap.data()?.soundMuted;
-      apply();
+    // Hallazgo H1: soundMuted vive solo en users/{uid}/private/data (el
+    // documento público ya no lo tiene y firestore.rules no deja escribirlo
+    // ahí).
+    const unsub = onSnapshot(doc(db, "users", currentUid, "private", "data"), (snap) => {
+      setSoundMuted(!!snap.data()?.soundMuted);
     });
-    const unsubPublic = onSnapshot(doc(db, "users", currentUid), (snap) => {
-      publicValue = snap.data()?.soundMuted;
-      apply();
-    });
-    return () => {
-      unsubPrivate();
-      unsubPublic();
-    };
+    return unsub;
   }, [currentUid]);
 
   return children;
