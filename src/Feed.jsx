@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { auth, db } from "./firebase";
 import { useUserProfile } from "./AllUsersContext";
 import { onAuthStateChanged } from "firebase/auth";
@@ -14,7 +14,6 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-  where,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
@@ -43,6 +42,7 @@ import {
   rankByPopularity,
 } from "./Explore";
 import { setCommentCount, useCommentCount, useCommentCounts } from "./commentCounts";
+import { useFeedPosts, useExplorePool } from "./feedPosts";
 import Groups from "./Groups";
 import Events from "./Events";
 import VerifiedBadge from "./VerifiedBadge";
@@ -449,6 +449,17 @@ const styles = {
     textAlign: "center",
     color: "var(--text-muted)",
     padding: "40px 24px",
+  },
+  loadMoreRow: { display: "flex", justifyContent: "center", padding: "8px 0 24px" },
+  loadMoreBtn: {
+    padding: "9px 20px",
+    borderRadius: "999px",
+    border: "1px solid var(--border)",
+    background: "transparent",
+    color: "var(--text-muted)",
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
   },
   skeletonCard: {
     background: "var(--surface)",
@@ -984,11 +995,6 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const [currentUid, setCurrentUid] = useState(null);
   // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
   const myProfile = useUserProfile(currentUid);
-  // Se separa en dos (auditoría de seguridad, 2026-07-28, hallazgo H2):
-  // ver el comentario junto al useEffect que las llena, más abajo.
-  const [publicPosts, setPublicPosts] = useState([]);
-  const [myPosts, setMyPosts] = useState([]);
-  const [postsLoading, setPostsLoading] = useState(true);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [composerImages, setComposerImages] = useState([]);
@@ -1027,57 +1033,24 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     return unsub;
   }, []);
 
-  // Escucha el feed en tiempo real, en DOS consultas separadas (auditoría
-  // de seguridad, 2026-07-28, hallazgo H2): antes era una sola consulta
-  // sin filtro (traía TODOS los posts, incluidos los de perfiles
-  // privados, y React los escondía después) — ahora firestore.rules exige
-  // que un post sea legible solo si authorIsPrivate == false O sos el
-  // autor (ver el bloque de posts/{postId} en firestore.rules), así que
-  // una consulta sin where() quedaría sin poder demostrarse ante
-  // Firestore y se rechazaría entera. "Siempre ves tus propios posts"
-  // (línea de abajo, en visiblePosts) necesita la segunda consulta
-  // porque tus propios posts pueden tener authorIsPrivate == true y no
-  // aparecerían en la primera. orderBy() no se usa en ninguna de las dos
-  // a propósito (evita tener que crear un índice compuesto en Firestore)
-  // — el orden por fecha se arma en el cliente, en visiblePosts.
-  // Solo con sesión (punto 68): firestore.rules exige sesión para leer
-  // "posts", y un listener abierto sin ella fallaba y no se volvía a abrir.
-  useEffect(() => {
-    if (!currentUid) {
-      setPublicPosts([]);
-      return;
-    }
-    const q = query(collection(db, "posts"), where("authorIsPrivate", "==", false));
-    const unsub = onSnapshot(q, (snap) => {
-      setPublicPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      setPostsLoading(false);
-    });
-    return unsub;
-  }, [currentUid]);
-
-  useEffect(() => {
-    if (!currentUid) {
-      setMyPosts([]);
-      return;
-    }
-    const q = query(collection(db, "posts"), where("authorId", "==", currentUid));
-    const unsub = onSnapshot(q, (snap) => {
-      setMyPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [currentUid]);
-
-  // Junta las dos consultas de arriba (sin duplicar los propios posts
-  // públicos, que ya vienen en publicPosts) y los ordena por fecha, más
-  // reciente primero — mismo orden que antes daba orderBy() en la consulta.
-  const posts = useMemo(() => {
-    const merged = new Map();
-    publicPosts.forEach((p) => merged.set(p.id, p));
-    myPosts.forEach((p) => merged.set(p.id, p));
-    return Array.from(merged.values()).sort(
-      (a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
-    );
-  }, [publicPosts, myPosts]);
+  // El feed, paginado y en vivo (punto 70, commit 9e): ver feedPosts.js.
+  // Las consultas siguen exigiendo authorIsPrivate == false (o ser el
+  // autor) para poder demostrarse ante firestore.rules (auditoría de
+  // seguridad, 2026-07-28, hallazgo H2). Solo con sesión (punto 68).
+  const {
+    posts,
+    loading: postsLoading,
+    hasMore,
+    loadingMore,
+    loadMore,
+    pageCount,
+  } = useFeedPosts(currentUid);
+  // Explorar ya no sale del feed cargado: su propio listener de los últimos
+  // posts públicos, abierto solo mientras la pestaña está activa.
+  const { pool: explorePool, loading: exploreLoading } = useExplorePool(
+    currentUid,
+    feedTab === "explorar"
+  );
 
   // Punto 61: un post puede tener texto solo, imágenes solas, o ambos —
   // antes exigía texto sí o sí. "setDoc" con el id pre-generado
@@ -1153,7 +1126,7 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   // esto último a propósito distinto de "Todos" (ver docstring más arriba).
   const exploreCandidates =
     feedTab === "explorar"
-      ? posts.filter((p) => {
+      ? explorePool.filter((p) => {
           if (p.groupId) return false; // los posts de grupo no aparecen en Explorar
           if (p.authorId === currentUid) return false;
           const author = usersMap[p.authorId];
@@ -1187,8 +1160,53 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   const commentCounts = useCommentCounts(roughRanked.map((p) => p.id));
   const explorePosts = rankByPopularity(roughRanked, commentCounts);
 
-  const trendingHashtags = getTrendingHashtags(visiblePosts);
-  const authorHashtagMap = buildAuthorHashtagMap(posts);
+  // Tendencias y sugerencias solo se muestran en Explorar: salen de los
+  // mismos últimos posts públicos (más los tuyos ya cargados del feed).
+  const trendingHashtags = getTrendingHashtags(
+    explorePool.filter((p) => {
+      if (p.groupId) return false;
+      if (p.authorId === currentUid) return true;
+      if (usersMap[p.authorId]?.isPrivate) return false;
+      return !isBlockedEitherWay(blockedByMe, blockedMe, p.authorId);
+    })
+  );
+  const authorHashtagMap = buildAuthorHashtagMap([...explorePool, ...posts]);
+
+  // "Grupos" y "Eventos" reemplazan por completo el feed de posts (lista de
+  // grupos/eventos en su lugar) — ocultan composer, hashtags, skeletons y
+  // la lista de PostCard, que solo tienen sentido en Todos/Siguiendo/Explorar.
+  const isSpecialTab = feedTab === "grupos" || feedTab === "eventos";
+  const isPagedTab = !isSpecialTab && feedTab !== "explorar";
+  const listLoading = feedTab === "explorar" ? exploreLoading : postsLoading;
+
+  // Relleno automático (punto 70, commit 9e): si los filtros del cliente
+  // (bloqueos, posts de grupo, "Siguiendo", hashtag) dejan pocos posts a la
+  // vista, carga sola hasta AUTO_FILL_PAGES páginas; de ahí en más, solo al
+  // llegar al final (IntersectionObserver) o con el botón "Cargar más".
+  const AUTO_FILL_PAGES = 3;
+  const AUTO_FILL_MIN = 10;
+  const shownCount = finalPosts.length;
+  useEffect(() => {
+    if (!isPagedTab || postsLoading || !hasMore || loadingMore) return;
+    if (pageCount < AUTO_FILL_PAGES && shownCount < AUTO_FILL_MIN) loadMore();
+  }, [isPagedTab, postsLoading, hasMore, loadingMore, pageCount, shownCount, loadMore]);
+
+  // El observer solo avisa cuando el final ENTRA en pantalla: si una página
+  // no agrega nada visible, no encadena cargas solas, queda el botón.
+  const sentinelRef = useRef(null);
+  const showPager = isPagedTab && !postsLoading && hasMore;
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!showPager || !el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { rootMargin: "400px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [showPager, loadMore]);
   const peopleSuggestions = getPeopleSuggestions(
     Object.entries(usersMap).map(([uid, data]) => ({ uid, ...data })),
     currentUid,
@@ -1211,11 +1229,6 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   let emptyMessage = t("feed.emptyDefault");
   if (activeHashtag) emptyMessage = t("feed.emptyHashtag", { hashtag: activeHashtag });
   else if (feedTab === "siguiendo") emptyMessage = t("feed.emptyFollowing");
-
-  // "Grupos" y "Eventos" reemplazan por completo el feed de posts (lista de
-  // grupos/eventos en su lugar) — ocultan composer, hashtags, skeletons y
-  // la lista de PostCard, que solo tienen sentido en Todos/Siguiendo/Explorar.
-  const isSpecialTab = feedTab === "grupos" || feedTab === "eventos";
 
   return (
     <div style={styles.wrapper}>
@@ -1320,7 +1333,7 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
           </div>
         )}
 
-        {!isSpecialTab && postsLoading && (
+        {!isSpecialTab && listLoading && (
           <>
             <PostSkeleton />
             <PostSkeleton />
@@ -1328,16 +1341,16 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
           </>
         )}
 
-        {!isSpecialTab && !postsLoading && feedTab === "explorar" && explorePosts.length === 0 && (
+        {!isSpecialTab && !listLoading && feedTab === "explorar" && explorePosts.length === 0 && (
           <p style={styles.empty}>{t("explore.emptyFeed")}</p>
         )}
 
-        {!isSpecialTab && !postsLoading && feedTab !== "explorar" && finalPosts.length === 0 && (
+        {isPagedTab && !postsLoading && finalPosts.length === 0 && !hasMore && (
           <p style={styles.empty}>{emptyMessage}</p>
         )}
 
         {!isSpecialTab &&
-          !postsLoading &&
+          !listLoading &&
           (feedTab === "explorar" ? explorePosts : finalPosts).map((p) => (
             <PostCard
               key={p.id}
@@ -1348,6 +1361,14 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
               onHashtagClick={setActiveHashtag}
             />
           ))}
+
+        {showPager && (
+          <div ref={sentinelRef} style={styles.loadMoreRow}>
+            <button style={styles.loadMoreBtn} onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? t("feed.loadingMore") : t("feed.loadMore")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
