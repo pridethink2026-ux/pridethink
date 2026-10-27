@@ -69,7 +69,7 @@ export const translations = {
     "theme.arcoiris": "Arcoíris",
     "theme.oceano": "Océano",
     "theme.atardecer": "Atardecer",
-    "theme.elegante": "Elegante",
+    "theme.elegante": "Clásico",
 
     // Login (LoginForm, dentro de AuthProfile.jsx)
     "login.eyebrowBack": "Bienvenido de vuelta",
@@ -704,7 +704,7 @@ export const translations = {
     "theme.arcoiris": "Rainbow",
     "theme.oceano": "Ocean",
     "theme.atardecer": "Sunset",
-    "theme.elegante": "Elegant",
+    "theme.elegante": "Classic",
 
     // Login (LoginForm, inside AuthProfile.jsx)
     "login.eyebrowBack": "Welcome back",

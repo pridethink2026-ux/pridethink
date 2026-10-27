@@ -404,9 +404,9 @@ const styles = {
     gap: "8px",
     padding: "6px 12px",
     borderRadius: "999px",
-    background: "var(--surface)",
+    background: "var(--surface-sheen)",
     border: "1px solid var(--border)",
-    boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+    boxShadow: "0 4px 14px rgba(0,0,0,0.18), var(--chip-shine)",
     color: "var(--accent)",
     cursor: "pointer",
   },
@@ -569,7 +569,8 @@ const styles = {
     padding: "12px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "14px",
     fontWeight: 600,
@@ -617,7 +618,7 @@ function ConsentModal({ onAccept, onCancel, loading, t }) {
         <p style={styles.consentBody}>{t("weather.consentBody1")}</p>
         <p style={styles.consentBody}>{t("weather.consentBody2")}</p>
         <p style={styles.consentBody}>{t("weather.consentBody3")}</p>
-        <button type="button" style={styles.consentAccept} onClick={onAccept} disabled={loading}>
+        <button type="button" className="pt-relief" style={styles.consentAccept} onClick={onAccept} disabled={loading}>
           {loading ? t("weather.consentAccepting") : t("weather.consentAccept")}
         </button>
         <button type="button" style={styles.consentCancel} onClick={onCancel} disabled={loading}>

@@ -304,7 +304,7 @@ function AudioWaveform({ seed, playing, mine }) {
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -316,10 +316,10 @@ const styles = {
     width: "100%",
     maxWidth: "760px",
     height: "80vh",
-    background: "var(--surface)",
+    background: "var(--surface-sheen)",
     borderRadius: "24px",
     border: "1px solid var(--border)",
-    boxShadow: "0 12px 36px rgba(0,0,0,0.25)",
+    boxShadow: "0 12px 36px rgba(0,0,0,0.25), var(--shine)",
     display: "flex",
     overflow: "hidden",
   },
@@ -337,7 +337,7 @@ const styles = {
     textTransform: "uppercase",
     fontWeight: 700,
     fontFamily: "var(--font-display)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
@@ -353,6 +353,7 @@ const styles = {
     boxSizing: "border-box",
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
+    boxShadow: "var(--field-shine)",
     borderRadius: "999px",
     padding: "7px 12px",
     fontSize: "12px",
@@ -473,7 +474,7 @@ const styles = {
     lineHeight: 1.4,
     wordBreak: "break-word",
     background: mine
-      ? "linear-gradient(135deg, var(--accent), var(--accent2))"
+      ? "var(--gradient-primary)"
       : "var(--surface-alt)",
     color: mine ? "var(--bg)" : "var(--text)",
   }),
@@ -495,6 +496,7 @@ const styles = {
     minWidth: 0,
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
+    boxShadow: "var(--field-shine)",
     borderRadius: "12px",
     padding: "10px 14px",
     fontSize: "14px",
@@ -505,7 +507,8 @@ const styles = {
     padding: "10px 18px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontWeight: 600,
     cursor: "pointer",
@@ -580,7 +583,8 @@ const styles = {
     borderRadius: "50%",
     width: "34px",
     height: "34px",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "14px",
     cursor: "pointer",
@@ -1553,6 +1557,7 @@ export default function Chat({
                     </button>
                     <button
                       type="button"
+                      className="pt-relief"
                       style={styles.recordSendBtn}
                       onClick={sendPendingImage}
                       disabled={sendingImage}
@@ -1604,7 +1609,7 @@ export default function Chat({
                     >
                       <MicIcon />
                     </button>
-                    <button type="submit" style={styles.sendBtn}>
+                    <button type="submit" className="pt-relief" style={styles.sendBtn}>
                       {t("chat.send")}
                     </button>
                   </form>
@@ -1633,6 +1638,7 @@ export default function Chat({
                     </button>
                     <button
                       type="button"
+                      className="pt-relief"
                       style={styles.recordSendBtn}
                       onClick={
                         recordingState === "recording"

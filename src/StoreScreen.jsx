@@ -53,7 +53,7 @@ import ImageViewer from "./ImageViewer";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -75,7 +75,7 @@ const styles = {
     fontSize: "24px",
     fontWeight: 700,
     margin: 0,
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
@@ -162,10 +162,10 @@ const styles = {
     gap: "14px",
   },
   card: {
-    background: "var(--surface)",
+    background: "var(--surface-sheen)",
     border: "1px solid var(--border)",
     borderRadius: "18px",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.15), var(--shine)",
     overflow: "hidden",
     cursor: "pointer",
     display: "flex",
@@ -261,7 +261,7 @@ const styles = {
     height: "56px",
     borderRadius: "50%",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
     color: "var(--bg)",
     fontSize: "26px",
     lineHeight: 1,
@@ -269,7 +269,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
-    boxShadow: "0 10px 26px rgba(0,0,0,0.35)",
+    boxShadow: "0 10px 26px rgba(0,0,0,0.35), var(--button-shine)",
     zIndex: 20,
   }),
 };
@@ -513,7 +513,7 @@ export default function StoreScreen({ onOpenProfile, initialProductId, onConsume
       </div>
 
       {currentUid && (
-        <button style={styles.fab(isMobile)} onClick={openCreate} title={t("store.createFabTitle")}>
+        <button className="pt-relief" style={styles.fab(isMobile)} onClick={openCreate} title={t("store.createFabTitle")}>
           <PlusIcon />
         </button>
       )}

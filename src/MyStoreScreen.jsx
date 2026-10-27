@@ -36,7 +36,7 @@ import { getProductImages, notifyFollowersOfNewProduct } from "./storeData";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -130,7 +130,8 @@ const styles = {
     padding: "7px 14px",
     borderRadius: "10px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "12px",
     fontWeight: 700,
@@ -172,7 +173,8 @@ const styles = {
     padding: "10px 18px",
     borderRadius: "999px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "13px",
     fontWeight: 600,
@@ -240,7 +242,7 @@ function ProductRow({ product, t, onOpenProduct, onEditProduct, onDelete, onTogg
           <button style={styles.smallBtn} onClick={() => onEditProduct(product.id)}>
             {t("store.mine.editButton")}
           </button>
-          <button style={styles.smallBtnAccent} onClick={() => onTogglePublish(product)}>
+          <button className="pt-relief" style={styles.smallBtnAccent} onClick={() => onTogglePublish(product)}>
             {product.isPublished ? t("store.mine.unpublishButton") : t("store.mine.publishButton")}
           </button>
           <button style={styles.smallBtnDanger} onClick={() => onDelete(product)}>
@@ -292,7 +294,7 @@ function CreateCatalogForm({ currentUid, onCreated, onCancel, t }) {
         onChange={(e) => setDescription(e.target.value)}
       />
       <div style={styles.formActions}>
-        <button type="submit" style={styles.smallBtnAccent} disabled={creating || !name.trim()}>
+        <button type="submit" className="pt-relief" style={styles.smallBtnAccent} disabled={creating || !name.trim()}>
           {t("store.mine.catalogSave")}
         </button>
         <button type="button" style={styles.smallBtn} onClick={onCancel}>
@@ -448,7 +450,7 @@ export default function MyStoreScreen({ currentUid, myProfile, onBack, onOpenPro
             </>
           ) : (
             <>
-              <button style={styles.createCatalogBtn} onClick={() => setCreatingCatalog((v) => !v)}>
+              <button className="pt-relief" style={styles.createCatalogBtn} onClick={() => setCreatingCatalog((v) => !v)}>
                 {creatingCatalog ? t("store.mine.catalogCancel") : t("store.mine.createCatalogButton")}
               </button>
               {creatingCatalog && (

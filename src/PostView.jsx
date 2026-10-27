@@ -29,7 +29,7 @@ import { unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",

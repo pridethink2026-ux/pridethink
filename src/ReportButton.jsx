@@ -174,7 +174,8 @@ const styles = {
     padding: "12px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "14px",
     fontWeight: 600,
@@ -294,7 +295,7 @@ function ReportModal({ targetType, targetId, currentUid, extraFields, onClose })
               </>
             )}
 
-            <button type="submit" style={styles.button} disabled={status === "sending"}>
+            <button type="submit" className="pt-relief" style={styles.button} disabled={status === "sending"}>
               {status === "sending" ? t("report.submitting") : t("report.submit")}
             </button>
             <button type="button" style={styles.buttonGhost} onClick={onClose}>

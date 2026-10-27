@@ -43,7 +43,7 @@ import ImageViewer from "./ImageViewer";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -234,7 +234,8 @@ const styles = {
     padding: "13px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "15px",
     fontWeight: 700,
@@ -515,7 +516,7 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
         <div style={styles.actionsCol}>
           {isMine ? (
             <>
-              <button style={styles.editBtn} onClick={() => onEdit(productId)}>
+              <button className="pt-relief" style={styles.editBtn} onClick={() => onEdit(productId)}>
                 {t("store.detail.editButton")}
               </button>
               <button style={styles.deleteBtn} onClick={handleDelete}>

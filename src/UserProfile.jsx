@@ -57,7 +57,7 @@ import { useLanguage } from "./LanguageContext";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -145,7 +145,8 @@ const styles = {
     padding: "10px 26px",
     borderRadius: "999px",
     border: following ? "1px solid var(--border)" : "none",
-    background: following ? "transparent" : "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: following ? "transparent" : "var(--gradient-primary)",
+    boxShadow: following ? undefined : "var(--button-shine)",
     color: following ? "var(--text-muted)" : "var(--bg)",
     fontSize: "13px",
     fontWeight: 700,
@@ -398,7 +399,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
           </div>
 
           {!isMe && currentUid && (
-            <button style={styles.followBtn(isFollowing)} onClick={handleToggleFollow}>
+            <button className="pt-relief" style={styles.followBtn(isFollowing)} onClick={handleToggleFollow}>
               {isFollowing ? t("userProfile.unfollow") : t("userProfile.follow")}
             </button>
           )}

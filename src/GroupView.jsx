@@ -53,7 +53,7 @@ import { useMyBlocks } from "./Blocks";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -96,7 +96,7 @@ const styles = {
     fontSize: "22px",
     fontWeight: 700,
     margin: "0 0 6px",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
@@ -119,7 +119,8 @@ const styles = {
     padding: "8px 18px",
     borderRadius: "999px",
     border: joined ? "1px solid var(--border)" : "none",
-    background: joined ? "transparent" : "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: joined ? "transparent" : "var(--gradient-primary)",
+    boxShadow: joined ? undefined : "var(--button-shine)",
     color: joined ? "var(--text-muted)" : "var(--bg)",
     fontSize: "13px",
     fontWeight: 600,
@@ -172,7 +173,8 @@ const styles = {
     padding: "10px 20px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontWeight: 600,
     cursor: "pointer",
@@ -380,7 +382,7 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
               👥 {t("groups.memberCount", { count: memberUids.length })}
             </button>
             {currentUid && (
-              <button style={styles.joinBtn(isMember)} onClick={handleToggleMembership}>
+              <button className="pt-relief" style={styles.joinBtn(isMember)} onClick={handleToggleMembership}>
                 {isMember ? t("groups.leave") : t("groups.join")}
               </button>
             )}
@@ -426,7 +428,7 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
                 />
               )}
             </div>
-            <button type="submit" style={styles.postBtn} disabled={posting}>
+            <button type="submit" className="pt-relief" style={styles.postBtn} disabled={posting}>
               {posting ? t("feed.posting") : t("feed.postButton")}
             </button>
             <div style={{ clear: "both" }} />

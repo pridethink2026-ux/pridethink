@@ -87,7 +87,8 @@ const styles = {
     padding: "10px 18px",
     borderRadius: "999px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "14px",
     fontWeight: 600,
@@ -135,7 +136,8 @@ const styles = {
     padding: "9px 18px",
     borderRadius: "10px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "13px",
     fontWeight: 600,
@@ -157,7 +159,7 @@ const styles = {
     textTransform: "uppercase",
     fontWeight: 700,
     fontFamily: "var(--font-display)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
@@ -185,7 +187,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     fontSize: "20px",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
   },
   eventTitle: { fontSize: "14px", fontWeight: 700, margin: 0, color: "var(--text)" },
   eventMeta: { fontSize: "12px", color: "var(--text-muted)", margin: "2px 0 0" },
@@ -282,6 +284,7 @@ function CreateEventForm({ currentUid, onCreated, onCancel }) {
       <div style={styles.formActions}>
         <button
           type="submit"
+          className="pt-relief"
           style={styles.submitBtn}
           disabled={creating || !title.trim() || !dateStr || !timeStr}
         >
@@ -336,7 +339,7 @@ export default function Events({ onOpenEvent }) {
   return (
     <div>
       <div style={styles.headerRow}>
-        <button style={styles.createBtn} onClick={() => setCreating((v) => !v)}>
+        <button className="pt-relief" style={styles.createBtn} onClick={() => setCreating((v) => !v)}>
           {creating ? t("events.cancel") : t("events.createButton")}
         </button>
       </div>

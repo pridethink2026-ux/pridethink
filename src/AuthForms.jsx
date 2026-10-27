@@ -31,7 +31,7 @@ function getIdentitySuggestions(t) {
 export const authStyles = {
   page: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -163,7 +163,8 @@ export const authStyles = {
     padding: "13px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "15px",
     fontWeight: 600,
@@ -340,7 +341,7 @@ export const authStyles = {
     textTransform: "uppercase",
     fontWeight: 700,
     fontFamily: "var(--font-display)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",

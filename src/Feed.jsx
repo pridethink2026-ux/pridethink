@@ -152,7 +152,7 @@ import { playReactionSound, playCommentSound } from "./sound";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -170,10 +170,10 @@ const styles = {
     marginBottom: "12px",
   },
   composer: {
-    background: "var(--surface)",
+    background: "var(--surface-sheen)",
     border: "1px solid var(--border)",
     borderRadius: "20px",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.18), var(--shine)",
     padding: "20px",
     marginBottom: "18px",
   },
@@ -182,6 +182,7 @@ const styles = {
     boxSizing: "border-box",
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
+    boxShadow: "var(--field-shine)",
     borderRadius: "10px",
     padding: "12px 14px",
     fontSize: "14px",
@@ -197,7 +198,8 @@ const styles = {
     padding: "10px 20px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontWeight: 600,
     cursor: "pointer",
@@ -213,8 +215,9 @@ const styles = {
     padding: "7px 16px",
     borderRadius: "999px",
     border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
-    background: active ? "var(--accent2-soft)" : "transparent",
-    color: active ? "var(--accent2)" : "var(--text-muted)",
+    background: active ? "var(--tab-active-bg)" : "var(--tab-bg)",
+    boxShadow: active ? "var(--button-shine)" : "var(--chip-shine)",
+    color: active ? "var(--tab-active-text)" : "var(--text-muted)",
     fontSize: "13px",
     fontWeight: 600,
     cursor: "pointer",
@@ -236,10 +239,10 @@ const styles = {
     fontWeight: 700,
   },
   post: {
-    background: "var(--surface)",
+    background: "var(--surface-sheen)",
     border: "1px solid var(--border)",
     borderRadius: "20px",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.18), var(--shine)",
     padding: "18px 20px",
     marginBottom: "16px",
   },
@@ -338,7 +341,8 @@ const styles = {
     padding: "6px 14px",
     borderRadius: "8px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "12px",
     fontWeight: 600,
@@ -423,6 +427,7 @@ const styles = {
     boxSizing: "border-box",
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
+    boxShadow: "var(--field-shine)",
     borderRadius: "999px",
     padding: "8px 14px",
     fontSize: "13px",
@@ -433,7 +438,8 @@ const styles = {
     padding: "8px 16px",
     borderRadius: "999px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "13px",
     fontWeight: 600,
@@ -843,7 +849,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
             )}
           </div>
           <div style={styles.editRow}>
-            <button style={styles.smallBtn} onClick={handleSaveEdit}>
+            <button className="pt-relief" style={styles.smallBtn} onClick={handleSaveEdit}>
               {t("feed.save")}
             </button>
             <button
@@ -976,7 +982,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
                 />
               )}
             </div>
-            <button type="submit" style={styles.commentSendBtn}>
+            <button type="submit" className="pt-relief" style={styles.commentSendBtn}>
               {t("feed.send")}
             </button>
           </form>
@@ -1265,7 +1271,7 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
                 maxSize={1024}
               />
             </div>
-            <button type="submit" style={styles.postBtn} disabled={posting}>
+            <button type="submit" className="pt-relief" style={styles.postBtn} disabled={posting}>
               {posting ? t("feed.posting") : t("feed.postButton")}
             </button>
             <div style={{ clear: "both" }} />
@@ -1273,28 +1279,32 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
         )}
 
         <div style={styles.tabsRow}>
-          <button style={styles.tabBtn(feedTab === "todos")} onClick={() => setFeedTab("todos")}>
+          <button className="pt-relief" style={styles.tabBtn(feedTab === "todos")} onClick={() => setFeedTab("todos")}>
             {t("feed.tabAll")}
           </button>
           <button
+            className="pt-relief"
             style={styles.tabBtn(feedTab === "siguiendo")}
             onClick={() => setFeedTab("siguiendo")}
           >
             {t("feed.tabFollowing")}
           </button>
           <button
+            className="pt-relief"
             style={styles.tabBtn(feedTab === "explorar")}
             onClick={() => setFeedTab("explorar")}
           >
             {t("feed.tabExplore")}
           </button>
           <button
+            className="pt-relief"
             style={styles.tabBtn(feedTab === "grupos")}
             onClick={() => setFeedTab("grupos")}
           >
             {t("feed.tabGroups")}
           </button>
           <button
+            className="pt-relief"
             style={styles.tabBtn(feedTab === "eventos")}
             onClick={() => setFeedTab("eventos")}
           >

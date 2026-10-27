@@ -50,7 +50,7 @@ const styles = {
     textTransform: "uppercase",
     fontWeight: 700,
     fontFamily: "var(--font-display)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",

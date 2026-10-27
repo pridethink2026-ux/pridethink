@@ -28,7 +28,7 @@ import { useSavedPosts } from "./SavedPostsContext";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -53,7 +53,7 @@ const styles = {
     fontSize: "22px",
     fontWeight: 700,
     margin: "0 0 18px",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",

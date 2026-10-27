@@ -86,7 +86,7 @@ function LoadErrorMessage() {
   return (
     <div role="alert" style={styles.box}>
       <p style={styles.text}>{t("common.loadFailed")}</p>
-      <button type="button" style={styles.button} onClick={() => window.location.reload()}>
+      <button type="button" className="pt-relief" style={styles.button} onClick={() => window.location.reload()}>
         {t("common.reload")}
       </button>
     </div>
@@ -124,7 +124,8 @@ const styles = {
     padding: "11px 24px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontFamily: "inherit",
     fontSize: "15px",

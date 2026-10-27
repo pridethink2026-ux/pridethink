@@ -23,7 +23,7 @@ import { useLanguage } from "./LanguageContext";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -43,6 +43,7 @@ const styles = {
     boxSizing: "border-box",
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
+    boxShadow: "var(--field-shine)",
     borderRadius: "999px",
     padding: "12px 18px",
     fontSize: "14px",
@@ -55,7 +56,7 @@ const styles = {
     textTransform: "uppercase",
     fontWeight: 700,
     fontFamily: "var(--font-display)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",

@@ -18,6 +18,95 @@ const FONT_VARS = {
     "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 
+// Variables de "efecto" (punto 71): brillo de botones, títulos, tarjetas,
+// barra superior, pestaña activa y notificaciones sin leer. Un tema que no
+// las define usa estos valores, que reproducen exactamente cómo se veía
+// antes (el degradado de --accent a --accent2, la tarjeta de un color). Se
+// aplican siempre junto con las del tema (applyTheme): si no, al salir de
+// un tema que sí las define quedarían puestas las suyas.
+const EFFECT_DEFAULTS = {
+  "--gradient-primary": "linear-gradient(135deg, var(--accent), var(--accent2))",
+  "--gradient-text": "linear-gradient(135deg, var(--accent), var(--accent2))",
+  "--surface-sheen": "var(--surface)",
+  "--shine": "0 0 0 0 transparent",
+  "--bar-bg": "var(--bg)",
+  "--unread-edge": "transparent",
+  "--tab-active-bg": "var(--accent2-soft)",
+  "--tab-active-text": "var(--accent2)",
+  // Relieve de campos, pestañas, chip del clima,
+  // botones principales y barra inferior, y el fondo con reflejos fijos
+  // (body::before en index.css; las pantallas dejan ver el fondo con
+  // --page-bg transparente).
+  "--field-shine": "0 0 0 0 transparent",
+  "--chip-shine": "0 0 0 0 transparent",
+  "--button-shine": "0 0 0 0 transparent",
+  "--bottom-bar-bg": "var(--surface)",
+  "--bottom-bar-shine": "0 0 0 0 transparent",
+  "--page-bg": "var(--bg)",
+  "--page-glare": "none",
+  "--button-shine-pressed": "0 0 0 0 transparent",
+  "--tab-bg": "transparent",
+};
+
+// Clásico (clave "elegante", punto 71): negro laca, como vidrio de piano.
+// Tarjetas, campos, pestañas, chip del clima y barra inferior con bisel
+// curvo de cristal (luz arriba e izquierda, sombra abajo, con varias
+// box-shadow; sin backdrop-filter, por el bug conocido de Chromium);
+// botones en blanco perla con efecto domo que flotan; fondo con reflejos
+// difusos en diagonal (--page-glare); y una línea de tablero bajo la barra
+// superior. Los botones blancos llevan .pt-relief (index.css): se hunden
+// al presionar y un destello los cruza una vez al pasar el mouse o tocar.
+const CLASICO_VARS = {
+  "--bg": "#030303",
+  "--surface": "#0c0c0c",
+  "--surface-alt": "#1a1a1a",
+  "--accent": "#ffffff",
+  "--accent2": "#ebe8e1",
+  "--text": "#ffffff",
+  "--text-muted": "#b5b5b5",
+  "--border": "rgba(255, 255, 255, 0.3)",
+  "--accent2-soft": "rgba(235, 232, 225, 0.16)",
+  "--accent2-softer": "rgba(235, 232, 225, 0.12)",
+  "--accent2-soft-border": "rgba(235, 232, 225, 0.55)",
+  "--accent-soft": "rgba(255, 255, 255, 0.16)",
+  "--accent-softer": "rgba(255, 255, 255, 0.12)",
+  "--accent-soft-border": "rgba(255, 255, 255, 0.55)",
+  // Domo de perla: reflejo especular fino arriba (la elipse chica) sobre
+  // una luz redondeada que se oscurece hacia abajo.
+  "--gradient-primary":
+    "radial-gradient(60% 22% at 50% 10%, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0) 100%), radial-gradient(130% 100% at 50% 0%, #ffffff 0%, #f1eee7 38%, #d9d4c9 70%, #b9b3a6 100%)",
+  "--gradient-text": "linear-gradient(180deg, #ffffff 0%, #ffffff 50%, #d6d3cc 100%)",
+  "--surface-sheen":
+    "radial-gradient(140% 50% at 50% 0%, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 70%), #0a0a0a",
+  // Bisel curvo: línea especular fina en el borde superior, luz que baja
+  // desde arriba e izquierda, sombra abajo y derecha, y sombra externa.
+  "--shine":
+    "inset 0 1px 0 rgba(255, 255, 255, 0.75), inset 0 6px 10px rgba(255, 255, 255, 0.07), inset 3px 0 5px rgba(255, 255, 255, 0.1), inset 0 -6px 10px rgba(0, 0, 0, 0.9), inset -3px 0 5px rgba(0, 0, 0, 0.6), inset 0 0 0 4px rgba(255, 255, 255, 0.03), 0 1px 0 rgba(255, 255, 255, 0.12), 0 14px 30px rgba(0, 0, 0, 0.8)",
+  "--field-shine":
+    "inset 0 3px 6px rgba(0, 0, 0, 0.9), inset 0 -1px 0 rgba(255, 255, 255, 0.18), 0 1px 0 rgba(255, 255, 255, 0.22), 0 -1px 0 rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(255, 255, 255, 0.06)",
+  "--chip-shine":
+    "inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 4px 6px rgba(255, 255, 255, 0.12), inset 2px 0 3px rgba(255, 255, 255, 0.12), inset 0 -4px 6px rgba(0, 0, 0, 0.9), inset -2px 0 3px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.12), 0 6px 14px rgba(0, 0, 0, 0.8)",
+  "--button-shine":
+    "inset 0 1px 1px rgba(255, 255, 255, 1), inset 0 -4px 8px rgba(90, 80, 65, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 1px 0 rgba(255, 255, 255, 0.15), 0 4px 6px rgba(0, 0, 0, 0.7), 0 12px 24px rgba(0, 0, 0, 0.75)",
+  "--button-shine-pressed":
+    "inset 0 1px 1px rgba(255, 255, 255, 0.8), inset 0 -2px 6px rgba(90, 80, 65, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.4), 0 2px 3px rgba(0, 0, 0, 0.7)",
+  "--tab-bg":
+    "radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%), #0a0a0a",
+  "--tab-active-bg":
+    "radial-gradient(60% 22% at 50% 10%, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0) 100%), radial-gradient(130% 100% at 50% 0%, #ffffff 0%, #f1eee7 38%, #d9d4c9 70%, #b9b3a6 100%)",
+  "--tab-active-text": "#050505",
+  "--bar-bg":
+    "repeating-linear-gradient(90deg, #d9d9d9 0 6px, #030303 6px 12px) left bottom / 100% 3px no-repeat, linear-gradient(180deg, #121212, #030303)",
+  "--bottom-bar-bg":
+    "radial-gradient(120% 160% at 50% 0%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, #181818, #050505)",
+  "--bottom-bar-shine":
+    "inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 6px 10px rgba(255, 255, 255, 0.06), 0 -10px 24px rgba(0, 0, 0, 0.85)",
+  "--unread-edge": "rgba(255, 255, 255, 0.75)",
+  "--page-bg": "transparent",
+  "--page-glare":
+    "linear-gradient(115deg, rgba(255, 255, 255, 0) 18%, rgba(255, 255, 255, 0.05) 26%, rgba(255, 255, 255, 0) 34%), linear-gradient(115deg, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, 0.07) 66%, rgba(255, 255, 255, 0.02) 72%, rgba(255, 255, 255, 0) 80%), radial-gradient(ellipse at 85% 30%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 45%), #030303",
+};
+
 export const THEMES = {
   noche: {
     labelKey: "theme.noche",
@@ -38,10 +127,6 @@ export const THEMES = {
       "--accent-softer": "rgba(155, 107, 255, 0.12)",
       "--accent-soft-border": "rgba(155, 107, 255, 0.4)",
     },
-    gradientPrimary: "linear-gradient(135deg, #8d57ff, #ff4ba4)",
-    glowColor: "rgba(155, 107, 255, 0.35)",
-    glassBg: "rgba(42, 26, 92, 0.55)",
-    borderGlow: "rgba(255, 95, 174, 0.4)",
   },
   arcoiris: {
     labelKey: "theme.arcoiris",
@@ -62,10 +147,6 @@ export const THEMES = {
       "--accent-softer": "rgba(255, 201, 60, 0.12)",
       "--accent-soft-border": "rgba(255, 201, 60, 0.4)",
     },
-    gradientPrimary: "linear-gradient(135deg, #ffc328, #ff4865)",
-    glowColor: "rgba(255, 201, 60, 0.35)",
-    glassBg: "rgba(39, 24, 73, 0.55)",
-    borderGlow: "rgba(255, 92, 118, 0.4)",
   },
   oceano: {
     labelKey: "theme.oceano",
@@ -86,10 +167,6 @@ export const THEMES = {
       "--accent-softer": "rgba(19, 236, 209, 0.12)",
       "--accent-soft-border": "rgba(19, 236, 209, 0.4)",
     },
-    gradientPrimary: "linear-gradient(135deg, #03e7cb, #1fbcff)",
-    glowColor: "rgba(19, 236, 209, 0.35)",
-    glassBg: "rgba(11, 44, 76, 0.55)",
-    borderGlow: "rgba(51, 194, 255, 0.4)",
   },
   atardecer: {
     labelKey: "theme.atardecer",
@@ -110,45 +187,20 @@ export const THEMES = {
       "--accent-softer": "rgba(255, 151, 66, 0.12)",
       "--accent-soft-border": "rgba(255, 151, 66, 0.4)",
     },
-    gradientPrimary: "linear-gradient(135deg, #ff8c2e, #ff1f44)",
-    glowColor: "rgba(255, 151, 66, 0.35)",
-    glassBg: "rgba(67, 27, 20, 0.55)",
-    borderGlow: "rgba(255, 51, 85, 0.4)",
   },
-  // "--bg"/"--surface" se mantienen sólidos a propósito (no el degradado
-  // tipo laca 0a0a0a→1c1c1c que se pidió originalmente): varios componentes
-  // compartidos los usan como "color" de texto (color: var(--bg), p.ej. el
-  // banner motivacional en App.js) o como "border: Npx solid var(--surface)"
-  // (el punto verde de "en línea" en Avatar.jsx) — un degradado ahí es CSS
-  // inválido y rompería esos elementos en TODOS los temas, no solo este. El
-  // brillo nacarado sí se logra: "--accent"/"--accent2" alimentan el mismo
-  // linear-gradient(135deg, var(--accent), var(--accent2)) que ya usan el
-  // anillo del avatar (Avatar.jsx) y los botones/badges principales
-  // (App.js), así que con blanco marfil → plata ese degradado compartido ya
-  // sale con sheen de perla, sin tocar ningún componente.
+  // Clásico (se muestra "Clásico"/"Classic"; la clave sigue siendo
+  // "elegante" en las reglas y en las cuentas). "--bg"/"--surface" son
+  // sólidos a propósito: varios componentes los usan como color de texto
+  // o de borde, donde un degradado es CSS inválido. El brillo va en las
+  // variables de efecto (--surface-sheen, --gradient-primary, etc.).
+  // ♛ (U+265B) no tiene versión emoji: se dibuja como letra, con el color
+  // del texto, igual en todos los sistemas.
   elegante: {
     labelKey: "theme.elegante",
-    emoji: "🤵",
-    vars: {
-      "--bg": "#121212",
-      "--surface": "#1c1c1c",
-      "--surface-alt": "#242424",
-      "--accent": "#f5f3ec",
-      "--accent2": "#c9c6bc",
-      "--text": "#f5f3ec",
-      "--text-muted": "#a9a69c",
-      "--border": "rgba(255, 255, 255, 0.15)",
-      "--accent2-soft": "rgba(201, 198, 188, 0.15)",
-      "--accent2-softer": "rgba(201, 198, 188, 0.12)",
-      "--accent2-soft-border": "rgba(201, 198, 188, 0.4)",
-      "--accent-soft": "rgba(245, 243, 236, 0.15)",
-      "--accent-softer": "rgba(245, 243, 236, 0.12)",
-      "--accent-soft-border": "rgba(245, 243, 236, 0.4)",
-    },
-    gradientPrimary: "linear-gradient(135deg, #f1ecdc, #c8c1a8)",
-    glowColor: "rgba(245, 243, 236, 0.35)",
-    glassBg: "rgba(28, 28, 28, 0.55)",
-    borderGlow: "rgba(201, 198, 188, 0.4)",
+    emoji: "♛",
+    vars: CLASICO_VARS,
+    // Activa .pt-relief (index.css) en los botones blancos.
+    relief: true,
   },
 };
 
@@ -160,7 +212,10 @@ export const THEMES = {
 // Hoy los valores coinciden con "noche" (morado y rosa, los del logo),
 // pero son una copia aparte a propósito: cambiar "noche" no cambia la
 // entrada.
+// Las variables de efecto van con sus valores por defecto: así la entrada
+// no hereda el brillo del tema que quedó puesto en :root.
 export const ENTRY_THEME_VARS = {
+  ...EFFECT_DEFAULTS,
   "--bg": "#150b33",
   "--surface": "#2a1a5c",
   "--surface-alt": "#35216e",
@@ -243,7 +298,10 @@ export function applyTheme(key, { animate = false } = {}) {
     clearTimeout(transitionTimer);
     transitionTimer = setTimeout(() => root.classList.remove("pt-theme-transition"), THEME_TRANSITION_MS);
   }
-  Object.entries(theme.vars).forEach(([prop, value]) => {
+  // Solo con data-relief en <html> actúan :active y el destello de
+  // .pt-relief (index.css); los otros temas no lo llevan.
+  root.toggleAttribute("data-relief", !!theme.relief);
+  Object.entries({ ...EFFECT_DEFAULTS, ...theme.vars }).forEach(([prop, value]) => {
     root.style.setProperty(prop, value);
   });
   Object.entries(FONT_VARS).forEach(([prop, value]) => {

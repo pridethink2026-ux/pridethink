@@ -10,6 +10,72 @@ body {
   background: var(--bg);
 }
 
+/* Reflejos fijos del fondo (--page-glare, themes.js; hoy solo el tema
+   Clásico, en el resto es "none"): una capa fija detrás de todo el
+   contenido, pintada una vez, que no se mueve con el scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--page-glare, none);
+}
+
+/* Botones en relieve (Clásico): solo cuando applyTheme pone
+   data-relief en <html>; en los otros temas .pt-relief no hace nada.
+   Al presionar se hunden (transform y opacity, más la sombra baja de
+   --button-shine-pressed; !important porque la sombra va inline). Al
+   pasar el mouse o tocar, un destello los cruza UNA vez (sin bucle). */
+[data-relief] .pt-relief {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+[data-relief] .pt-relief:active {
+  transform: translateY(1px) scale(0.97);
+  opacity: 0.9;
+  box-shadow: var(--button-shine-pressed) !important;
+}
+
+[data-relief] .pt-relief::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  pointer-events: none;
+  background-image: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-120%);
+}
+
+[data-relief] .pt-relief:hover::after,
+[data-relief] .pt-relief:focus-visible::after {
+  animation: pt-relief-sweep 0.7s ease-out 1;
+}
+
+@keyframes pt-relief-sweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-relief] .pt-relief::after {
+    display: none;
+  }
+}
+
 /* Anillo de foco solo al navegar con teclado (no al tocar o hacer clic).
    Los campos de texto llevan outline: none inline y no lo muestran. */
 :focus-visible {

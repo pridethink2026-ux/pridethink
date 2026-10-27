@@ -54,7 +54,7 @@ import MultiImageUploader from "./MultiImageUploader";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -220,7 +220,8 @@ const styles = {
     padding: "13px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "14px",
     fontWeight: 700,
@@ -556,7 +557,7 @@ export default function CreateProductScreen({ productId, currentUid, myProfile, 
           <button type="button" style={styles.draftBtn} disabled={saving} onClick={() => handleSave(false)}>
             {saving ? t("store.create.saving") : t("store.create.saveDraftButton")}
           </button>
-          <button type="button" style={styles.publishBtn} disabled={saving} onClick={() => handleSave(true)}>
+          <button type="button" className="pt-relief" style={styles.publishBtn} disabled={saving} onClick={() => handleSave(true)}>
             {saving
               ? t("store.create.saving")
               : isEdit

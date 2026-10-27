@@ -69,7 +69,8 @@ const styles = {
     padding: "10px 18px",
     borderRadius: "999px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "14px",
     fontWeight: 600,
@@ -117,7 +118,8 @@ const styles = {
     padding: "9px 18px",
     borderRadius: "10px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "13px",
     fontWeight: 600,
@@ -154,7 +156,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     fontSize: "20px",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
   },
   groupName: { fontSize: "14px", fontWeight: 700, margin: 0, color: "var(--text)" },
   groupDescription: {
@@ -250,7 +252,7 @@ function CreateGroupForm({ currentUid, onCreated, onCancel }) {
         onChange={(e) => setDescription(e.target.value)}
       />
       <div style={styles.formActions}>
-        <button type="submit" style={styles.submitBtn} disabled={creating || !name.trim()}>
+        <button type="submit" className="pt-relief" style={styles.submitBtn} disabled={creating || !name.trim()}>
           {creating ? t("groups.creating") : t("groups.createSubmit")}
         </button>
         <button type="button" style={styles.cancelBtn} onClick={onCancel}>
@@ -303,7 +305,7 @@ export default function Groups({ onOpenGroup }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button style={styles.createBtn} onClick={() => setCreating((v) => !v)}>
+        <button className="pt-relief" style={styles.createBtn} onClick={() => setCreating((v) => !v)}>
           {creating ? t("groups.cancel") : t("groups.createButton")}
         </button>
       </div>

@@ -146,7 +146,7 @@ const styles = {
     textTransform: "uppercase",
     fontWeight: 700,
     fontFamily: "var(--font-display)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
@@ -207,7 +207,8 @@ const styles = {
     padding: "6px 16px",
     borderRadius: "999px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "12px",
     fontWeight: 600,
@@ -257,7 +258,7 @@ function SuggestionCard({ user, currentUid, myProfile, onOpenProfile }) {
       <Avatar uid={user.uid} name={user.displayName || user.identity} identity={user.identity} photoURL={user.photoURL} size="md" />
       <p style={styles.suggestName}>{user.displayName || "Sin nombre"}</p>
       {user.identity && <p style={styles.suggestIdentity}>{user.identity}</p>}
-      <button style={styles.suggestFollowBtn} onClick={handleFollow}>
+      <button className="pt-relief" style={styles.suggestFollowBtn} onClick={handleFollow}>
         {t("explore.follow")}
       </button>
     </div>

@@ -122,7 +122,7 @@ function LoadingScreen({ timedOut, onRetry }) {
       {timedOut && (
         <div role="alert" style={loadingStyles.failBox}>
           <p style={loadingStyles.failText}>{t("common.connectFailed")}</p>
-          <button type="button" style={loadingStyles.retryBtn} onClick={onRetry}>
+          <button type="button" className="pt-relief" style={loadingStyles.retryBtn} onClick={onRetry}>
             {t("common.retry")}
           </button>
         </div>
@@ -165,7 +165,8 @@ const loadingStyles = {
     padding: "11px 24px",
     borderRadius: "12px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontFamily: "inherit",
     fontSize: "15px",

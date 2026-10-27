@@ -29,7 +29,7 @@ import { formatEventDateTime } from "./Events";
 const styles = {
   wrapper: {
     minHeight: "100vh",
-    background: "var(--bg)",
+    background: "var(--page-bg)",
     display: "flex",
     justifyContent: "center",
     padding: "24px",
@@ -72,7 +72,7 @@ const styles = {
     fontSize: "22px",
     fontWeight: 700,
     margin: "0 0 10px",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
@@ -86,7 +86,8 @@ const styles = {
     padding: "9px 20px",
     borderRadius: "999px",
     border: attending ? "1px solid var(--border)" : "none",
-    background: attending ? "transparent" : "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: attending ? "transparent" : "var(--gradient-primary)",
+    boxShadow: attending ? undefined : "var(--button-shine)",
     color: attending ? "var(--text-muted)" : "var(--bg)",
     fontSize: "13px",
     fontWeight: 600,
@@ -223,7 +224,7 @@ export default function EventView({ eventId, onBack, onOpenProfile }) {
           {event.description && <p style={styles.description}>{event.description}</p>}
 
           {currentUid && (
-            <button style={styles.joinBtn(isAttending)} onClick={handleToggleAttending}>
+            <button className="pt-relief" style={styles.joinBtn(isAttending)} onClick={handleToggleAttending}>
               {isAttending ? t("events.notAttending") : t("events.attending")}
             </button>
           )}

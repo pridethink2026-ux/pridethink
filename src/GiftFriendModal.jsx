@@ -148,7 +148,8 @@ const styles = {
     padding: "9px 20px",
     borderRadius: "999px",
     border: "none",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-primary)",
+    boxShadow: "var(--button-shine)",
     color: "var(--bg)",
     fontSize: "13px",
     fontWeight: 700,
@@ -275,6 +276,7 @@ export default function GiftFriendModal({ product, currentUid, myProfile, onClos
               </p>
               {!search && onGoToSearch && (
                 <button
+                  className="pt-relief"
                   style={styles.findPeopleBtn}
                   onClick={() => {
                     onClose();

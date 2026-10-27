@@ -107,7 +107,7 @@ const navStyles = {
     alignItems: "center",
     gap: "10px",
     padding: "14px 20px",
-    background: "var(--bg)",
+    background: "var(--bar-bg)",
     borderBottom: "1px solid var(--border)",
   },
   buttonsGroup: {
@@ -125,8 +125,9 @@ const navStyles = {
     padding: "8px 20px",
     borderRadius: "999px",
     border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
-    background: active ? "var(--accent2-soft)" : "transparent",
-    color: active ? "var(--accent2)" : "var(--text-muted)",
+    background: active ? "var(--tab-active-bg)" : "var(--tab-bg)",
+    boxShadow: active ? "var(--button-shine)" : "var(--chip-shine)",
+    color: active ? "var(--tab-active-text)" : "var(--text-muted)",
     fontSize: "14px",
     fontWeight: 600,
     cursor: "pointer",
@@ -155,7 +156,7 @@ const navStyles = {
     fontSize: "17px",
     fontWeight: 700,
     whiteSpace: "nowrap",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
+    background: "var(--gradient-text)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
@@ -229,8 +230,8 @@ const bannerStyles = {
     margin: "16px auto 0",
     padding: "16px 18px",
     borderRadius: "18px",
-    background: "linear-gradient(135deg, var(--accent), var(--accent2))",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+    background: "var(--gradient-primary)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.25), var(--button-shine)",
     boxSizing: "border-box",
   },
   // Overlay del shimmer: cubre toda la tarjeta (position absolute, no
@@ -282,8 +283,9 @@ const bottomNavStyles = {
     left: 0,
     right: 0,
     display: "flex",
-    background: "var(--surface)",
+    background: "var(--bottom-bar-bg)",
     borderTop: "1px solid var(--border)",
+    boxShadow: "var(--bottom-bar-shine)",
     zIndex: 30,
   },
   btn: (active) => ({
@@ -743,6 +745,7 @@ function App() {
               return (
                 <button
                   key={tab.key}
+                  className="pt-relief"
                   style={navStyles.button(active)}
                   aria-current={active ? "page" : undefined}
                   onClick={() => navigate(tab.key)}
