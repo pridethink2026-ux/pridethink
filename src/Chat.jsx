@@ -684,7 +684,7 @@ const styles = {
   // propio o --surface-alt ajeno), la distinguen de un mensaje de texto
   // normal a simple vista, sin agregar ningún color nuevo fuera de las
   // variables de tema. Siempre --bg, también en la ajena: --accent2 sobre
-  // --surface no llega a 4,5 en Atardecer.
+  // --surface no llegaba a 4,5 con la paleta anterior de Atardecer.
   sharedPostCard: {
     padding: "10px 12px",
     borderRadius: "12px",

@@ -128,6 +128,58 @@ const NOCHE_VARS = {
   "--page-glare": `${NOCHE_STARS}, radial-gradient(30% 22% at 88% 6%, rgba(214, 196, 255, 0.16), rgba(214, 196, 255, 0) 70%), #0d0a24`,
 };
 
+// Atardecer (punto 75), "Brasas": fondo casi negro con un resplandor de
+// brasa que sube desde abajo (--page-glare), tarjetas de barro con el
+// brillo interior abajo (la luz viene del fuego, no del cielo), botones y
+// pestaña activa naranja brasa en relieve (se hunden y llevan el destello
+// cálido, como el Clásico) y barra inferior con un filo encendido arriba.
+const ATARDECER_VARS = {
+  "--bg": "#140b08",
+  "--surface": "#2a1610",
+  "--surface-alt": "#3a1f16",
+  "--accent": "#ff9a4d",
+  "--accent2": "#ff6b5e",
+  "--text": "#fff0e8",
+  "--text-muted": "#e6b49c",
+  "--border": "rgba(255, 154, 77, 0.26)",
+  "--accent2-soft": "rgba(255, 107, 94, 0.15)",
+  "--accent2-softer": "rgba(255, 107, 94, 0.12)",
+  "--accent2-soft-border": "rgba(255, 107, 94, 0.4)",
+  "--accent-soft": "rgba(255, 154, 77, 0.15)",
+  "--accent-softer": "rgba(255, 154, 77, 0.12)",
+  "--accent-soft-border": "rgba(255, 154, 77, 0.4)",
+  "--gradient-primary":
+    "radial-gradient(70% 30% at 50% 8%, rgba(255, 230, 190, 0.6), rgba(255, 230, 190, 0) 100%), linear-gradient(180deg, #ffb066 0%, #ff7a3d 55%, #e8552e 100%)",
+  "--gradient-text": "linear-gradient(135deg, #ffb066, #ff6b5e)",
+  "--surface-sheen":
+    "radial-gradient(140% 60% at 50% 100%, rgba(255, 110, 40, 0.1), rgba(255, 110, 40, 0) 70%), #2a1610",
+  "--shine":
+    "inset 0 1px 0 rgba(255, 190, 140, 0.16), inset 0 -8px 16px rgba(255, 100, 40, 0.1), inset 0 0 0 1px rgba(255, 154, 77, 0.1), 0 6px 16px rgba(0, 0, 0, 0.6), 0 2px 10px rgba(255, 90, 30, 0.08)",
+  "--field-shine":
+    "inset 0 2px 6px rgba(0, 0, 0, 0.7), inset 0 -1px 0 rgba(255, 130, 60, 0.2), 0 1px 0 rgba(255, 190, 140, 0.06)",
+  "--chip-shine":
+    "inset 0 1px 0 rgba(255, 190, 140, 0.25), inset 0 -3px 6px rgba(255, 100, 40, 0.15), 0 4px 10px rgba(0, 0, 0, 0.6)",
+  "--button-shine":
+    "inset 0 1px 1px rgba(255, 240, 210, 0.8), inset 0 -3px 6px rgba(140, 30, 0, 0.4), 0 3px 6px rgba(0, 0, 0, 0.6), 0 6px 18px rgba(255, 100, 40, 0.35)",
+  "--button-shine-pressed":
+    "inset 0 1px 1px rgba(255, 240, 210, 0.55), inset 0 -2px 5px rgba(140, 30, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.6)",
+  "--sweep-color": "rgba(255, 225, 180, 0.5)",
+  "--tab-bg":
+    "radial-gradient(120% 100% at 50% 100%, rgba(255, 110, 40, 0.12), rgba(255, 110, 40, 0) 60%), #22120d",
+  "--tab-active-bg":
+    "radial-gradient(70% 30% at 50% 8%, rgba(255, 230, 190, 0.6), rgba(255, 230, 190, 0) 100%), linear-gradient(180deg, #ffb066 0%, #ff7a3d 55%, #e8552e 100%)",
+  "--tab-active-text": "#140b08",
+  "--bar-bg": "linear-gradient(180deg, #1c0f0b, #140b08)",
+  "--bottom-bar-bg":
+    "radial-gradient(120% 160% at 50% 0%, rgba(255, 110, 40, 0.14), rgba(255, 110, 40, 0) 55%), linear-gradient(180deg, #24130d, #0f0806)",
+  "--bottom-bar-shine": "inset 0 1px 0 rgba(255, 130, 60, 0.55), 0 -8px 18px rgba(0, 0, 0, 0.7)",
+  "--unread-edge": "#ff6b5e",
+  "--page-bg": "transparent",
+  "--page-glare":
+    "radial-gradient(120% 40% at 50% 105%, rgba(255, 100, 30, 0.24), rgba(255, 100, 30, 0) 70%), radial-gradient(50% 20% at 50% 102%, rgba(255, 170, 80, 0.16), rgba(255, 170, 80, 0) 70%), radial-gradient(60% 30% at 0% 0%, rgba(255, 150, 90, 0.05), rgba(255, 150, 90, 0) 70%), #140b08",
+  "--shadow-rgb": "0, 0, 0",
+};
+
 // Clásico (clave "elegante", punto 71): negro laca, como vidrio de piano.
 // Tarjetas, campos, pestañas, chip del clima y barra inferior con bisel
 // curvo de cristal (luz arriba e izquierda, sombra abajo, con varias
@@ -288,22 +340,9 @@ export const THEMES = {
   atardecer: {
     labelKey: "theme.atardecer",
     emoji: "🌅",
-    vars: {
-      "--bg": "#240e0a",
-      "--surface": "#431b14",
-      "--surface-alt": "#58261d",
-      "--accent": "#ff9742",
-      "--accent2": "#ff3355",
-      "--text": "#fff1e6",
-      "--text-muted": "#e0a98d",
-      "--border": "rgba(255, 151, 66, 0.25)",
-      "--accent2-soft": "rgba(255, 51, 85, 0.15)",
-      "--accent2-softer": "rgba(255, 51, 85, 0.12)",
-      "--accent2-soft-border": "rgba(255, 51, 85, 0.4)",
-      "--accent-soft": "rgba(255, 151, 66, 0.15)",
-      "--accent-softer": "rgba(255, 151, 66, 0.12)",
-      "--accent-soft-border": "rgba(255, 151, 66, 0.4)",
-    },
+    vars: ATARDECER_VARS,
+    // Activa .pt-relief (index.css) en los botones naranja brasa.
+    relief: true,
   },
   // Clásico (se muestra "Clásico"/"Classic"; la clave sigue siendo
   // "elegante" en las reglas y en las cuentas). "--bg"/"--surface" son
