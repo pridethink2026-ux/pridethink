@@ -232,57 +232,55 @@ const OCEANO_VARS = {
   "--shadow-rgb": "2, 10, 20",
 };
 
-// Arcoíris (punto 77), "Prisma": violeta casi negro con una banda de
-// espectro suave que cruza el fondo en diagonal (--page-glare), tarjetas
-// y chip del clima con borde tornasol (amarillo arriba, celeste a la
-// izquierda, rosa a la derecha), botones y pestaña activa con el arcoíris
-// en pastel, en relieve (se hunden y llevan el destello, como el Clásico).
+// Arcoíris (punto 77), "Neón": fondo oscuro con resplandores de neón en
+// las esquinas (magenta, celeste, amarillo y verde, en --page-glare),
+// tarjetas con halo rosa neón, campos con halo celeste, botones y pestaña
+// activa amarillo sol con brillo, en relieve (se hunden y llevan el
+// destello, como el Clásico).
 const ARCOIRIS_VARS = {
-  "--bg": "#120a24",
-  "--surface": "#22163f",
-  "--surface-alt": "#2d1f52",
-  "--accent": "#ffd166",
-  "--accent2": "#ff8fb1",
-  "--text": "#fbf5ff",
-  "--text-muted": "#cdbde9",
-  "--border": "rgba(201, 167, 255, 0.3)",
-  "--accent2-soft": "rgba(255, 143, 177, 0.15)",
-  "--accent2-softer": "rgba(255, 143, 177, 0.12)",
-  "--accent2-soft-border": "rgba(255, 143, 177, 0.4)",
-  "--accent-soft": "rgba(255, 209, 102, 0.15)",
-  "--accent-softer": "rgba(255, 209, 102, 0.12)",
-  "--accent-soft-border": "rgba(255, 209, 102, 0.4)",
+  "--bg": "#0e0820",
+  "--surface": "#1d1238",
+  "--surface-alt": "#281a4a",
+  "--accent": "#ffd23f",
+  "--accent2": "#ff5fa2",
+  "--text": "#fff6ff",
+  "--text-muted": "#d0bdf0",
+  "--border": "rgba(255, 95, 162, 0.3)",
+  "--accent2-soft": "rgba(255, 95, 162, 0.15)",
+  "--accent2-softer": "rgba(255, 95, 162, 0.12)",
+  "--accent2-soft-border": "rgba(255, 95, 162, 0.4)",
+  "--accent-soft": "rgba(255, 210, 63, 0.15)",
+  "--accent-softer": "rgba(255, 210, 63, 0.12)",
+  "--accent-soft-border": "rgba(255, 210, 63, 0.4)",
   "--gradient-primary":
-    "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 100%), linear-gradient(100deg, #ffe27a 0%, #ffb36b 25%, #ff9fbf 50%, #c9a7ff 75%, #93d6ff 100%)",
-  "--gradient-text": "linear-gradient(90deg, #ffd166, #ff9f7a, #ff8fb1, #c9a7ff, #93d6ff)",
+    "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 240, 0.75), rgba(255, 255, 240, 0) 100%), linear-gradient(180deg, #fff09a 0%, #ffd23f 50%, #ffa62b 100%)",
+  "--gradient-text": "linear-gradient(135deg, #ffd23f, #ff5fa2, #5fd4ff)",
   "--surface-sheen":
-    "radial-gradient(140% 55% at 50% 0%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 70%), #22163f",
+    "radial-gradient(140% 55% at 50% 0%, rgba(255, 95, 162, 0.08), rgba(255, 95, 162, 0) 70%), #1d1238",
   "--shine":
-    "inset 0 1px 0 rgba(255, 226, 122, 0.35), inset 1px 0 0 rgba(147, 214, 255, 0.28), inset -1px 0 0 rgba(255, 143, 177, 0.28), inset 0 -10px 18px rgba(6, 2, 16, 0.45), 0 6px 14px rgba(6, 2, 16, 0.6)",
+    "inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 95, 162, 0.2), 0 0 18px rgba(255, 95, 162, 0.12), 0 6px 14px rgba(4, 2, 12, 0.6)",
   "--field-shine":
-    "inset 0 2px 6px rgba(6, 2, 16, 0.7), inset 0 -1px 0 rgba(201, 167, 255, 0.2), 0 1px 0 rgba(255, 255, 255, 0.06)",
+    "inset 0 2px 6px rgba(4, 2, 12, 0.7), inset 0 0 0 1px rgba(95, 212, 255, 0.16), 0 0 10px rgba(95, 212, 255, 0.06)",
   "--chip-shine":
-    "inset 0 1px 0 rgba(255, 226, 122, 0.45), inset 1px 0 0 rgba(147, 214, 255, 0.3), inset -1px 0 0 rgba(255, 143, 177, 0.3), inset 0 -3px 6px rgba(6, 2, 16, 0.5), 0 4px 10px rgba(6, 2, 16, 0.6)",
+    "inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 210, 63, 0.3), 0 0 12px rgba(255, 210, 63, 0.15), 0 4px 10px rgba(4, 2, 12, 0.6)",
   "--button-shine":
-    "inset 0 1px 1px rgba(255, 255, 255, 0.85), inset 0 -3px 6px rgba(70, 30, 110, 0.3), 0 3px 6px rgba(6, 2, 16, 0.6), 0 8px 18px rgba(201, 167, 255, 0.25)",
+    "inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 -3px 6px rgba(150, 70, 0, 0.3), 0 3px 6px rgba(4, 2, 12, 0.6), 0 0 18px rgba(255, 210, 63, 0.35)",
   "--button-shine-pressed":
-    "inset 0 1px 1px rgba(255, 255, 255, 0.6), inset 0 -2px 5px rgba(70, 30, 110, 0.4), 0 1px 3px rgba(6, 2, 16, 0.6)",
-  "--sweep-color": "rgba(255, 255, 255, 0.55)",
-  "--tab-bg":
-    "radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 60%), #1c1236",
+    "inset 0 1px 1px rgba(255, 255, 255, 0.6), inset 0 -2px 5px rgba(150, 70, 0, 0.4), 0 1px 3px rgba(4, 2, 12, 0.6)",
+  "--sweep-color": "rgba(255, 255, 240, 0.6)",
+  "--tab-bg": "linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%), #170e2e",
   "--tab-active-bg":
-    "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 100%), linear-gradient(100deg, #ffe27a 0%, #ffb36b 25%, #ff9fbf 50%, #c9a7ff 75%, #93d6ff 100%)",
-  "--tab-active-text": "#120a24",
-  "--bar-bg": "linear-gradient(180deg, #1a1033, #120a24)",
+    "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 240, 0.75), rgba(255, 255, 240, 0) 100%), linear-gradient(180deg, #fff09a 0%, #ffd23f 50%, #ffa62b 100%)",
+  "--tab-active-text": "#0e0820",
+  "--bar-bg": "linear-gradient(180deg, #160d2d, #0e0820)",
   "--bottom-bar-bg":
-    "radial-gradient(120% 160% at 50% 0%, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, #22163f, #0d071b)",
-  "--bottom-bar-shine":
-    "inset 0 1px 0 rgba(201, 167, 255, 0.5), 0 -8px 18px rgba(6, 2, 16, 0.7)",
-  "--unread-edge": "#ffd166",
+    "radial-gradient(120% 160% at 50% 0%, rgba(255, 95, 162, 0.1), rgba(255, 95, 162, 0) 55%), linear-gradient(180deg, #1d1238, #0a0618)",
+  "--bottom-bar-shine": "inset 0 1px 0 rgba(255, 95, 162, 0.55), 0 -8px 18px rgba(4, 2, 12, 0.7)",
+  "--unread-edge": "#ff5fa2",
   "--page-bg": "transparent",
   "--page-glare":
-    "linear-gradient(120deg, rgba(255, 209, 102, 0) 30%, rgba(255, 209, 102, 0.06) 38%, rgba(255, 143, 177, 0.07) 44%, rgba(201, 167, 255, 0.07) 50%, rgba(147, 214, 255, 0.06) 56%, rgba(147, 214, 255, 0) 64%), radial-gradient(40% 25% at 0% 0%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 70%), #120a24",
-  "--shadow-rgb": "6, 2, 16",
+    "radial-gradient(45% 30% at 0% 10%, rgba(255, 95, 162, 0.16), rgba(255, 95, 162, 0) 70%), radial-gradient(45% 30% at 100% 40%, rgba(95, 212, 255, 0.13), rgba(95, 212, 255, 0) 70%), radial-gradient(50% 30% at 15% 95%, rgba(255, 210, 63, 0.1), rgba(255, 210, 63, 0) 70%), radial-gradient(40% 25% at 95% 100%, rgba(140, 255, 120, 0.08), rgba(140, 255, 120, 0) 70%), #0e0820",
+  "--shadow-rgb": "4, 2, 12",
 };
 
 // Clásico (clave "elegante", punto 71): negro laca, como vidrio de piano.
@@ -406,7 +404,7 @@ export const THEMES = {
     labelKey: "theme.arcoiris",
     emoji: "🌈",
     vars: ARCOIRIS_VARS,
-    // Activa .pt-relief (index.css) en los botones de arcoíris pastel.
+    // Activa .pt-relief (index.css) en los botones amarillo sol.
     relief: true,
   },
   oceano: {
