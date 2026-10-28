@@ -180,6 +180,58 @@ const ATARDECER_VARS = {
   "--shadow-rgb": "0, 0, 0",
 };
 
+// Océano (punto 76), "Marea": azul más vivo con ondas de oleaje suaves en
+// la parte de abajo del fondo (--page-glare), tarjetas, chip del clima y
+// barra inferior con una línea de espuma arriba, botones y pestaña activa
+// de espuma blanca a turquesa en relieve (se hunden y llevan el destello,
+// como el Clásico).
+const OCEANO_VARS = {
+  "--bg": "#062033",
+  "--surface": "#0c3350",
+  "--surface-alt": "#124266",
+  "--accent": "#4ff0d8",
+  "--accent2": "#7fd4ff",
+  "--text": "#eaf8ff",
+  "--text-muted": "#a9d0e6",
+  "--border": "rgba(79, 240, 216, 0.28)",
+  "--accent2-soft": "rgba(127, 212, 255, 0.15)",
+  "--accent2-softer": "rgba(127, 212, 255, 0.12)",
+  "--accent2-soft-border": "rgba(127, 212, 255, 0.4)",
+  "--accent-soft": "rgba(79, 240, 216, 0.15)",
+  "--accent-softer": "rgba(79, 240, 216, 0.12)",
+  "--accent-soft-border": "rgba(79, 240, 216, 0.4)",
+  "--gradient-primary":
+    "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 100%), linear-gradient(180deg, #e6fffb 0%, #7ff5e3 40%, #36c9e0 100%)",
+  "--gradient-text": "linear-gradient(135deg, #7ff5e3, #7fd4ff)",
+  "--surface-sheen":
+    "linear-gradient(180deg, rgba(234, 248, 255, 0.08), rgba(234, 248, 255, 0) 35%), #0c3350",
+  "--shine":
+    "inset 0 1.5px 0 rgba(234, 248, 255, 0.45), inset 0 3px 6px rgba(234, 248, 255, 0.06), inset 0 -10px 18px rgba(2, 12, 24, 0.35), 0 6px 14px rgba(2, 10, 20, 0.5)",
+  "--field-shine":
+    "inset 0 2px 6px rgba(2, 10, 20, 0.6), inset 0 -1px 0 rgba(234, 248, 255, 0.18), 0 1px 0 rgba(234, 248, 255, 0.1)",
+  "--chip-shine":
+    "inset 0 1.5px 0 rgba(234, 248, 255, 0.5), inset 0 -3px 6px rgba(2, 12, 24, 0.4), 0 4px 10px rgba(2, 10, 20, 0.5)",
+  "--button-shine":
+    "inset 0 1px 1px #ffffff, inset 0 -3px 6px rgba(0, 90, 110, 0.3), 0 3px 6px rgba(2, 10, 20, 0.5), 0 8px 18px rgba(79, 240, 216, 0.25)",
+  "--button-shine-pressed":
+    "inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 -2px 5px rgba(0, 90, 110, 0.4), 0 1px 3px rgba(2, 10, 20, 0.5)",
+  "--sweep-color": "rgba(255, 255, 255, 0.6)",
+  "--tab-bg":
+    "linear-gradient(180deg, rgba(234, 248, 255, 0.08), rgba(234, 248, 255, 0) 50%), #0a2c46",
+  "--tab-active-bg":
+    "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 100%), linear-gradient(180deg, #e6fffb 0%, #7ff5e3 40%, #36c9e0 100%)",
+  "--tab-active-text": "#062033",
+  "--bar-bg": "linear-gradient(180deg, #0a2c46, #062033)",
+  "--bottom-bar-bg":
+    "radial-gradient(140% 120% at 50% 0%, rgba(79, 240, 216, 0.12), rgba(79, 240, 216, 0) 55%), linear-gradient(180deg, #0c3350, #041726)",
+  "--bottom-bar-shine": "inset 0 1.5px 0 rgba(234, 248, 255, 0.55), 0 -8px 18px rgba(2, 10, 20, 0.6)",
+  "--unread-edge": "#7fd4ff",
+  "--page-bg": "transparent",
+  "--page-glare":
+    "radial-gradient(140% 22% at 50% 102%, rgba(79, 240, 216, 0.13), rgba(79, 240, 216, 0) 70%), radial-gradient(120% 18% at 25% 92%, rgba(127, 212, 255, 0.1), rgba(127, 212, 255, 0) 70%), radial-gradient(130% 16% at 80% 83%, rgba(127, 212, 255, 0.07), rgba(127, 212, 255, 0) 70%), radial-gradient(120% 14% at 40% 74%, rgba(127, 212, 255, 0.04), rgba(127, 212, 255, 0) 70%), linear-gradient(180deg, #0a2a42 0%, #062033 100%)",
+  "--shadow-rgb": "2, 10, 20",
+};
+
 // Clásico (clave "elegante", punto 71): negro laca, como vidrio de piano.
 // Tarjetas, campos, pestañas, chip del clima y barra inferior con bisel
 // curvo de cristal (luz arriba e izquierda, sombra abajo, con varias
@@ -320,22 +372,9 @@ export const THEMES = {
   oceano: {
     labelKey: "theme.oceano",
     emoji: "🌊",
-    vars: {
-      "--bg": "#051829",
-      "--surface": "#0b2c4c",
-      "--surface-alt": "#114069",
-      "--accent": "#13ecd1",
-      "--accent2": "#33c2ff",
-      "--text": "#e6f6ff",
-      "--text-muted": "#8db8d8",
-      "--border": "rgba(19, 236, 209, 0.25)",
-      "--accent2-soft": "rgba(51, 194, 255, 0.15)",
-      "--accent2-softer": "rgba(51, 194, 255, 0.12)",
-      "--accent2-soft-border": "rgba(51, 194, 255, 0.4)",
-      "--accent-soft": "rgba(19, 236, 209, 0.15)",
-      "--accent-softer": "rgba(19, 236, 209, 0.12)",
-      "--accent-soft-border": "rgba(19, 236, 209, 0.4)",
-    },
+    vars: OCEANO_VARS,
+    // Activa .pt-relief (index.css) en los botones de espuma.
+    relief: true,
   },
   atardecer: {
     labelKey: "theme.atardecer",
