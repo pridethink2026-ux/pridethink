@@ -43,7 +43,7 @@ const styles = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
     borderRadius: "22px",
-    boxShadow: "0 20px 50px rgba(0,0,0,0.45)",
+    boxShadow: "0 20px 50px rgba(var(--shadow-rgb), 0.45)",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",

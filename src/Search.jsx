@@ -72,7 +72,7 @@ const styles = {
     cursor: "pointer",
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+    boxShadow: "0 4px 14px rgba(var(--shadow-rgb), 0.15)",
     marginBottom: "10px",
   },
   userName: { fontSize: "14px", fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "4px" },
@@ -84,7 +84,7 @@ const styles = {
     borderRadius: "16px",
     background: "var(--surface)",
     border: "1px solid var(--border)",
-    boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+    boxShadow: "0 4px 14px rgba(var(--shadow-rgb), 0.15)",
     marginBottom: "10px",
   },
   postAuthor: {

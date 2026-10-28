@@ -107,7 +107,7 @@ service cloud.firestore {
         && (!('language' in datos) || textoValido(datos.language, 10))
         && (!('soundMuted' in datos) || datos.soundMuted is bool)
         && (!('theme' in datos) || datos.theme in
-          ['noche', 'arcoiris', 'oceano', 'atardecer', 'elegante', 'rotativo']);
+          ['noche', 'arcoiris', 'oceano', 'atardecer', 'elegante', 'pinky', 'rotativo']);
     }
 
     // Hallazgo H1, fase B: campos que ya no pueden estar en users/{uid}.

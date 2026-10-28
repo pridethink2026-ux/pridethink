@@ -487,7 +487,7 @@ export default function AuthScreen({ needsIdentity }) {
   };
 
   return (
-    <div style={{ ...ENTRY_THEME_VARS, ...styles.page }}>
+    <div className="pt-native-placeholder" style={{ ...ENTRY_THEME_VARS, ...styles.page }}>
       <div style={styles.card}>
         {(step === "login" || step === "signup") && (
           <>

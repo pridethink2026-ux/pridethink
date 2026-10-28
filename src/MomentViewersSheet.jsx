@@ -40,7 +40,7 @@ const styles = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
     borderRadius: "22px 22px 0 0",
-    boxShadow: "0 -10px 40px rgba(0,0,0,0.45)",
+    boxShadow: "0 -10px 40px rgba(var(--shadow-rgb), 0.45)",
     color: "var(--text)",
     fontFamily: "var(--font-body)",
     boxSizing: "border-box",

@@ -71,7 +71,7 @@ const styles = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
     borderRadius: "20px",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+    boxShadow: "0 6px 20px rgba(var(--shadow-rgb), 0.18)",
   },
   imagePlaceholder: {
     width: "100%",
@@ -236,7 +236,7 @@ const styles = {
     border: "none",
     background: "var(--gradient-primary)",
     boxShadow: "var(--button-shine)",
-    color: "var(--bg)",
+    color: "var(--on-primary)",
     fontSize: "15px",
     fontWeight: 700,
     cursor: "pointer",

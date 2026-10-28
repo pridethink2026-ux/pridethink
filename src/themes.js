@@ -48,6 +48,14 @@ const EFFECT_DEFAULTS = {
   "--tab-bg": "transparent",
   // Color del destello que cruza los botones .pt-relief (index.css).
   "--sweep-color": "rgba(255, 255, 255, 0.55)",
+  // Texto sobre los botones con --gradient-primary (punto 73). Por defecto
+  // el color del fondo, como siempre; un tema con botones claros sobre
+  // fondo claro (Pinky pastel) lo cambia.
+  "--on-primary": "var(--bg)",
+  // Color de las sombras de los componentes, en "r, g, b" para usarlo
+  // como rgba(var(--shadow-rgb), alfa). Negro por defecto; los temas
+  // claros las tiñen para que no se vean grises.
+  "--shadow-rgb": "0, 0, 0",
 };
 
 // Estrellas del fondo de Noche Violeta: puntos de degradado en dos mosaicos
@@ -177,6 +185,60 @@ const CLASICO_VARS = {
     "linear-gradient(115deg, rgba(255, 255, 255, 0) 18%, rgba(255, 255, 255, 0.05) 26%, rgba(255, 255, 255, 0) 34%), linear-gradient(115deg, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, 0.07) 66%, rgba(255, 255, 255, 0.02) 72%, rgba(255, 255, 255, 0) 80%), radial-gradient(ellipse at 85% 30%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 45%), #030303",
 };
 
+// Costura de Pinky: puntadas blancas bajo la barra superior, una capa de
+// --bar-bg.
+const PINKY_STITCH =
+  "repeating-linear-gradient(90deg, #ffffff 0 7px, rgba(255, 255, 255, 0) 7px 12px) left 0 bottom 3px / 100% 2px no-repeat";
+
+// Pinky (punto 73), rosa pastel: el primer tema claro. Texto ciruela,
+// tarjetas con bisel brillante (luz blanca arriba, borde blanco, sombra
+// rosada), campos hundidos, botones blancos perla en relieve con texto
+// rosa oscuro (--on-primary), destello rosa, reflejos suaves en el fondo
+// y la costura bajo la barra superior. Sombras teñidas (--shadow-rgb).
+const PINKY_VARS = {
+  "--bg": "#ffdbe5",
+  "--surface": "#ffc4d4",
+  "--surface-alt": "#ffb3c7",
+  "--accent": "#8e1a4b",
+  "--accent2": "#7a1640",
+  "--text": "#3d0b22",
+  "--text-muted": "#6e2346",
+  "--border": "rgba(142, 26, 75, 0.25)",
+  "--accent2-soft": "rgba(122, 22, 64, 0.12)",
+  "--accent2-softer": "rgba(122, 22, 64, 0.08)",
+  "--accent2-soft-border": "rgba(122, 22, 64, 0.35)",
+  "--accent-soft": "rgba(142, 26, 75, 0.12)",
+  "--accent-softer": "rgba(142, 26, 75, 0.08)",
+  "--accent-soft-border": "rgba(142, 26, 75, 0.35)",
+  "--gradient-primary":
+    "radial-gradient(60% 22% at 50% 10%, #ffffff, rgba(255, 255, 255, 0) 100%), radial-gradient(130% 100% at 50% 0%, #ffffff 0%, #fff3f7 45%, #ffdbe6 100%)",
+  "--gradient-text": "linear-gradient(135deg, #7a1640, #9c1d52)",
+  "--on-primary": "#a8124f",
+  "--surface-sheen": "linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 40%), #ffc4d4",
+  "--shine":
+    "inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1.5px rgba(255, 255, 255, 0.7), inset 0 -4px 8px rgba(176, 36, 94, 0.18), 0 6px 14px rgba(176, 36, 94, 0.22)",
+  "--field-shine": "inset 0 2px 5px rgba(142, 26, 75, 0.22), inset 0 0 0 1.5px rgba(255, 255, 255, 0.85)",
+  "--chip-shine":
+    "inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 0 0 1.5px rgba(255, 255, 255, 0.7), 0 3px 8px rgba(176, 36, 94, 0.2)",
+  "--button-shine":
+    "inset 0 1px 1px #ffffff, inset 0 -3px 6px rgba(176, 36, 94, 0.18), 0 0 0 1px rgba(176, 36, 94, 0.15), 0 4px 10px rgba(176, 36, 94, 0.3)",
+  "--button-shine-pressed":
+    "inset 0 1px 1px rgba(255, 255, 255, 0.8), inset 0 -2px 5px rgba(176, 36, 94, 0.25), 0 1px 3px rgba(176, 36, 94, 0.3)",
+  "--sweep-color": "rgba(255, 111, 170, 0.35)",
+  "--tab-bg": "linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.15))",
+  "--tab-active-bg":
+    "radial-gradient(60% 22% at 50% 10%, #ffffff, rgba(255, 255, 255, 0) 100%), radial-gradient(130% 100% at 50% 0%, #ffffff 0%, #fff3f7 45%, #ffdbe6 100%)",
+  "--tab-active-text": "#a8124f",
+  "--bar-bg": `${PINKY_STITCH}, linear-gradient(180deg, #ffd0dc, #ffc4d4)`,
+  "--bottom-bar-bg": "linear-gradient(180deg, #ffc4d4, #ffb3c7)",
+  "--bottom-bar-shine": "inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 -4px 12px rgba(176, 36, 94, 0.15)",
+  "--unread-edge": "#d6246e",
+  "--page-bg": "transparent",
+  "--page-glare":
+    "radial-gradient(70% 40% at 15% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%), radial-gradient(60% 40% at 90% 90%, rgba(255, 150, 190, 0.35), rgba(255, 150, 190, 0) 70%), #ffdbe5",
+  "--shadow-rgb": "120, 20, 60",
+};
+
 export const THEMES = {
   noche: {
     labelKey: "theme.noche",
@@ -259,6 +321,14 @@ export const THEMES = {
     // Activa .pt-relief (index.css) en los botones blancos.
     relief: true,
   },
+  // Pinky (punto 73): sin emoji, su ícono es PinkyHeartIcon.jsx (App.js,
+  // THEME_SVG_ICONS). Clave nueva: tiene que estar en firestore.rules.
+  pinky: {
+    labelKey: "theme.pinky",
+    vars: PINKY_VARS,
+    relief: true,
+    metaColor: "#ffd0dc",
+  },
 };
 
 // Paleta fija de marca para la pantalla de entrada (AuthScreen.jsx, punto
@@ -326,7 +396,7 @@ export function isThemeKey(key) {
 }
 
 // Elige un tema distinto cada día del año, en un ciclo fijo entre todos los
-// temas de THEMES (hoy 5, con Clásico; 6 cuando se sume Pinky).
+// temas de THEMES (hoy 6, con Pinky).
 export function getRotativeThemeKey() {
   const keys = getThemeKeys();
   const now = new Date();
@@ -338,6 +408,8 @@ export function getRotativeThemeKey() {
 // Duración del fundido al cambiar de tema: la de las transiciones de
 // .pt-theme-transition en index.css, con un poco de margen.
 const THEME_TRANSITION_MS = 400;
+// El theme-color de public/index.html.
+const DEFAULT_META_COLOR = "#000000";
 let transitionTimer = null;
 
 // Aplica un tema (o resuelve "rotativo" al tema del día) seteando las
@@ -365,6 +437,10 @@ export function applyTheme(key, { animate = false } = {}) {
   Object.entries(FONT_VARS).forEach(([prop, value]) => {
     root.style.setProperty(prop, value);
   });
+  // Barra del navegador en el celular (<meta name="theme-color">, punto
+  // 73): negra como siempre, salvo un tema que declare metaColor.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme.metaColor || DEFAULT_META_COLOR);
 }
 
 // localStorage es solo una caché del tema de la cuenta con sesión, para el

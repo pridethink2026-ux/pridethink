@@ -85,6 +85,22 @@ body::before {
   outline-offset: 2px;
 }
 
+/* Placeholders con el color secundario del tema (punto 73): el gris del
+   navegador no llega a 4,5 sobre los fondos claros (Pinky) ni sobre
+   varios oscuros. La entrada (paleta fija) y los campos sobre fondo
+   siempre oscuro (responder un Momento) llevan .pt-native-placeholder y
+   siguen con el del navegador. */
+::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.pt-native-placeholder::placeholder,
+.pt-native-placeholder ::placeholder {
+  color: revert;
+  opacity: revert;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

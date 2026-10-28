@@ -84,7 +84,7 @@ const styles = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
     borderRadius: "22px",
-    boxShadow: "0 8px 26px rgba(0,0,0,0.2)",
+    boxShadow: "0 8px 26px rgba(var(--shadow-rgb), 0.2)",
     padding: "30px 22px",
     textAlign: "center",
     marginBottom: "22px",
@@ -160,7 +160,7 @@ const styles = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
     borderRadius: "20px",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+    boxShadow: "0 6px 20px rgba(var(--shadow-rgb), 0.18)",
   },
   unblockBtn: {
     marginTop: "14px",

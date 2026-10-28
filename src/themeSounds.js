@@ -59,6 +59,13 @@ function playEleganteSound(ctx) {
   playTone(ctx, { freq: 3136, type: "sine", duration: 0.18, peakGain: 0.025, attack: 0.003, filterFreq: 7000 });
 }
 
+// Burbujas de chicle: dos "pop" cortos que suben (al revés que la gota de
+// Océano, que baja), el segundo más agudo y más bajito.
+function playPinkySound(ctx) {
+  playTone(ctx, { freq: 520, type: "sine", duration: 0.1, peakGain: 0.08, attack: 0.004, freqRampTo: 1040 });
+  playTone(ctx, { freq: 780, type: "sine", start: 0.09, duration: 0.1, peakGain: 0.05, attack: 0.004, freqRampTo: 1560 });
+}
+
 const SOUND_BUILDERS = {
   noche: playNocheSound,
   arcoiris: playArcoirisSound,
@@ -66,6 +73,7 @@ const SOUND_BUILDERS = {
   atardecer: playAtardecerSound,
   rotativo: playRotativoSound,
   elegante: playEleganteSound,
+  pinky: playPinkySound,
 };
 
 export function playThemeSound(themeKey) {

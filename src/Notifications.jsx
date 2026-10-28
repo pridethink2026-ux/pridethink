@@ -114,7 +114,7 @@ const styles = {
     borderRadius: "18px",
     padding: "8px",
     zIndex: 20,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.4), var(--shine)",
+    boxShadow: "0 10px 30px rgba(var(--shadow-rgb), 0.4), var(--shine)",
   },
   item: (unread) => ({
     display: "flex",
@@ -168,8 +168,8 @@ const styles = {
     background: unread ? "var(--surface-alt)" : "var(--surface-sheen)",
     border: "1px solid var(--border)",
     boxShadow: unread
-      ? "0 4px 14px rgba(0,0,0,0.15), inset 3px 0 0 var(--unread-edge)"
-      : "0 4px 14px rgba(0,0,0,0.15), var(--shine)",
+      ? "0 4px 14px rgba(var(--shadow-rgb), 0.15), inset 3px 0 0 var(--unread-edge)"
+      : "0 4px 14px rgba(var(--shadow-rgb), 0.15), var(--shine)",
     fontSize: "14px",
     marginBottom: "10px",
     cursor: "pointer",

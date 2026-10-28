@@ -77,7 +77,7 @@ const styles = {
     border: "1px solid var(--border)",
     borderRadius: "16px",
     padding: "10px",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+    boxShadow: "0 10px 30px rgba(var(--shadow-rgb), 0.4)",
     zIndex: 20,
   },
   grid: {

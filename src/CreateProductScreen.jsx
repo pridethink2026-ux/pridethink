@@ -222,7 +222,7 @@ const styles = {
     border: "none",
     background: "var(--gradient-primary)",
     boxShadow: "var(--button-shine)",
-    color: "var(--bg)",
+    color: "var(--on-primary)",
     fontSize: "14px",
     fontWeight: 700,
     cursor: "pointer",

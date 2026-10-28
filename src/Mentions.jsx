@@ -148,7 +148,7 @@ const styles = {
     borderRadius: "14px",
     padding: "6px",
     zIndex: 40,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+    boxShadow: "0 10px 30px rgba(var(--shadow-rgb), 0.4)",
   },
   dropdownItem: {
     display: "flex",

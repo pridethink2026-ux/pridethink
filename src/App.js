@@ -14,6 +14,7 @@ import { useLanguage } from "./LanguageContext";
 import { THEMES, ROTATIVO_KEY } from "./themes";
 import { useTheme } from "./ThemeContext";
 import { playThemeSound } from "./themeSounds";
+import PinkyHeartIcon from "./PinkyHeartIcon";
 
 /*
   App
@@ -190,7 +191,7 @@ const themeStyles = {
     borderRadius: "18px",
     padding: "8px",
     zIndex: 20,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+    boxShadow: "0 10px 30px rgba(var(--shadow-rgb), 0.4)",
   },
   // Cada opción es un <button>: ancho completo, sin borde y con la
   // fuente de la app (los botones no la heredan solos).
@@ -231,7 +232,7 @@ const bannerStyles = {
     padding: "16px 18px",
     borderRadius: "18px",
     background: "var(--gradient-primary)",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.25), var(--button-shine)",
+    boxShadow: "0 8px 24px rgba(var(--shadow-rgb), 0.25), var(--button-shine)",
     boxSizing: "border-box",
   },
   // Overlay del shimmer: cubre toda la tarjeta (position absolute, no
@@ -254,7 +255,7 @@ const bannerStyles = {
     fontFamily: "var(--font-display)",
     fontSize: "15px",
     fontWeight: 700,
-    color: "var(--bg)",
+    color: "var(--on-primary)",
     lineHeight: 1.3,
     textAlign: "center",
   },
@@ -266,7 +267,7 @@ const bannerStyles = {
     borderRadius: "999px",
     border: "none",
     background: "rgba(0,0,0,0.15)",
-    color: "var(--bg)",
+    color: "var(--on-primary)",
     fontSize: "15px",
     lineHeight: 1,
     cursor: "pointer",
@@ -372,6 +373,13 @@ const THEME_ICON_ANIM_CLASS = {
   elegante: "pt-theme-icon-elegante",
 };
 
+// Temas cuyo ícono es un SVG propio en vez del emoji (punto 73): 🩷 no
+// existe en sistemas viejos. Pinky queda quieto en el menú (sin clase de
+// animación): no se suman animaciones en bucle.
+const THEME_SVG_ICONS = {
+  pinky: PinkyHeartIcon,
+};
+
 function ThemeMenu() {
   const { t } = useLanguage();
   const { themeKey: selected, setTheme } = useTheme();
@@ -441,24 +449,27 @@ function ThemeMenu() {
       </button>
       {open && (
         <div style={themeStyles.panel}>
-          {Object.entries(THEMES).map(([key, theme]) => (
-            <button
-              type="button"
-              key={key}
-              style={themeStyles.option(selected === key)}
-              aria-pressed={selected === key}
-              onClick={() => handleSelect(key)}
-            >
-              <span
-                className={THEME_ICON_ANIM_CLASS[key]}
-                style={themeStyles.animatedIcon}
-                aria-hidden="true"
+          {Object.entries(THEMES).map(([key, theme]) => {
+            const SvgIcon = THEME_SVG_ICONS[key];
+            return (
+              <button
+                type="button"
+                key={key}
+                style={themeStyles.option(selected === key)}
+                aria-pressed={selected === key}
+                onClick={() => handleSelect(key)}
               >
-                {theme.emoji}
-              </span>
-              <span>{t(theme.labelKey)}</span>
-            </button>
-          ))}
+                <span
+                  className={THEME_ICON_ANIM_CLASS[key]}
+                  style={themeStyles.animatedIcon}
+                  aria-hidden="true"
+                >
+                  {SvgIcon ? <SvgIcon /> : theme.emoji}
+                </span>
+                <span>{t(theme.labelKey)}</span>
+              </button>
+            );
+          })}
           <button
             type="button"
             style={themeStyles.option(selected === ROTATIVO_KEY)}

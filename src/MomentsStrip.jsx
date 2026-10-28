@@ -39,7 +39,7 @@ const styles = {
     background: "var(--surface-sheen)",
     border: "1px solid var(--border)",
     borderRadius: "20px",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.18), var(--shine)",
+    boxShadow: "0 6px 20px rgba(var(--shadow-rgb), 0.18), var(--shine)",
     padding: "14px 14px 10px",
     marginBottom: "18px",
   },

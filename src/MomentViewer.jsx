@@ -746,6 +746,7 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
             <div style={styles.replyRow}>
               <input
                 ref={replyInputRef}
+                className="pt-native-placeholder"
                 style={styles.replyInput}
                 value={replyText}
                 maxLength={MAX_REPLY_LENGTH}

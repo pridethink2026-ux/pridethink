@@ -70,6 +70,7 @@ export const translations = {
     "theme.oceano": "Océano",
     "theme.atardecer": "Atardecer",
     "theme.elegante": "Clásico",
+    "theme.pinky": "Pinky",
 
     // Login (LoginForm, dentro de AuthProfile.jsx)
     "login.eyebrowBack": "Bienvenido de vuelta",
@@ -705,6 +706,7 @@ export const translations = {
     "theme.oceano": "Ocean",
     "theme.atardecer": "Sunset",
     "theme.elegante": "Classic",
+    "theme.pinky": "Pinky",
 
     // Login (LoginForm, inside AuthProfile.jsx)
     "login.eyebrowBack": "Welcome back",

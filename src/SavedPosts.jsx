@@ -68,7 +68,7 @@ const styles = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
     borderRadius: "20px",
-    boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
+    boxShadow: "0 6px 20px rgba(var(--shadow-rgb), 0.18)",
   },
 };
 

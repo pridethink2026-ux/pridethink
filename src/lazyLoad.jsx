@@ -126,7 +126,7 @@ const styles = {
     border: "none",
     background: "var(--gradient-primary)",
     boxShadow: "var(--button-shine)",
-    color: "var(--bg)",
+    color: "var(--on-primary)",
     fontFamily: "inherit",
     fontSize: "15px",
     fontWeight: 600,

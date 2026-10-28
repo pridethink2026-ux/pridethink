@@ -170,7 +170,7 @@ const pickerStyles = {
     border: "1px solid var(--border)",
     borderRadius: "999px",
     padding: "5px 6px",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+    boxShadow: "0 10px 30px rgba(var(--shadow-rgb), 0.4)",
     zIndex: 30,
   },
   btn: (active) => ({
