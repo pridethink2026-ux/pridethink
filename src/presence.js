@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
 import { timeAgo } from "./utils";
 
@@ -11,13 +11,22 @@ import { timeAgo } from "./utils";
   al cerrar sesión explícitamente) y quien necesite mostrar el puntito
   verde o el texto "Últ. vez..." (Chat.jsx, UserProfile.jsx).
 
-  Estructura en Firestore: dos campos nuevos en users/{uid}, ya cubiertos
-  por la regla existente "allow create, update: if esDueno(uid);" (no
-  restringe campos) — no hace falta tocar firestore.rules para esto.
+  Estructura en Firestore: presence/{uid} (punto 70, commit 9g). Antes
+  eran dos campos de users/{uid}, que cualquier autenticado lee y
+  AllUsersContext descarga para todos (fuga A: el dato crudo llegaba a
+  todos los clientes aunque canSeeOnlineStatus ocultara el punto), y cada
+  latido volvía a disparar ese listener en todos los clientes. Ahora las
+  reglas (puedeVerPresenciaDe en firestore.rules) solo dejan leerlo al
+  dueño y a quien no tenga bloqueo y pueda ver el perfil (público, o
+  privado con seguimiento mutuo). Mismos nombres de campo que antes, así
+  isEffectivelyOnline/formatLastSeen no cambian:
     - isOnline: boolean
-    - lastSeen: Timestamp (se actualiza cada vez que cambia isOnline, Y
-      además cada minuto mientras la pestaña sigue abierta — ver
-      HEARTBEAT_MS más abajo)
+    - lastSeen: Timestamp del servidor (se actualiza cada vez que cambia
+      isOnline, Y además cada HEARTBEAT_MS mientras la pestaña sigue
+      abierta)
+  Las reglas dependen del uid de la ruta, así que no se puede consultar la
+  colección entera: usePresences abre un listener por uid, compartido
+  entre todos los componentes que lo muestran (ver más abajo).
 
   CÓMO SE DECIDE "¿ESTÁ EN LÍNEA DE VERDAD?" (isEffectivelyOnline):
   Firestore NO tiene una forma nativa de detectar que alguien cerró la
@@ -39,13 +48,13 @@ import { timeAgo } from "./utils";
   para que una sesión genuinamente activa nunca se marque como "vieja".
 */
 
-const HEARTBEAT_MS = 60 * 1000; // 1 minuto
-export const STALE_MS = 2 * 60 * 1000; // 2 minutos
+const HEARTBEAT_MS = 2 * 60 * 1000; // 2 minutos
+export const STALE_MS = 5 * 60 * 1000; // 5 minutos
 
 async function markOnline(uid) {
   if (!uid) return;
   try {
-    await updateDoc(doc(db, "users", uid), { isOnline: true, lastSeen: serverTimestamp() });
+    await setDoc(doc(db, "presence", uid), { isOnline: true, lastSeen: serverTimestamp() });
   } catch (e) {
     // silencioso: no debe romper la app si por lo que sea falla la escritura
   }
@@ -58,7 +67,7 @@ async function markOnline(uid) {
 export async function markOffline(uid) {
   if (!uid) return;
   try {
-    await updateDoc(doc(db, "users", uid), { isOnline: false, lastSeen: serverTimestamp() });
+    await setDoc(doc(db, "presence", uid), { isOnline: false, lastSeen: serverTimestamp() });
   } catch (e) {
     // silencioso (ver arriba) — importante sobre todo en beforeunload,
     // donde el navegador puede cortar la pestaña antes de que termine.
@@ -88,8 +97,93 @@ export function useOnlinePresence(currentUid) {
   }, [currentUid]);
 }
 
+// Lectura compartida: un listener por uid aunque varios componentes muestren
+// a la misma persona (fila de contacto, encabezado del chat, perfil). Se
+// cierra cuando nadie lo usa; el cierre espera un turno para que un cambio
+// de lista (por ejemplo, filtrar contactos) no cierre y reabra los mismos.
+// Si las reglas lo rechazan (perfil privado sin seguimiento mutuo, bloqueo)
+// queda en null: sin punto ni "Últ. vez".
+const entries = new Map(); // uid -> { count, data, unsub }
+const storeListeners = new Set();
+let storeVersion = 0;
+
+function notifyStore() {
+  storeVersion += 1;
+  storeListeners.forEach((fn) => fn());
+}
+
+function subscribeStore(fn) {
+  storeListeners.add(fn);
+  return () => storeListeners.delete(fn);
+}
+
+const getStoreVersion = () => storeVersion;
+
+function retain(uid) {
+  let entry = entries.get(uid);
+  if (!entry) {
+    entry = { count: 0, data: null, unsub: null };
+    entries.set(uid, entry);
+    const current = entry;
+    current.unsub = onSnapshot(
+      doc(db, "presence", uid),
+      (snap) => {
+        current.data = snap.exists() ? snap.data() : null;
+        notifyStore();
+      },
+      () => {
+        current.data = null;
+        notifyStore();
+      }
+    );
+  }
+  entry.count += 1;
+}
+
+function release(uid) {
+  const entry = entries.get(uid);
+  if (!entry) return;
+  entry.count -= 1;
+  if (entry.count > 0) return;
+  setTimeout(() => {
+    if (entries.get(uid) !== entry || entry.count > 0) return;
+    entry.unsub();
+    entries.delete(uid);
+  }, 0);
+}
+
+// { uid: { isOnline, lastSeen } | null } de los uids pedidos. Además vuelve
+// a renderizar cada minuto, para que el punto de alguien que perdió la
+// conexión sin avisar se apague aunque no llegue ningún cambio.
+export function usePresences(uids) {
+  const key = Array.from(new Set(uids.filter(Boolean))).sort().join(",");
+  const [, setTick] = useState(0);
+  useSyncExternalStore(subscribeStore, getStoreVersion);
+
+  useEffect(() => {
+    if (!key) return;
+    const list = key.split(",");
+    list.forEach(retain);
+    const tick = setInterval(() => setTick((n) => n + 1), 60 * 1000);
+    return () => {
+      clearInterval(tick);
+      list.forEach(release);
+    };
+  }, [key]);
+
+  const byUid = {};
+  if (key) key.split(",").forEach((uid) => (byUid[uid] = entries.get(uid)?.data ?? null));
+  return byUid;
+}
+
+// Presencia de una sola persona (null si no se pide, no llegó o no se puede ver).
+export function usePresence(uid) {
+  return usePresences(uid ? [uid] : [])[uid] ?? null;
+}
+
 // ¿Se le puede mostrar el punto verde a esta persona? Combina el flag
-// guardado con la frescura de "lastSeen" (ver docstring de arriba).
+// guardado con la frescura de "lastSeen" (ver docstring de arriba). Recibe
+// el documento de presence/{uid} (usePresence/usePresences).
 export function isEffectivelyOnline(user) {
   if (!user?.isOnline || !user?.lastSeen?.toMillis) return false;
   return Date.now() - user.lastSeen.toMillis() < STALE_MS;

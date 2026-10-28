@@ -119,6 +119,32 @@ service cloud.firestore {
         'language', 'soundMuted', 'email', 'blockedUsers'];
     }
 
+    // Punto 70, commit 9g (fuga A): la presencia ya no vive en users/{uid}
+    // sino en presence/{uid} (más abajo), así que estos dos campos tampoco
+    // pueden volver a escribirse en el perfil público. Los que quedaron de
+    // antes se borran a mano en la consola.
+    function camposDePresenciaViejos() {
+      return ['isOnline', 'lastSeen'];
+    }
+
+    // Quién puede leer presence/{uid} (además del dueño): mismo criterio
+    // que canSeeOnlineStatus (presence.js) más los bloqueos — sin bloqueo
+    // en ninguna dirección, y el perfil no es privado o hay seguimiento
+    // mutuo. Las reglas dependen del uid de la ruta, así que la colección
+    // no se puede consultar entera: el cliente escucha documento por
+    // documento.
+    function puedeVerPresenciaDe(uid) {
+      let yo = request.auth.uid;
+      let perfil = get(/databases/$(database)/documents/users/$(uid)).data;
+      return !exists(/databases/$(database)/documents/blocks/$(uid + '_' + yo))
+        && !exists(/databases/$(database)/documents/blocks/$(yo + '_' + uid))
+        && (
+          perfil.get('isPrivate', false) != true
+          || (uid in get(/databases/$(database)/documents/users/$(yo)).data.get('following', [])
+            && yo in perfil.get('following', []))
+        );
+    }
+
     // Auditoría de seguridad (2026-07-28, hallazgo M1): antes, la ÚNICA
     // validación de tipo en todo este archivo era la fecha de nacimiento
     // de arriba — ningún campo de texto exigía ser string ni tenía límite
@@ -307,15 +333,16 @@ service cloud.firestore {
       // nacimiento (privadoEsDeMayorDeEdad arriba) y el documento público
       // no puede crearse con ningún campo sensible. Al editar se mira solo
       // lo que cambia (diff), así un documento viejo que todavía tuviera
-      // alguno de esos campos sigue pudiendo actualizar lo demás.
+      // alguno de esos campos sigue pudiendo actualizar lo demás. Lo mismo
+      // para isOnline/lastSeen (commit 9g, camposDePresenciaViejos).
       allow create: if esDueno(uid)
         && !('isVerified' in request.resource.data)
-        && !request.resource.data.keys().hasAny(camposSensiblesDePerfil())
+        && !request.resource.data.keys().hasAny(camposSensiblesDePerfil().concat(camposDePresenciaViejos()))
         && privadoEsDeMayorDeEdad(uid)
         && camposDePerfilValidos(request.resource.data);
       allow update: if esDueno(uid)
         && request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposSensiblesDePerfil())
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposSensiblesDePerfil().concat(camposDePresenciaViejos()))
         && camposDePerfilValidos(request.resource.data);
 
       // Nadie borra perfiles desde la app.
@@ -356,6 +383,25 @@ service cloud.firestore {
 
         allow delete: if false;
       }
+    }
+
+    // --------------------------------------------------------------------
+    // presence/{uid} → { isOnline, lastSeen } (punto 70, commit 9g)
+    // Antes eran dos campos de users/{uid}, que lee cualquier autenticado
+    // (fuga A): canSeeOnlineStatus solo ocultaba el punto en la interfaz.
+    // Solo el dueño escribe, solo esos dos campos, y lastSeen tiene que ser
+    // la hora del servidor (serverTimestamp). Lee el dueño o quien cumpla
+    // puedeVerPresenciaDe (arriba).
+    // --------------------------------------------------------------------
+    match /presence/{uid} {
+      allow read: if esDueno(uid) || (estaAutenticado() && puedeVerPresenciaDe(uid));
+
+      allow create, update: if esDueno(uid)
+        && request.resource.data.keys().hasOnly(['isOnline', 'lastSeen'])
+        && request.resource.data.isOnline is bool
+        && request.resource.data.lastSeen == request.time;
+
+      allow delete: if false;
     }
 
     // --------------------------------------------------------------------

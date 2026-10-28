@@ -22,8 +22,8 @@ import { getIdentityColors } from "./identityStyles";
   cómodo: `Avatar` es el componente que más veces se instancia en toda la
   app (muro, comentarios, chat, notificaciones, búsqueda...), y suscribirlo
   al contexto de `users` haría que TODOS los avatares en pantalla se
-  volvieran a renderizar con cada latido de presencia (`presence.js`
-  reescribe el documento de cada usuario conectado cada 60 segundos) — que
+  volvieran a renderizar con cada cambio de cualquier perfil (hasta el
+  commit 9g, también con cada latido de presencia de cada usuario) — que
   es exactamente el problema de rendimiento que se resolvió en la auditoría
   del 2026-07-28. Si falta la prop, simplemente se muestran las iniciales.
 

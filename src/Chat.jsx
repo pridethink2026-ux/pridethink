@@ -20,7 +20,7 @@ import Avatar from "./Avatar";
 import { notify, useIsMobile, getChatId } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
-import { isEffectivelyOnline, formatLastSeen } from "./presence";
+import { isEffectivelyOnline, formatLastSeen, usePresences } from "./presence";
 import { StickerImage, StickerPicker } from "./Stickers";
 import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
@@ -117,14 +117,13 @@ import ImageEditor from "./ImageEditor";
   sobre el avatar aparece tanto en cada fila de la lista de contactos como
   en el encabezado de la conversación activa (`isEffectivelyOnline`, que
   ya combina el flag guardado con la frescura de "lastSeen" — ver
-  presence.js). No hace falta filtrar por privacidad acá: `visibleContacts`
-  YA excluye del todo a cualquier perfil privado (`if (c.isPrivate) return
-  false`, ver más abajo), así que ningún contacto que aparezca en esta
-  pantalla puede ser privado. El encabezado de la conversación usa la
-  versión MÁS RECIENTE del contacto activo (buscada en `allUsers`, que se
-  actualiza en vivo) en vez de la copia guardada en `activeContact` al
-  hacer clic, para que el estado en línea se actualice mientras estás dentro
-  de la conversación. Si no está en línea, debajo del nombre se muestra
+  presence.js). La presencia sale de presence/{uid} (commit 9g) con
+  `usePresences`: un listener por cada contacto de la lista en pantalla
+  (filtrada por la búsqueda) más el de la conversación activa, solo
+  mientras el Chat está abierto. No hace falta filtrar por privacidad acá:
+  `visibleContacts` YA excluye del todo a cualquier perfil privado y a los
+  bloqueados (ver más abajo), y las reglas igual rechazan lo que no se
+  puede ver (queda sin punto). Si no está en línea, debajo del nombre se muestra
   "Últ. vez hace X" (`formatLastSeen`, reutiliza `timeAgo()` — formato
   relativo en español, igual que los posts).
 */
@@ -1050,10 +1049,13 @@ export default function Chat({
 
   // Versión más reciente del contacto activo (allUsers se actualiza en
   // vivo) — activeContact es solo una copia tomada al momento del clic,
-  // así que usarlo directo dejaría el estado en línea "congelado".
+  // así que usarlo directo dejaría la foto "congelada".
   const liveActiveContact = activeContact
     ? allUsers.find((u) => u.uid === activeContact.uid) || activeContact
     : null;
+
+  const presenceByUid = usePresences([...contacts.map((c) => c.uid), activeContact?.uid]);
+  const activePresence = activeContact ? presenceByUid[activeContact.uid] : null;
 
   // Abrir una conversación puntual al llegar desde una notificación de
   // mensaje (App.js -> openChat, mismo patrón que initialProductId en
@@ -1481,7 +1483,7 @@ export default function Chat({
                     identity={c.identity}
                     photoURL={c.photoURL}
                     size="md"
-                    online={isEffectivelyOnline(c)}
+                    online={isEffectivelyOnline(presenceByUid[c.uid])}
                   />
                   <div>
                     <p style={styles.contactName}>{c.displayName || t("chat.defaultName")}</p>
@@ -1513,13 +1515,13 @@ export default function Chat({
                       identity={activeContact.identity}
                       photoURL={liveActiveContact?.photoURL}
                       size="sm"
-                      online={isEffectivelyOnline(liveActiveContact)}
+                      online={isEffectivelyOnline(activePresence)}
                     />
                     <div style={styles.chatHeaderText}>
                       <p style={styles.chatHeaderName}>{activeContact.displayName}</p>
                       <p style={styles.chatHeaderIdentity}>{activeContact.identity}</p>
-                      {!isEffectivelyOnline(liveActiveContact) && formatLastSeen(liveActiveContact, t) && (
-                        <p style={styles.chatHeaderLastSeen}>{formatLastSeen(liveActiveContact, t)}</p>
+                      {!isEffectivelyOnline(activePresence) && formatLastSeen(activePresence, t) && (
+                        <p style={styles.chatHeaderLastSeen}>{formatLastSeen(activePresence, t)}</p>
                       )}
                     </div>
                   </div>

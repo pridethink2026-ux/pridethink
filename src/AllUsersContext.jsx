@@ -26,7 +26,9 @@ import { auth, db } from "./firebase";
   los usuarios a cada cliente. Por eso ningún dato sensible puede vivir
   ahí: los datos personales y ajustes privados están en
   users/{uid}/private/data (hallazgo H1, 2026-10-24), que solo lee el
-  dueño y que este listener no toca.
+  dueño y que este listener no toca. La presencia (isOnline/lastSeen)
+  tampoco: desde el commit 9g vive en presence/{uid} (ver presence.js), así
+  que el latido ya no vuelve a disparar este listener.
 
   Solo con sesión iniciada (2026-10-26, punto 68): firestore.rules exige
   sesión para leer "users", así que un listener abierto sin sesión fallaba

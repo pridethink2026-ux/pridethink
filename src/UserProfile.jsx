@@ -22,7 +22,7 @@ import ImageViewer from "./ImageViewer";
 import MomentViewer from "./MomentViewer";
 import { useMoments } from "./MomentsContext";
 import VerifiedBadge from "./VerifiedBadge";
-import { isEffectivelyOnline, canSeeOnlineStatus } from "./presence";
+import { isEffectivelyOnline, canSeeOnlineStatus, usePresence } from "./presence";
 import { unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useLanguage } from "./LanguageContext";
 
@@ -44,6 +44,9 @@ import { useLanguage } from "./LanguageContext";
     misma privacidad: si el perfil es privado, solo se muestra si hay
     seguimiento MUTUO entre vos y esa persona (`canSeeOnlineStatus`) — a
     quien no te sigue y no seguís, no le mostrás si estás conectado o no.
+    Desde el commit 9g lo hacen cumplir las reglas de presence/{uid}; acá
+    solo se escucha si `canSeeOnlineStatus` lo permite y no hay bloqueo,
+    para no pedir algo que el servidor va a rechazar.
 
   "following" vive en users/{uid}.following: [uid...]. Los seguidores de
   un usuario NO se guardan aparte: se derivan en tiempo real con una
@@ -261,6 +264,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const isFollowing = (myProfile?.following || []).includes(uid);
   const followingCount = (profileUser?.following || []).length;
   const canSeeOnline = canSeeOnlineStatus(profileUser, uid, currentUid, myProfile?.following || []);
+  const presence = usePresence(canSeeOnline && !isBlocked ? uid : null);
 
   const handleUnblock = async () => {
     if (!currentUid) return;
@@ -351,7 +355,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
               identity={profileUser.identity}
               photoURL={profileUser.photoURL}
               size="lg"
-              online={canSeeOnline && isEffectivelyOnline(profileUser)}
+              online={isEffectivelyOnline(presence)}
               // Punto 66: con momentos activos, tocar el avatar los abre
               // (destello si hay alguno sin ver) y la foto en grande pasa
               // al botón de abajo.
