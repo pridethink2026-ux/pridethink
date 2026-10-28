@@ -46,6 +46,76 @@ const EFFECT_DEFAULTS = {
   "--page-glare": "none",
   "--button-shine-pressed": "0 0 0 0 transparent",
   "--tab-bg": "transparent",
+  // Color del destello que cruza los botones .pt-relief (index.css).
+  "--sweep-color": "rgba(255, 255, 255, 0.55)",
+};
+
+// Estrellas del fondo de Noche Violeta: puntos de degradado en dos mosaicos
+// de tamaños distintos (173 y 251 px) para que no se note la repetición.
+const star = (x, y, size, alpha, tile) =>
+  `radial-gradient(${size}px ${size}px at ${x}px ${y}px, rgba(255, 255, 255, ${alpha}), rgba(255, 255, 255, 0)) 0 0 / ${tile}px ${tile}px`;
+const NOCHE_STARS = [
+  star(23, 41, 1.2, 0.85, 173),
+  star(97, 12, 1, 0.6, 173),
+  star(141, 88, 1.4, 0.75, 173),
+  star(58, 131, 1, 0.55, 173),
+  star(119, 156, 1.2, 0.7, 173),
+  star(37, 203, 1.6, 0.8, 251),
+  star(181, 47, 1.1, 0.6, 251),
+  star(219, 171, 1.3, 0.7, 251),
+  star(102, 238, 1, 0.5, 251),
+  star(160, 112, 0.9, 0.55, 251),
+].join(", ");
+
+// Noche Violeta (punto 72), "Noche estrellada": cielo con estrellas fijas y
+// resplandor de luna (--page-glare), tarjetas de terciopelo (luz satinada
+// arriba, profundidad hacia adentro), botones lila satinado en relieve (se
+// hunden y llevan el destello lila claro, como el Clásico) y una
+// constelación de puntos bajo la barra superior.
+const NOCHE_VARS = {
+  "--bg": "#0d0a24",
+  "--surface": "#1f1748",
+  "--surface-alt": "#2a1f5e",
+  "--accent": "#b296ff",
+  "--accent2": "#ff8ac4",
+  "--text": "#f6f3ff",
+  "--text-muted": "#c2b7ef",
+  "--border": "rgba(178, 150, 255, 0.26)",
+  "--accent2-soft": "rgba(255, 138, 196, 0.15)",
+  "--accent2-softer": "rgba(255, 138, 196, 0.12)",
+  "--accent2-soft-border": "rgba(255, 138, 196, 0.4)",
+  "--accent-soft": "rgba(178, 150, 255, 0.15)",
+  "--accent-softer": "rgba(178, 150, 255, 0.12)",
+  "--accent-soft-border": "rgba(178, 150, 255, 0.4)",
+  "--gradient-primary":
+    "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 100%), linear-gradient(180deg, #d9c9ff 0%, #b296ff 55%, #9a7cf0 100%)",
+  "--gradient-text": "linear-gradient(135deg, #c4adff, #ff8ac4)",
+  "--surface-sheen":
+    "radial-gradient(140% 55% at 50% 0%, rgba(214, 196, 255, 0.1), rgba(214, 196, 255, 0) 70%), #1f1748",
+  "--shine":
+    "inset 0 1px 0 rgba(214, 196, 255, 0.22), inset 0 -10px 18px rgba(6, 4, 20, 0.45), inset 0 0 0 1px rgba(178, 150, 255, 0.12), 0 6px 14px rgba(4, 2, 16, 0.6)",
+  "--field-shine":
+    "inset 0 2px 6px rgba(4, 2, 16, 0.7), inset 0 -1px 0 rgba(214, 196, 255, 0.14), 0 1px 0 rgba(214, 196, 255, 0.08)",
+  "--chip-shine":
+    "inset 0 1px 0 rgba(214, 196, 255, 0.4), inset 0 -3px 6px rgba(6, 4, 20, 0.5), 0 4px 10px rgba(4, 2, 16, 0.6)",
+  "--button-shine":
+    "inset 0 1px 1px rgba(255, 255, 255, 0.85), inset 0 -3px 6px rgba(60, 30, 130, 0.35), 0 3px 6px rgba(4, 2, 16, 0.6), 0 8px 16px rgba(120, 90, 230, 0.25)",
+  "--button-shine-pressed":
+    "inset 0 1px 1px rgba(255, 255, 255, 0.6), inset 0 -2px 5px rgba(60, 30, 130, 0.45), 0 1px 3px rgba(4, 2, 16, 0.6)",
+  "--sweep-color": "rgba(255, 255, 255, 0.5)",
+  "--tab-bg":
+    "radial-gradient(120% 100% at 50% 0%, rgba(214, 196, 255, 0.1), rgba(214, 196, 255, 0) 60%), #1a1340",
+  "--tab-active-bg":
+    "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 100%), linear-gradient(180deg, #d9c9ff 0%, #b296ff 55%, #9a7cf0 100%)",
+  "--tab-active-text": "#0d0a24",
+  "--bar-bg":
+    "radial-gradient(circle, rgba(214, 196, 255, 0.7) 0 1px, rgba(214, 196, 255, 0) 1.5px) left 0 bottom 1px / 14px 4px repeat-x, linear-gradient(180deg, #151036, #0d0a24)",
+  "--bottom-bar-bg":
+    "radial-gradient(120% 160% at 50% 0%, rgba(214, 196, 255, 0.1), rgba(214, 196, 255, 0) 55%), linear-gradient(180deg, #1b1442, #0b0820)",
+  "--bottom-bar-shine": "inset 0 1px 0 rgba(214, 196, 255, 0.4), 0 -8px 18px rgba(4, 2, 16, 0.7)",
+  "--unread-edge": "#ff8ac4",
+  "--page-bg": "transparent",
+  "--page-glare": `${NOCHE_STARS}, radial-gradient(30% 22% at 88% 6%, rgba(214, 196, 255, 0.16), rgba(214, 196, 255, 0) 70%), #0d0a24`,
 };
 
 // Clásico (clave "elegante", punto 71): negro laca, como vidrio de piano.
@@ -111,22 +181,9 @@ export const THEMES = {
   noche: {
     labelKey: "theme.noche",
     emoji: "🌙",
-    vars: {
-      "--bg": "#150b33",
-      "--surface": "#2a1a5c",
-      "--surface-alt": "#35216e",
-      "--accent": "#9b6bff",
-      "--accent2": "#ff5fae",
-      "--text": "#f5f3ff",
-      "--text-muted": "#b8adf0",
-      "--border": "rgba(155, 107, 255, 0.25)",
-      "--accent2-soft": "rgba(255, 95, 174, 0.15)",
-      "--accent2-softer": "rgba(255, 95, 174, 0.12)",
-      "--accent2-soft-border": "rgba(255, 95, 174, 0.4)",
-      "--accent-soft": "rgba(155, 107, 255, 0.15)",
-      "--accent-softer": "rgba(155, 107, 255, 0.12)",
-      "--accent-soft-border": "rgba(155, 107, 255, 0.4)",
-    },
+    vars: NOCHE_VARS,
+    // Activa .pt-relief (index.css) en los botones principales.
+    relief: true,
   },
   arcoiris: {
     labelKey: "theme.arcoiris",
@@ -209,9 +266,9 @@ export const THEMES = {
 // importar el tema que cada persona eligió dentro de la app. Mismas
 // variables que un tema; AuthScreen las pone en su contenedor, así que
 // solo valen ahí adentro y el resto de la app sigue con el tema elegido.
-// Hoy los valores coinciden con "noche" (morado y rosa, los del logo),
-// pero son una copia aparte a propósito: cambiar "noche" no cambia la
-// entrada.
+// Son los colores que tenía "noche" antes del punto 72 (morado y rosa, los
+// del logo): una copia aparte a propósito, así que cambiar "noche" no
+// cambia la entrada.
 // Las variables de efecto van con sus valores por defecto: así la entrada
 // no hereda el brillo del tema que quedó puesto en :root.
 export const ENTRY_THEME_VARS = {
@@ -268,7 +325,8 @@ export function isThemeKey(key) {
   return key === ROTATIVO_KEY || Object.prototype.hasOwnProperty.call(THEMES, key);
 }
 
-// Elige un tema distinto cada día del año, en un ciclo fijo entre los 4 temas.
+// Elige un tema distinto cada día del año, en un ciclo fijo entre todos los
+// temas de THEMES (hoy 5, con Clásico; 6 cuando se sume Pinky).
 export function getRotativeThemeKey() {
   const keys = getThemeKeys();
   const now = new Date();
@@ -299,7 +357,7 @@ export function applyTheme(key, { animate = false } = {}) {
     transitionTimer = setTimeout(() => root.classList.remove("pt-theme-transition"), THEME_TRANSITION_MS);
   }
   // Solo con data-relief en <html> actúan :active y el destello de
-  // .pt-relief (index.css); los otros temas no lo llevan.
+  // .pt-relief (index.css): solo los temas con relief: true lo llevan.
   root.toggleAttribute("data-relief", !!theme.relief);
   Object.entries({ ...EFFECT_DEFAULTS, ...theme.vars }).forEach(([prop, value]) => {
     root.style.setProperty(prop, value);
