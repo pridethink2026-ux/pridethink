@@ -56,6 +56,10 @@ const EFFECT_DEFAULTS = {
   // como rgba(var(--shadow-rgb), alfa). Negro por defecto; los temas
   // claros las tiñen para que no se vean grises.
   "--shadow-rgb": "0, 0, 0",
+  // Botón del menú de temas (barra superior, App.js): fondo y borde
+  // propios para que se distinga de la barra en todos los temas.
+  "--theme-btn-bg": "var(--surface)",
+  "--theme-btn-border": "var(--text-muted)",
 };
 
 // Estrellas del fondo de Noche Violeta: puntos de degradado en dos mosaicos
@@ -78,8 +82,7 @@ const NOCHE_STARS = [
 // Noche Violeta (punto 72), "Noche estrellada": cielo con estrellas fijas y
 // resplandor de luna (--page-glare), tarjetas de terciopelo (luz satinada
 // arriba, profundidad hacia adentro), botones lila satinado en relieve (se
-// hunden y llevan el destello lila claro, como el Clásico) y una
-// constelación de puntos bajo la barra superior.
+// hunden y llevan el destello lila claro, como el Clásico).
 const NOCHE_VARS = {
   "--bg": "#0d0a24",
   "--surface": "#1f1748",
@@ -116,8 +119,7 @@ const NOCHE_VARS = {
   "--tab-active-bg":
     "radial-gradient(70% 30% at 50% 8%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 100%), linear-gradient(180deg, #d9c9ff 0%, #b296ff 55%, #9a7cf0 100%)",
   "--tab-active-text": "#0d0a24",
-  "--bar-bg":
-    "radial-gradient(circle, rgba(214, 196, 255, 0.7) 0 1px, rgba(214, 196, 255, 0) 1.5px) left 0 bottom 1px / 14px 4px repeat-x, linear-gradient(180deg, #151036, #0d0a24)",
+  "--bar-bg": "linear-gradient(180deg, #151036, #0d0a24)",
   "--bottom-bar-bg":
     "radial-gradient(120% 160% at 50% 0%, rgba(214, 196, 255, 0.1), rgba(214, 196, 255, 0) 55%), linear-gradient(180deg, #1b1442, #0b0820)",
   "--bottom-bar-shine": "inset 0 1px 0 rgba(214, 196, 255, 0.4), 0 -8px 18px rgba(4, 2, 16, 0.7)",
@@ -131,8 +133,7 @@ const NOCHE_VARS = {
 // curvo de cristal (luz arriba e izquierda, sombra abajo, con varias
 // box-shadow; sin backdrop-filter, por el bug conocido de Chromium);
 // botones en blanco perla con efecto domo que flotan; fondo con reflejos
-// difusos en diagonal (--page-glare); y una línea de tablero bajo la barra
-// superior. Los botones blancos llevan .pt-relief (index.css): se hunden
+// difusos en diagonal (--page-glare). Los botones blancos llevan .pt-relief (index.css): se hunden
 // al presionar y un destello los cruza una vez al pasar el mouse o tocar.
 const CLASICO_VARS = {
   "--bg": "#030303",
@@ -173,8 +174,7 @@ const CLASICO_VARS = {
   "--tab-active-bg":
     "radial-gradient(60% 22% at 50% 10%, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0) 100%), radial-gradient(130% 100% at 50% 0%, #ffffff 0%, #f1eee7 38%, #d9d4c9 70%, #b9b3a6 100%)",
   "--tab-active-text": "#050505",
-  "--bar-bg":
-    "repeating-linear-gradient(90deg, #d9d9d9 0 6px, #030303 6px 12px) left bottom / 100% 3px no-repeat, linear-gradient(180deg, #121212, #030303)",
+  "--bar-bg": "linear-gradient(180deg, #121212, #030303)",
   "--bottom-bar-bg":
     "radial-gradient(120% 160% at 50% 0%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, #181818, #050505)",
   "--bottom-bar-shine":
@@ -185,16 +185,11 @@ const CLASICO_VARS = {
     "linear-gradient(115deg, rgba(255, 255, 255, 0) 18%, rgba(255, 255, 255, 0.05) 26%, rgba(255, 255, 255, 0) 34%), linear-gradient(115deg, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, 0.07) 66%, rgba(255, 255, 255, 0.02) 72%, rgba(255, 255, 255, 0) 80%), radial-gradient(ellipse at 85% 30%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 45%), #030303",
 };
 
-// Costura de Pinky: puntadas blancas bajo la barra superior, una capa de
-// --bar-bg.
-const PINKY_STITCH =
-  "repeating-linear-gradient(90deg, #ffffff 0 7px, rgba(255, 255, 255, 0) 7px 12px) left 0 bottom 3px / 100% 2px no-repeat";
-
 // Pinky (punto 73), rosa pastel: el primer tema claro. Texto ciruela,
 // tarjetas con bisel brillante (luz blanca arriba, borde blanco, sombra
 // rosada), campos hundidos, botones blancos perla en relieve con texto
-// rosa oscuro (--on-primary), destello rosa, reflejos suaves en el fondo
-// y la costura bajo la barra superior. Sombras teñidas (--shadow-rgb).
+// rosa oscuro (--on-primary), destello rosa y reflejos suaves en el
+// fondo. Sombras teñidas (--shadow-rgb).
 const PINKY_VARS = {
   "--bg": "#ffdbe5",
   "--surface": "#ffc4d4",
@@ -229,7 +224,10 @@ const PINKY_VARS = {
   "--tab-active-bg":
     "radial-gradient(60% 22% at 50% 10%, #ffffff, rgba(255, 255, 255, 0) 100%), radial-gradient(130% 100% at 50% 0%, #ffffff 0%, #fff3f7 45%, #ffdbe6 100%)",
   "--tab-active-text": "#a8124f",
-  "--bar-bg": `${PINKY_STITCH}, linear-gradient(180deg, #ffd0dc, #ffc4d4)`,
+  "--bar-bg": "linear-gradient(180deg, #ffd0dc, #ffc4d4)",
+  // Botón de temas blanco: sobre la barra rosa el fondo de tarjeta casi
+  // no se distinguía.
+  "--theme-btn-bg": "#ffffff",
   "--bottom-bar-bg": "linear-gradient(180deg, #ffc4d4, #ffb3c7)",
   "--bottom-bar-shine": "inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 -4px 12px rgba(176, 36, 94, 0.15)",
   "--unread-edge": "#d6246e",

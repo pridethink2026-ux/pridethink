@@ -476,7 +476,9 @@ const styles = {
     background: mine
       ? "var(--gradient-primary)"
       : "var(--surface-alt)",
-    color: mine ? "var(--bg)" : "var(--text)",
+    // Texto propio sobre --gradient-primary: --on-primary, como los botones
+    // (en Pinky el degradado es blanco y --bg rosa claro no se lee).
+    color: mine ? "var(--on-primary)" : "var(--text)",
   }),
   // Sin fondo de burbuja a propósito (pedido explícito: "como en
   // WhatsApp") — solo un poco de padding para que la reacción no quede
@@ -612,7 +614,7 @@ const styles = {
     height: "14px",
     borderRadius: "50%",
     border: "2px solid rgba(255,255,255,0.4)",
-    borderTopColor: "var(--bg)",
+    borderTopColor: "var(--on-primary)",
     boxSizing: "border-box",
     display: "inline-block",
   },
@@ -653,19 +655,19 @@ const styles = {
     color: mine ? "var(--accent2)" : "var(--bg)",
   }),
   // Barras de la waveform: contraste distinto según la burbuja sea propia
-  // (fondo degradado rosa, necesita un color oscuro) o ajena (fondo oscuro,
-  // necesita un color claro/muted) — mismas variables ya usadas para el
-  // texto de duración de al lado, así que siempre combinan.
+  // (sobre --gradient-primary, con --on-primary como el texto) o ajena
+  // (sobre --surface-alt, con --text-muted) — mismas variables ya usadas
+  // para el texto de duración de al lado, así que siempre combinan.
   waveform: (mine) => ({
     flexShrink: 0,
     maxWidth: "100%",
-    color: mine ? "var(--bg)" : "var(--text-muted)",
+    color: mine ? "var(--on-primary)" : "var(--text-muted)",
   }),
   audioDuration: (mine) => ({
     fontSize: "12px",
     fontWeight: 600,
     flexShrink: 0,
-    color: mine ? "var(--bg)" : "var(--text-muted)",
+    color: mine ? "var(--on-primary)" : "var(--text-muted)",
   }),
   emptyState: {
     flex: 1,
@@ -677,20 +679,21 @@ const styles = {
     padding: "24px",
     textAlign: "center",
   },
-  // Tarjeta del post compartido: un borde de acento a la izquierda y un
-  // fondo más oscuro que la burbuja que la contiene (var(--bg) sobre el
-  // degradado propio, var(--surface) sobre el fondo ajeno) la distinguen
-  // de un mensaje de texto normal a simple vista, sin agregar ningún color
-  // nuevo fuera de las variables de tema.
-  sharedPostCard: (mine) => ({
+  // Tarjeta del post compartido: un borde de acento a la izquierda y el
+  // fondo var(--bg), distinto de la burbuja que la contiene (degradado
+  // propio o --surface-alt ajeno), la distinguen de un mensaje de texto
+  // normal a simple vista, sin agregar ningún color nuevo fuera de las
+  // variables de tema. Siempre --bg, también en la ajena: --accent2 sobre
+  // --surface no llega a 4,5 en Atardecer.
+  sharedPostCard: {
     padding: "10px 12px",
     borderRadius: "12px",
     borderLeft: "3px solid var(--accent2)",
-    background: mine ? "var(--bg)" : "var(--surface)",
+    background: "var(--bg)",
     cursor: "pointer",
     minWidth: "170px",
     maxWidth: "220px",
-  }),
+  },
   sharedPostLabel: {
     display: "flex",
     alignItems: "center",
@@ -799,7 +802,7 @@ function AudioMessage({ src, duration, mine, id }) {
 // el mensaje) — si el post se editó después de compartirlo, la vista
 // previa muestra la versión actual; si se borró, muestra un aviso en vez
 // de romperse.
-function SharedPostPreview({ postId, mine, onOpenPost }) {
+function SharedPostPreview({ postId, onOpenPost }) {
   const { t } = useLanguage();
   const [post, setPost] = useState(undefined); // undefined: cargando | null: no existe
 
@@ -812,7 +815,7 @@ function SharedPostPreview({ postId, mine, onOpenPost }) {
 
   if (post === null) {
     return (
-      <div style={styles.sharedPostCard(mine)}>
+      <div style={styles.sharedPostCard}>
         <p style={styles.sharedPostLabel}>📝 {t("chat.sharedPostLabel")}</p>
         <p style={styles.sharedPostUnavailable}>{t("chat.sharedPostUnavailable")}</p>
       </div>
@@ -820,7 +823,7 @@ function SharedPostPreview({ postId, mine, onOpenPost }) {
   }
 
   return (
-    <div style={styles.sharedPostCard(mine)} onClick={() => post && onOpenPost(postId)}>
+    <div style={styles.sharedPostCard} onClick={() => post && onOpenPost(postId)}>
       <p style={styles.sharedPostLabel}>📝 {t("chat.sharedPostLabel")}</p>
       {post && (
         <>
@@ -844,7 +847,7 @@ function MomentReplyPreview({ message, mine }) {
   return (
     // Misma tarjeta que el post compartido, pero no se toca (no lleva a
     // ningún lado).
-    <div style={{ ...styles.sharedPostCard(mine), cursor: "default" }}>
+    <div style={{ ...styles.sharedPostCard, cursor: "default" }}>
       <p style={styles.sharedPostLabel}>✨ {mine ? t("chat.momentReplyMine") : t("chat.momentReplyTheirs")}</p>
       {available ? (
         <img
@@ -922,7 +925,6 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
             ) : message.type === "shared_post" ? (
               <SharedPostPreview
                 postId={message.sharedPostId}
-                mine={mine}
                 onOpenPost={onOpenPost}
               />
             ) : message.type === "moment_reply" ? (

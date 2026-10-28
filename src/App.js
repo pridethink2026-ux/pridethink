@@ -169,8 +169,9 @@ const themeStyles = {
   wrapper: { position: "relative" },
   themeBtn: {
     position: "relative",
-    background: "none",
-    border: "1px solid var(--border)",
+    background: "var(--theme-btn-bg)",
+    border: "1.5px solid var(--theme-btn-border)",
+    boxShadow: "0 2px 6px rgba(var(--shadow-rgb), 0.25)",
     borderRadius: "999px",
     width: "38px",
     height: "38px",
