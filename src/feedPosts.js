@@ -3,6 +3,7 @@ import { db } from "./firebase";
 import {
   Timestamp,
   collection,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -35,10 +36,15 @@ import {
 
   useExplorePool: los últimos EXPLORE_POOL_SIZE posts públicos, escuchados
   solo mientras la pestaña Explorar está abierta.
+
+  useSearchPool (commit 9f): los últimos SEARCH_POOL_SIZE posts públicos más
+  todos los tuyos, leídos UNA vez al entrar a Buscar (getDocs, sin
+  listeners). Antes Buscar escuchaba todos los posts públicos sin límite.
 */
 
 export const PAGE_SIZE = 20;
 const EXPLORE_POOL_SIZE = 100;
+const SEARCH_POOL_SIZE = 200;
 
 const toPost = (d) => ({ id: d.id, ...d.data() });
 // Un post recién publicado tiene createdAt pendiente (null): va arriba.
@@ -192,4 +198,53 @@ export function useExplorePool(uid, active) {
   }, [uid, active]);
 
   return { pool, loading };
+}
+
+export function useSearchPool(uid) {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setPosts([]);
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    let cancelled = false;
+    const postsRef = collection(db, "posts");
+    // Si una de las dos falla, se muestra lo que trajo la otra.
+    const read = (q, label) =>
+      getDocs(q).then(
+        (snap) => snap.docs.map(toPost),
+        (err) => {
+          console.error("Buscar:", label, err);
+          return [];
+        }
+      );
+    Promise.all([
+      read(
+        query(
+          postsRef,
+          where("authorIsPrivate", "==", false),
+          orderBy("createdAt", "desc"),
+          limit(SEARCH_POOL_SIZE)
+        ),
+        "posts públicos"
+      ),
+      read(query(postsRef, where("authorId", "==", uid)), "mis posts"),
+    ]).then(([publicPosts, myPosts]) => {
+      if (cancelled) return;
+      const merged = new Map();
+      publicPosts.forEach((p) => merged.set(p.id, p));
+      myPosts.forEach((p) => merged.set(p.id, p));
+      setPosts(Array.from(merged.values()).sort((a, b) => millisOf(b) - millisOf(a)));
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
+
+  return { posts, loading };
 }

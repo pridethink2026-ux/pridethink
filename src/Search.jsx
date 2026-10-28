@@ -1,20 +1,22 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { auth, db } from "./firebase";
+import React, { useEffect, useState } from "react";
+import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
 import Avatar from "./Avatar";
 import VerifiedBadge from "./VerifiedBadge";
 import { timeAgo } from "./utils";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
 import { useLanguage } from "./LanguageContext";
+import { useSearchPool } from "./feedPosts";
 
 /*
   Search
   ------
-  Busca, entre lo ya cargado en tiempo real (mismo patrón que Feed.jsx y
-  Chat.jsx: se escuchan las colecciones completas y se filtra en el
-  cliente), usuarios por nombre y publicaciones por texto o hashtag.
+  Busca usuarios por nombre (en la lista compartida de AllUsersContext) y
+  publicaciones por texto o hashtag. Las publicaciones se leen una sola vez
+  al entrar (useSearchPool, commit 9f): los últimos 200 posts públicos más
+  todos los tuyos, y se filtra en el cliente. Lo publicado mientras Buscar
+  está abierto aparece al volver a entrar.
 
   Se excluyen de los resultados los usuarios bloqueados (en cualquier
   dirección) y los perfiles privados, igual que en el resto de la app.
@@ -121,12 +123,6 @@ export default function Search({ onOpenProfile }) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   const users = useAllUsers();
-  // Separado en dos consultas (auditoría de seguridad, 2026-07-28,
-  // hallazgo H2) — mismo motivo y mismo patrón que Feed.jsx: firestore.rules
-  // ahora exige authorIsPrivate == false O ser el autor para poder leer un
-  // post, así que una consulta sin where() se rechazaría entera.
-  const [publicPosts, setPublicPosts] = useState([]);
-  const [myPosts, setMyPosts] = useState([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -135,41 +131,7 @@ export default function Search({ onOpenProfile }) {
   }, []);
 
   // Solo con sesión (punto 68), mismo motivo que Feed.jsx.
-  useEffect(() => {
-    if (!currentUid) {
-      setPublicPosts([]);
-      return;
-    }
-    const q = query(collection(db, "posts"), where("authorIsPrivate", "==", false));
-    const unsub = onSnapshot(q, (snap) => {
-      setPublicPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [currentUid]);
-
-  useEffect(() => {
-    if (!currentUid) {
-      setMyPosts([]);
-      return;
-    }
-    const q = query(collection(db, "posts"), where("authorId", "==", currentUid));
-    const unsub = onSnapshot(q, (snap) => {
-      setMyPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [currentUid]);
-
-  // Junta las dos consultas de arriba, ordenadas por fecha (orderBy() no
-  // se usa en las consultas a propósito, para no necesitar un índice
-  // compuesto — ver el mismo comentario en Feed.jsx).
-  const posts = useMemo(() => {
-    const merged = new Map();
-    publicPosts.forEach((p) => merged.set(p.id, p));
-    myPosts.forEach((p) => merged.set(p.id, p));
-    return Array.from(merged.values()).sort(
-      (a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)
-    );
-  }, [publicPosts, myPosts]);
+  const { posts, loading: postsLoading } = useSearchPool(currentUid);
 
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
 
@@ -234,7 +196,9 @@ export default function Search({ onOpenProfile }) {
         {!q && <p style={styles.hint}>{t("search.hint")}</p>}
 
         {q && matchedUsers.length === 0 && matchedPosts.length === 0 && (
-          <p style={styles.empty}>{t("search.noResults", { query: search.trim() })}</p>
+          <p style={styles.empty}>
+            {postsLoading ? t("common.loading") : t("search.noResults", { query: search.trim() })}
+          </p>
         )}
 
         {matchedUsers.length > 0 && (
