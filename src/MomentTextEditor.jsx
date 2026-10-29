@@ -458,7 +458,8 @@ export default function MomentTextEditor({ blob, isPrivate = false, onConfirm, o
             onClick={handleConfirm}
             {...hoverProps("publish")}
           >
-            {busy ? t("moments.publishing") : t("momentText.publish")}
+            {/* Punto 79: después viene el paso de música (MomentMusicStep), que es el que publica. */}
+            {busy ? t("common.loading") : t("momentText.next")}
           </button>
         </div>
       </div>

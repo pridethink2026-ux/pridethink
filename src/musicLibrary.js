@@ -34,13 +34,15 @@ export function loadMusicLibrary() {
   return libraryPromise;
 }
 
-// { library, error, retry }: library es null mientras carga.
-export function useMusicLibrary() {
+// { library, error, retry }: library es null mientras carga. Con
+// `enabled` en false no pide nada todavía.
+export function useMusicLibrary(enabled = true) {
   const [library, setLibrary] = useState(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     setError(false);
     loadMusicLibrary().then(
@@ -55,7 +57,7 @@ export function useMusicLibrary() {
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, enabled]);
 
   return { library, error, retry: () => setAttempt((n) => n + 1) };
 }

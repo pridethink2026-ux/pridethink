@@ -1,12 +1,15 @@
-import React, { useRef, useState } from "react";
+import React, { Suspense, useRef, useState } from "react";
 import Avatar from "./Avatar";
 import ImageEditor from "./ImageEditor";
 import MomentTextEditor from "./MomentTextEditor";
 import MomentViewer from "./MomentViewer";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
+import { lazyWithReload } from "./lazyLoad";
 import { useMoments } from "./MomentsContext";
 import { MAX_ACTIVE_MOMENTS, MomentLimitError, MomentTimeoutError, publishMoment } from "./moments";
+
+const MomentMusicStep = lazyWithReload(() => import(/* webpackChunkName: "moment-music" */ "./MomentMusicStep"));
 
 /*
   MomentsStrip
@@ -25,7 +28,8 @@ import { MAX_ACTIVE_MOMENTS, MomentLimitError, MomentTimeoutError, publishMoment
   Publicar: elegir foto (misma validación de tipo y 10 MB que
   MultiImageUploader.jsx) → ImageEditor (girar/recortar, 1080 px de lado
   como máximo) → MomentTextEditor (texto encima, opcional; con perfil
-  privado avisa ahí mismo que solo lo verás tú) → publishMoment
+  privado avisa ahí mismo que solo lo verás tú) → MomentMusicStep (música
+  de fondo opcional, punto 79; en su propio archivo) → publishMoment
   (moments.js). Con 30 momentos activos se
   avisa en vez de intentar.
 */
@@ -105,6 +109,19 @@ const styles = {
     fontFamily: "var(--font-body)",
     fontSize: "12px",
   }),
+  // Mientras baja el archivo del paso de música: mismo fondo que los pasos.
+  stepLoading: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.92)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 60,
+    color: "#fff",
+    fontFamily: "var(--font-body)",
+    fontSize: "14px",
+  },
 };
 
 export default function MomentsStrip({ currentUid, myProfile }) {
@@ -114,6 +131,7 @@ export default function MomentsStrip({ currentUid, myProfile }) {
   const fileInputRef = useRef(null);
   const [editingFile, setEditingFile] = useState(null);
   const [textBlob, setTextBlob] = useState(null); // foto ya recortada, esperando el paso de texto
+  const [musicStep, setMusicStep] = useState(null); // { blob, caption }: esperando el paso de música
   const [publishing, setPublishing] = useState(false);
   const [message, setMessage] = useState(null); // { text, isError }
   const [viewer, setViewer] = useState(null); // { authorUids, startIndex }
@@ -152,11 +170,17 @@ export default function MomentsStrip({ currentUid, myProfile }) {
     setTextBlob(blob);
   };
 
-  const handleTextDone = async (blob, caption) => {
+  const handleTextDone = (blob, caption) => {
     setTextBlob(null);
+    setMusicStep({ blob, caption });
+  };
+
+  const handlePublish = async (music) => {
+    const { blob, caption } = musicStep;
+    setMusicStep(null);
     setPublishing(true);
     try {
-      await publishMoment(currentUid, blob, myIndex, caption);
+      await publishMoment(currentUid, blob, myIndex, caption, music);
       setMessage({
         text: myProfile?.isPrivate ? t("moments.privateNotice") : t("moments.published"),
         isError: !!myProfile?.isPrivate,
@@ -270,6 +294,17 @@ export default function MomentsStrip({ currentUid, myProfile }) {
             setMessage({ text: t("image.errorRead"), isError: true });
           }}
         />
+      )}
+
+      {musicStep && (
+        <Suspense fallback={<div style={styles.stepLoading}>{t("moments.loading")}</div>}>
+          <MomentMusicStep
+            blob={musicStep.blob}
+            publishing={publishing}
+            onPublish={handlePublish}
+            onCancel={() => setMusicStep(null)}
+          />
+        </Suspense>
       )}
 
       {viewer && (

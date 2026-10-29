@@ -961,6 +961,27 @@ service cloud.firestore {
         );
     }
 
+    // Música de un momento (punto 79): campo opcional
+    // music: { trackId, startSec }. trackId es el id de una pista de
+    // src/musicLibrary.json (minúsculas, números y guiones, hasta 48
+    // caracteres; las reglas no pueden leer la ficha, así que una pista que
+    // no existe simplemente no suena). startSec es el segundo, entero, en
+    // que empieza el tramo de 17 s dentro del fragmento de 60 (0 a 43).
+    // La música nunca se mezcla en la foto: el visor reproduce las dos.
+    function musicaDeMomentoValida(datos) {
+      return !('music' in datos) || (
+        datos.music is map
+        && datos.music.keys().hasOnly(['trackId', 'startSec'])
+        && datos.music.keys().hasAll(['trackId', 'startSec'])
+        && datos.music.trackId is string
+        && datos.music.trackId.size() <= 48
+        && datos.music.trackId.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
+        && datos.music.startSec is int
+        && datos.music.startSec >= 0
+        && datos.music.startSec <= 43
+      );
+    }
+
     match /moments/{momentId} {
       allow read: if estaAutenticado()
         && resource.data.expireAt > request.time
@@ -971,15 +992,17 @@ service cloud.firestore {
       // queda al terminar el batch, ya lo incluya: así no puede existir un
       // momento fuera del índice, y el tope de 30 del índice es también el
       // tope de momentos activos. La foto tiene que estar en la carpeta
-      // del autor con el nombre del momento.
+      // del autor con el nombre del momento. "music" es opcional (punto
+      // 79), ver musicaDeMomentoValida.
       allow create: if estaAutenticado()
-        && request.resource.data.keys().hasOnly(['authorId', 'imageURL', 'storagePath', 'caption', 'createdAt', 'expireAt'])
+        && request.resource.data.keys().hasOnly(['authorId', 'imageURL', 'storagePath', 'caption', 'createdAt', 'expireAt', 'music'])
         && request.resource.data.authorId == request.auth.uid
         && textoValido(request.resource.data.imageURL, 2000)
         && request.resource.data.storagePath == 'momentImages/' + request.auth.uid + '/' + momentId + '.jpg'
         && textoValido(request.resource.data.caption, 600)
         && request.resource.data.createdAt == request.time
         && venceDentroDe24h(request.resource.data.expireAt)
+        && musicaDeMomentoValida(request.resource.data)
         && momentId in getAfter(/databases/$(database)/documents/momentIndex/$(request.auth.uid)).data.ids;
 
       // Un momento no se edita: se borra y se publica otro.

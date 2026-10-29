@@ -12,9 +12,11 @@ import { getChatId } from "./utils";
 
   Datos (ver firestore.rules y storage.rules para las reglas):
   - moments/{momentId} → { authorId, imageURL, storagePath, caption,
-    createdAt, expireAt }. "caption" es el texto escrito sobre la foto en
-    texto plano (accesibilidad y reportes), lo arma MomentTextEditor.jsx;
-    vacío si no se escribió nada.
+    createdAt, expireAt, music? }. "caption" es el texto escrito sobre la
+    foto en texto plano (accesibilidad y reportes), lo arma
+    MomentTextEditor.jsx; vacío si no se escribió nada. "music" (punto 79,
+    opcional) es { trackId, startSec }: qué pista de musicLibrary.json y
+    desde qué segundo suena; lo elige MomentMusicStep.jsx.
   - momentIndex/{authorUid} → { ids, times: { [id]: { createdAt,
     expireAt } } en milisegundos, expireAt }. Es lo que escucha
     MomentsContext.jsx para saber quién tiene momentos activos sin hacer
@@ -33,6 +35,13 @@ import { getChatId } from "./utils";
 
 export const MOMENT_TTL_MS = 24 * 60 * 60 * 1000;
 export const MOMENT_DURATION_MS = 17 * 1000;
+// Música (punto 79): cada pista es un fragmento de MUSIC_CLIP_SEC y el
+// momento suena desde music.startSec (entero) durante MOMENT_DURATION_MS,
+// así que startSec va de 0 a MUSIC_MAX_START_SEC (mismo tope que
+// firestore.rules, musicaDeMomentoValida).
+export const MUSIC_CLIP_SEC = 60;
+export const MUSIC_MAX_START_SEC = MUSIC_CLIP_SEC - MOMENT_DURATION_MS / 1000;
+const MUSIC_TRACK_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const MAX_ACTIVE_MOMENTS = 30;
 const MAX_CAPTION_LENGTH = 600; // mismo tope que firestore.rules
 export const MAX_REPLY_LENGTH = 1000; // mismo tope que firestore.rules (respuestaAMomentoValida)
@@ -152,8 +161,23 @@ export async function setMomentLike(uid, moment, liked, myView) {
 // Sube la foto (Blob JPEG que devuelve MomentTextEditor, con el texto ya
 // quemado) y publica el momento con su texto en plano (`caption`).
 // `myIndex` es mi propio momentIndex tal como lo tiene MomentsContext:
-// se reescribe entero, sin las entradas vencidas.
-export async function publishMoment(uid, blob, myIndex, caption = "") {
+// se reescribe entero, sin las entradas vencidas. `music` (opcional, de
+// MomentMusicStep) es { trackId, startSec }: se guarda tal cual, la foto
+// no lleva sonido.
+export async function publishMoment(uid, blob, myIndex, caption = "", music = null) {
+  if (
+    music &&
+    !(
+      typeof music.trackId === "string" &&
+      music.trackId.length <= 48 &&
+      MUSIC_TRACK_ID.test(music.trackId) &&
+      Number.isInteger(music.startSec) &&
+      music.startSec >= 0 &&
+      music.startSec <= MUSIC_MAX_START_SEC
+    )
+  ) {
+    throw new Error("moment music inválida");
+  }
   const now = Date.now();
   const active = getActiveEntries(myIndex, now);
   if (active.length >= MAX_ACTIVE_MOMENTS) throw new MomentLimitError();
@@ -182,6 +206,7 @@ export async function publishMoment(uid, blob, myIndex, caption = "") {
       caption: caption.slice(0, MAX_CAPTION_LENGTH),
       createdAt: serverTimestamp(),
       expireAt: Timestamp.fromMillis(expireAt),
+      ...(music ? { music: { trackId: music.trackId, startSec: music.startSec } } : {}),
     });
     batch.set(doc(db, "momentIndex", uid), {
       ids: entries.map((e) => e.id),
