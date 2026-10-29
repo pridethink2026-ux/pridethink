@@ -9,6 +9,9 @@ import { isBlockedEitherWay } from "./Blocks";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { useMoments } from "./MomentsContext";
+import { localized } from "./musicLibrary";
+import { isSoundMuted } from "./sound";
+import { useMomentMusic } from "./useMomentMusic";
 import {
   MAX_REPLY_LENGTH,
   MOMENT_DURATION_MS,
@@ -51,6 +54,13 @@ import { notify, timeAgo } from "./utils";
     foco o se está enviando, el tiempo se pausa. Con perfil privado se
     avisa que el autor no podrá contestarte por chat (Chat.jsx no muestra
     perfiles privados).
+  - Música (punto 79, commit C): si el momento tiene `music`, suena ese
+    tramo sincronizado con el tiempo del momento (useMomentMusic.js): se
+    pausa con todo lo que pausa el tiempo y se detiene al avanzar o
+    cerrar. Arriba se ve "♪ Título · Compositor" y un botón 🔊/🔇 que
+    silencia solo la música de este visor (empieza silenciado si
+    "Silenciar sonidos" está activo en el perfil). Si el navegador no deja
+    reproducir solo, aparece "Toca para escuchar".
 
   Props:
   - `authorUids` (array): los autores en el orden de la tira.
@@ -147,6 +157,30 @@ const styles = {
     whiteSpace: "nowrap",
   },
   time: { margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.7)" },
+  musicLabel: {
+    margin: "1px 0 0",
+    fontSize: "12px",
+    color: "rgba(255,255,255,0.85)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  tapToListen: (hover) => ({
+    position: "absolute",
+    top: "84px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    zIndex: 2,
+    padding: "8px 16px",
+    borderRadius: "999px",
+    border: "1px solid rgba(255,255,255,0.4)",
+    background: hover ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.6)",
+    color: "#fff",
+    fontSize: "14px",
+    fontWeight: 600,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  }),
   iconBtn: (hover) => ({
     width: "40px",
     height: "40px",
@@ -293,7 +327,7 @@ const styles = {
 };
 
 export default function MomentViewer({ authorUids, startIndex = 0, continueToNext = false, startMomentId, onClose }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const {
     currentUid,
     myIndex,
@@ -335,8 +369,16 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const [replySending, setReplySending] = useState(false);
   const [replyStatus, setReplyStatus] = useState(null); // null | "sent" | "error"
   const [sendHover, setSendHover] = useState(false);
+  // Música (punto 79): solo de este visor; arranca como "Silenciar sonidos".
+  const [musicMuted, setMusicMuted] = useState(() => isSoundMuted());
+  const [muteHover, setMuteHover] = useState(false);
+  const [tapHover, setTapHover] = useState(false);
 
   const elapsedRef = useRef(0);
+  // Id del momento cuya foto terminó de cargar: imgLoaded se reinicia en un
+  // efecto, así que en el primer render de un momento nuevo todavía vale
+  // true por el anterior; con esto la música no arranca antes de tiempo.
+  const loadedIdRef = useRef(null);
   const holdTimerRef = useRef(null);
   const heldRef = useRef(false);
   const blockedRef = useRef(false);
@@ -394,6 +436,19 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   // se leen desde un ref para usar siempre la versión con el estado actual.
   const actionsRef = useRef({ next, prev, onClose, dialogOpen });
   actionsRef.current = { next, prev, onClose, dialogOpen };
+
+  const nextMoment = moments ? moments[momentPos + 1] : null;
+  const music = useMomentMusic({
+    momentId: currentId,
+    music: current?.music,
+    nextMusic: nextMoment?.music,
+    running: !!current && imgLoaded && loadedIdRef.current === currentId && !paused && !dialogOpen,
+    elapsedRef,
+    muted: musicMuted,
+  });
+  const musicTitle = music.track
+    ? `${localized(music.track.title, language)} · ${localized(music.track.composer, language)}`
+    : "";
 
   // Al cambiar de autor: leer sus momentos de a uno por id. Se toma la
   // lista de ids de ESE momento (no se sigue en vivo) para que la
@@ -653,7 +708,26 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
           <div style={styles.headerText}>
             <p style={styles.name}>{author?.displayName || ""}</p>
             {current && <p style={styles.time}>{timeAgo(current.createdAt, t)}</p>}
+            {current && music.track && (
+              <p style={styles.musicLabel} aria-label={t("moments.musicLabel", { track: musicTitle })}>
+                ♪ {musicTitle}
+              </p>
+            )}
           </div>
+          {current && music.track && (
+            <button
+              type="button"
+              style={styles.iconBtn(muteHover)}
+              onClick={() => setMusicMuted(!musicMuted)}
+              onMouseEnter={() => setMuteHover(true)}
+              onMouseLeave={() => setMuteHover(false)}
+              aria-pressed={musicMuted}
+              aria-label={musicMuted ? t("moments.musicUnmute") : t("moments.musicMute")}
+              title={musicMuted ? t("moments.musicUnmute") : t("moments.musicMute")}
+            >
+              {musicMuted ? "🔇" : "🔊"}
+            </button>
+          )}
           {current && isMine && (
             <button
               type="button"
@@ -695,6 +769,18 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
           </button>
         </div>
 
+        {current && music.track && music.needsTap && !musicMuted && (
+          <button
+            type="button"
+            style={styles.tapToListen(tapHover)}
+            onClick={music.tapToPlay}
+            onMouseEnter={() => setTapHover(true)}
+            onMouseLeave={() => setTapHover(false)}
+          >
+            {t("moments.tapToListen")}
+          </button>
+        )}
+
         <div
           style={styles.stage}
           onPointerDown={handlePointerDown}
@@ -710,7 +796,10 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
               alt={current.caption || t("moments.imageAlt", { name: author?.displayName || "" })}
               style={styles.image}
               draggable={false}
-              onLoad={() => setImgLoaded(true)}
+              onLoad={() => {
+                loadedIdRef.current = current.id;
+                setImgLoaded(true);
+              }}
               onError={next}
             />
           ) : (
