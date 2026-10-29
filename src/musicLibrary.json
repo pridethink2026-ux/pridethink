@@ -1,0 +1,607 @@
+{
+  "contact": "pridethink2026@gmail.com",
+  "moods": [
+    "alegre",
+    "tranquila",
+    "romantica",
+    "epica",
+    "misteriosa",
+    "ritmo"
+  ],
+  "tracks": [
+    {
+      "id": "mozart-flauta-magica",
+      "mood": "alegre",
+      "title": {
+        "es": "La flauta mágica: Obertura",
+        "en": "The Magic Flute: Overture"
+      },
+      "composer": {
+        "es": "Mozart",
+        "en": "Mozart"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/mozart-flauta-magica.mp3",
+      "musopenUrl": "https://musopen.org/music/43978-overture-to-the-magic-flute-k-620/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Mozart - Magic Flute Overture/Magic Flute Overture.flac",
+      "cutStart": 337
+    },
+    {
+      "id": "mozart-bodas-figaro",
+      "mood": "alegre",
+      "title": {
+        "es": "Las bodas de Fígaro: Obertura",
+        "en": "The Marriage of Figaro: Overture"
+      },
+      "composer": {
+        "es": "Mozart",
+        "en": "Mozart"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/mozart-bodas-figaro.mp3",
+      "musopenUrl": "https://musopen.org/music/2682-the-marriage-of-figaro-k-492/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Mozart - Marriage Of Figaro/Marriage of Figaro.flac",
+      "cutStart": 177
+    },
+    {
+      "id": "mendelssohn-italiana",
+      "mood": "alegre",
+      "title": {
+        "es": "Sinfonía n.º 4 «Italiana»: I. Allegro vivace",
+        "en": "Symphony No. 4 \"Italian\": I. Allegro vivace"
+      },
+      "composer": {
+        "es": "Mendelssohn",
+        "en": "Mendelssohn"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/mendelssohn-italiana.mp3",
+      "musopenUrl": "https://musopen.org/music/42991-symphony-no-4-in-a-major-italian-op-90/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Mendelssohn - Italian Symphony/Symphon No. 4 in A Major, Op. 90 'Italian' - I. Allegro vivace.flac",
+      "cutStart": 375
+    },
+    {
+      "id": "brahms-sinfonia-4-giocoso",
+      "mood": "alegre",
+      "title": {
+        "es": "Sinfonía n.º 4: III. Allegro giocoso",
+        "en": "Symphony No. 4: III. Allegro giocoso"
+      },
+      "composer": {
+        "es": "Brahms",
+        "en": "Brahms"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/brahms-sinfonia-4-giocoso.mp3",
+      "musopenUrl": "https://musopen.org/music/performer/musopen-symphony/composer/johannes-brahms/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Brahms - Symphony No 4 in E minor/Symphony No. 4 in E Minor, Op. 98 - III. Allegro Giocoso.flac",
+      "cutStart": 316
+    },
+    {
+      "id": "haydn-alondra",
+      "mood": "alegre",
+      "title": {
+        "es": "Cuarteto «La alondra»: I. Allegro moderato",
+        "en": "\"Lark\" Quartet: I. Allegro moderato"
+      },
+      "composer": {
+        "es": "Haydn",
+        "en": "Haydn"
+      },
+      "performer": "Musopen String Quartet",
+      "duration": 60,
+      "file": "/music/haydn-alondra.mp3",
+      "musopenUrl": "https://musopen.org/music/5261-string-quartets-hob-iii63-68/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/String Quartets/Haydn Quartet in D Major Op.64/String Quartet In D, Op. 645, H 363, Lark - I. Allegro Moderato.mp3",
+      "cutStart": 25
+    },
+    {
+      "id": "grieg-manana",
+      "mood": "tranquila",
+      "title": {
+        "es": "Peer Gynt: La mañana",
+        "en": "Peer Gynt: Morning Mood"
+      },
+      "composer": {
+        "es": "Grieg",
+        "en": "Grieg"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/grieg-manana.mp3",
+      "musopenUrl": "https://musopen.org/music/777-peer-gynt-suite-no-1-op-46/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Grieg - Peer Gynt/Peer Gynt Suite No. 1, Op. 46 - I. Morning.flac",
+      "cutStart": 47
+    },
+    {
+      "id": "borodin-estepas",
+      "mood": "tranquila",
+      "title": {
+        "es": "En las estepas de Asia Central",
+        "en": "In the Steppes of Central Asia"
+      },
+      "composer": {
+        "es": "Borodín",
+        "en": "Borodin"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/borodin-estepas.mp3",
+      "musopenUrl": "https://musopen.org/music/681-in-the-steppes-of-central-asia/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Borodin - In The Steppes Of Central Asia/In The Steppes of Central Asia.flac",
+      "cutStart": 170
+    },
+    {
+      "id": "suk-meditacion",
+      "mood": "tranquila",
+      "title": {
+        "es": "Meditación sobre el coral de San Wenceslao",
+        "en": "Meditation on the St. Wenceslas Chorale"
+      },
+      "composer": {
+        "es": "Suk",
+        "en": "Suk"
+      },
+      "performer": "Musopen String Quartet",
+      "duration": 60,
+      "file": "/music/suk-meditacion.mp3",
+      "musopenUrl": "https://musopen.org/music/43982-meditation-on-the-old-czech-chorale-st-wenceslas-op-35a/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/String Quartets/Suk -Meditation/Meditation.mp3",
+      "cutStart": 259
+    },
+    {
+      "id": "borodin-notturno",
+      "mood": "romantica",
+      "title": {
+        "es": "Cuarteto n.º 2: III. Notturno",
+        "en": "String Quartet No. 2: III. Notturno"
+      },
+      "composer": {
+        "es": "Borodín",
+        "en": "Borodin"
+      },
+      "performer": "Musopen String Quartet",
+      "duration": 60,
+      "file": "/music/borodin-notturno.mp3",
+      "musopenUrl": "https://musopen.org/music/690-string-quartet-no-2-in-d-major/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/String Quartets/Borodin String Quartet No 2/String Quartet No. 2 in D Major - III. Nocturne Andante.mp3",
+      "cutStart": 155
+    },
+    {
+      "id": "dvorak-americano-lento",
+      "mood": "romantica",
+      "title": {
+        "es": "Cuarteto «Americano»: II. Lento",
+        "en": "\"American\" Quartet: II. Lento"
+      },
+      "composer": {
+        "es": "Dvořák",
+        "en": "Dvořák"
+      },
+      "performer": "Musopen String Quartet",
+      "duration": 60,
+      "file": "/music/dvorak-americano-lento.mp3",
+      "musopenUrl": "https://musopen.org/music/4887-string-quartet-no-12-in-f-major-american-op-96/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/String Quartets/Dvorak - American in F major/String Quartet No. 12 in F Major, Op. 96, American - II. Lento.mp3",
+      "cutStart": 145
+    },
+    {
+      "id": "brahms-sinfonia-3-allegretto",
+      "mood": "romantica",
+      "title": {
+        "es": "Sinfonía n.º 3: III. Poco allegretto",
+        "en": "Symphony No. 3: III. Poco allegretto"
+      },
+      "composer": {
+        "es": "Brahms",
+        "en": "Brahms"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/brahms-sinfonia-3-allegretto.mp3",
+      "musopenUrl": "https://musopen.org/music/66-symphony-no-3-in-f-major-op-90/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Brahms - Symphony No 3/Symphony No. 3 in F Major, Op. 90 - III. Poco allegretto.flac",
+      "cutStart": 297
+    },
+    {
+      "id": "smetana-moldava",
+      "mood": "romantica",
+      "title": {
+        "es": "Má vlast: El Moldava",
+        "en": "Má vlast: The Moldau"
+      },
+      "composer": {
+        "es": "Smetana",
+        "en": "Smetana"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/smetana-moldava.mp3",
+      "musopenUrl": "https://musopen.org/music/25719-ma-vlast-vltava-the-moldau/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/Smetana - Vltava/Ma Vlast (My Fatherland) - Vltava.mp3",
+      "cutStart": 557
+    },
+    {
+      "id": "mendelssohn-escocesa-adagio",
+      "mood": "romantica",
+      "title": {
+        "es": "Sinfonía n.º 3 «Escocesa»: III. Adagio",
+        "en": "Symphony No. 3 \"Scottish\": III. Adagio"
+      },
+      "composer": {
+        "es": "Mendelssohn",
+        "en": "Mendelssohn"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/mendelssohn-escocesa-adagio.mp3",
+      "musopenUrl": "https://musopen.org/music/282-symphony-no-3-scottish-op-56/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Mendelssohn - Scottish Symphony/Symphony No. 3 in A Minor Scottish, Op. 56 - III. Adagio.flac",
+      "cutStart": 390
+    },
+    {
+      "id": "beethoven-egmont",
+      "mood": "epica",
+      "title": {
+        "es": "Obertura Egmont",
+        "en": "Egmont Overture"
+      },
+      "composer": {
+        "es": "Beethoven",
+        "en": "Beethoven"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/beethoven-egmont.mp3",
+      "musopenUrl": "https://musopen.org/music/13441-overture-to-egmont-op-84/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/Beethoven - Egmont Overture Op. 84/Egmont Overture Op. 84.mp3",
+      "cutStart": 455
+    },
+    {
+      "id": "beethoven-heroica",
+      "mood": "epica",
+      "title": {
+        "es": "Sinfonía n.º 3 «Heroica»: I. Allegro con brio",
+        "en": "Symphony No. 3 \"Eroica\": I. Allegro con brio"
+      },
+      "composer": {
+        "es": "Beethoven",
+        "en": "Beethoven"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/beethoven-heroica.mp3",
+      "musopenUrl": "https://musopen.org/music/2565-symphony-no-3-in-e-flat-major-eroica-op-55/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Beethoven - Symphony No 3 Eroica/Symphony No. 3 in E Flat Major Eroica, Op. 55 - I. Allegro con brio.flac",
+      "cutStart": 845
+    },
+    {
+      "id": "rimsky-pascua-rusa",
+      "mood": "epica",
+      "title": {
+        "es": "Obertura de la Gran Pascua Rusa",
+        "en": "Russian Easter Festival Overture"
+      },
+      "composer": {
+        "es": "Rimski-Kórsakov",
+        "en": "Rimsky-Korsakov"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/rimsky-pascua-rusa.mp3",
+      "musopenUrl": "https://musopen.org/music/9008-russian-easter-festival-overture-op-36/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/Rimsky Korsakov - Russian Overture/Russian Easter Festival Overture, Op. 36.mp3",
+      "cutStart": 873
+    },
+    {
+      "id": "chaikovski-patetica-marcha",
+      "mood": "epica",
+      "title": {
+        "es": "Sinfonía n.º 6 «Patética»: III. Allegro molto vivace",
+        "en": "Symphony No. 6 \"Pathétique\": III. Allegro molto vivace"
+      },
+      "composer": {
+        "es": "Chaikovski",
+        "en": "Tchaikovsky"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/chaikovski-patetica-marcha.mp3",
+      "musopenUrl": "https://musopen.org/music/80-symphony-no-6-in-b-minor-pathetique-op-74/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/Tchaikovsky - Symphony Pathetique/Symphony No. 6 in B minor, Op. 74, 'Pathetique' - III. Allegro molto vivace.mp3",
+      "cutStart": 528
+    },
+    {
+      "id": "grieg-rey-montana",
+      "mood": "misteriosa",
+      "title": {
+        "es": "Peer Gynt: En la gruta del rey de la montaña",
+        "en": "Peer Gynt: In the Hall of the Mountain King"
+      },
+      "composer": {
+        "es": "Grieg",
+        "en": "Grieg"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/grieg-rey-montana.mp3",
+      "musopenUrl": "https://musopen.org/music/777-peer-gynt-suite-no-1-op-46/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Grieg - Peer Gynt/Peer Gynt Suite No. 1, Op. 46 - IV. In the Hall Of The Mountain King.flac",
+      "cutStart": 91
+    },
+    {
+      "id": "mozart-sinfonia-40",
+      "mood": "misteriosa",
+      "title": {
+        "es": "Sinfonía n.º 40: I. Molto allegro",
+        "en": "Symphony No. 40: I. Molto allegro"
+      },
+      "composer": {
+        "es": "Mozart",
+        "en": "Mozart"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/mozart-sinfonia-40.mp3",
+      "musopenUrl": "https://musopen.org/music/1577-symphony-no-40-in-g-minor-k-550/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Mozart - Symphony No 40 in G Minor_/1st Mov Molto allegro.flac",
+      "cutStart": 207
+    },
+    {
+      "id": "mendelssohn-hebridas",
+      "mood": "misteriosa",
+      "title": {
+        "es": "Las Hébridas (La gruta de Fingal)",
+        "en": "The Hebrides (Fingal's Cave)"
+      },
+      "composer": {
+        "es": "Mendelssohn",
+        "en": "Mendelssohn"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/mendelssohn-hebridas.mp3",
+      "musopenUrl": "https://musopen.org/music/9420-die-hebriden-op26/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Mendelssohn - Hebrides/Hebrides Overture Fingal's Cave.flac",
+      "cutStart": 191
+    },
+    {
+      "id": "brahms-obertura-tragica",
+      "mood": "misteriosa",
+      "title": {
+        "es": "Obertura trágica",
+        "en": "Tragic Overture"
+      },
+      "composer": {
+        "es": "Brahms",
+        "en": "Brahms"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/brahms-obertura-tragica.mp3",
+      "musopenUrl": "https://musopen.org/music/2120-tragic-overture-op-81/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Brahms - Tragic Overture/Tragic Overture.flac",
+      "cutStart": 714
+    },
+    {
+      "id": "mendelssohn-saltarello",
+      "mood": "ritmo",
+      "title": {
+        "es": "Sinfonía n.º 4 «Italiana»: IV. Saltarello",
+        "en": "Symphony No. 4 \"Italian\": IV. Saltarello"
+      },
+      "composer": {
+        "es": "Mendelssohn",
+        "en": "Mendelssohn"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/mendelssohn-saltarello.mp3",
+      "musopenUrl": "https://musopen.org/music/42991-symphony-no-4-in-a-major-italian-op-90/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Mendelssohn - Italian Symphony/Symphon No. 4 in A Major, Op. 90 'Italian' - IV. Saltarello (Presto).flac",
+      "cutStart": 280
+    },
+    {
+      "id": "grieg-anitra",
+      "mood": "ritmo",
+      "title": {
+        "es": "Peer Gynt: Danza de Anitra",
+        "en": "Peer Gynt: Anitra's Dance"
+      },
+      "composer": {
+        "es": "Grieg",
+        "en": "Grieg"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/grieg-anitra.mp3",
+      "musopenUrl": "https://musopen.org/music/777-peer-gynt-suite-no-1-op-46/",
+      "downloadUrl": "https://archive.org/details/musopen-dvd-in-lossless-flac-format",
+      "license": "Public Domain Mark 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org/Grieg - Peer Gynt/Peer Gynt Suite No. 1, Op. 46 - III. Anitra's Dream.flac",
+      "cutStart": 97
+    },
+    {
+      "id": "chaikovski-patetica-vals",
+      "mood": "ritmo",
+      "title": {
+        "es": "Sinfonía n.º 6 «Patética»: II. Allegro con grazia (vals)",
+        "en": "Symphony No. 6 \"Pathétique\": II. Allegro con grazia (waltz)"
+      },
+      "composer": {
+        "es": "Chaikovski",
+        "en": "Tchaikovsky"
+      },
+      "performer": "Czech National Symphony Orchestra (Musopen Symphony)",
+      "duration": 60,
+      "file": "/music/chaikovski-patetica-vals.mp3",
+      "musopenUrl": "https://musopen.org/music/80-symphony-no-6-in-b-minor-pathetique-op-74/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/Tchaikovsky - Symphony Pathetique/Symphony No. 6 in B minor, Op. 74, 'Pathetique' - II. Allegro con gracia.mp3",
+      "cutStart": 95
+    },
+    {
+      "id": "haydn-alondra-minueto",
+      "mood": "ritmo",
+      "title": {
+        "es": "Cuarteto «La alondra»: III. Minueto",
+        "en": "\"Lark\" Quartet: III. Minuet"
+      },
+      "composer": {
+        "es": "Haydn",
+        "en": "Haydn"
+      },
+      "performer": "Musopen String Quartet",
+      "duration": 60,
+      "file": "/music/haydn-alondra-minueto.mp3",
+      "musopenUrl": "https://musopen.org/music/5261-string-quartets-hob-iii63-68/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/String Quartets/Haydn Quartet in D Major Op.64/String Quartet In D, Op. 645, H 363, Lark - III. Menuetto Allegretto.mp3",
+      "cutStart": 6
+    },
+    {
+      "id": "mozart-k421-minueto",
+      "mood": "ritmo",
+      "title": {
+        "es": "Cuarteto n.º 15, K. 421: III. Minueto",
+        "en": "String Quartet No. 15, K. 421: III. Minuet"
+      },
+      "composer": {
+        "es": "Mozart",
+        "en": "Mozart"
+      },
+      "performer": "Musopen String Quartet",
+      "duration": 60,
+      "file": "/music/mozart-k421-minueto.mp3",
+      "musopenUrl": "https://musopen.org/music/performer/musopen-string-quartet/instrument/string-quartet/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/String Quartets/Mozart Quartet D Minor K421/String Quartet No. 15 In D Minor, K 421 - III. Minuetto.mp3",
+      "cutStart": 22
+    },
+    {
+      "id": "mozart-k465-minueto",
+      "mood": "ritmo",
+      "title": {
+        "es": "Cuarteto n.º 19 «Disonancias», K. 465: III. Minueto",
+        "en": "String Quartet No. 19 \"Dissonance\", K. 465: III. Minuet"
+      },
+      "composer": {
+        "es": "Mozart",
+        "en": "Mozart"
+      },
+      "performer": "Musopen String Quartet",
+      "duration": 60,
+      "file": "/music/mozart-k465-minueto.mp3",
+      "musopenUrl": "https://musopen.org/music/3002-string-quartet-no-19-in-c-major-dissonant-k-465/",
+      "downloadUrl": "https://archive.org/details/MusopenKickstarterRecordings",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "downloaded": "2026-10-28",
+      "original": "archive-org-kickstarter-zip/String Quartets/Mozart Quartet in C Major K 465/3rd Mov Minuetto Allegretto.mp3",
+      "cutStart": 180
+    }
+  ]
+}

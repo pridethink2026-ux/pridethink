@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { auth, db } from "./firebase";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import {
@@ -26,6 +26,9 @@ import { markOffline } from "./presence";
 import { unblockUser, useMyBlocks } from "./Blocks";
 import { formatMonthYear, formatLongDate } from "./utils";
 import { authStyles as styles, IdentityForm } from "./AuthForms";
+import { lazyWithReload } from "./lazyLoad";
+
+const MusicCredits = lazyWithReload(() => import(/* webpackChunkName: "music-credits" */ "./MusicCredits"));
 
 /*
   AuthProfile
@@ -99,6 +102,7 @@ function ProfileView({
   onUnblock,
   onOpenProfile,
   onOpenSaved,
+  onOpenMusicCredits,
 }) {
   const { language, setLanguage, t } = useLanguage();
   const { blockedByMe: blockedUsers } = useMyBlocks(uid);
@@ -308,6 +312,9 @@ function ProfileView({
           <button style={{ ...styles.buttonGhost, marginTop: "20px" }} onClick={onOpenSaved}>
             {t("saved.openButton")}
           </button>
+          <button style={{ ...styles.buttonGhost, marginTop: "10px" }} onClick={onOpenMusicCredits}>
+            {t("musicCredits.openButton")}
+          </button>
           <button style={{ ...styles.buttonGhost, marginTop: "10px" }} onClick={onEdit}>
             {t("profile.changeIdentity")}
           </button>
@@ -385,6 +392,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   const { t } = useLanguage();
   // profile | identity (editar)
   const [step, setStep] = useState("profile");
+  const [creditsOpen, setCreditsOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
@@ -525,6 +533,24 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     );
   }
 
+  // Créditos de música (punto 79): pantalla propia dentro del perfil, en su
+  // propio archivo (lazy).
+  if (creditsOpen) {
+    return (
+      <Suspense
+        fallback={
+          <div style={styles.page}>
+            <div style={{ ...styles.card, textAlign: "center", color: "var(--text-muted)" }}>
+              {t("common.loading")}
+            </div>
+          </div>
+        }
+      >
+        <MusicCredits onBack={() => setCreditsOpen(false)} />
+      </Suspense>
+    );
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.card}>
@@ -549,6 +575,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
             onUnblock={handleUnblock}
             onOpenProfile={onOpenProfile}
             onOpenSaved={onOpenSaved}
+            onOpenMusicCredits={() => setCreditsOpen(true)}
           />
         )}
       </div>
