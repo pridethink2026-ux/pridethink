@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DEBUG } from "./debug";
 import { MOMENT_DURATION_MS } from "./moments";
 import { loadMusicLibrary } from "./musicLibrary";
 
@@ -12,15 +13,21 @@ import { loadMusicLibrary } from "./musicLibrary";
 
   - La ficha (musicLibrary.json) se pide recién cuando el momento actual o
     el siguiente tienen música.
-  - Un solo <audio> para todo el visor (preload "none": no baja nada hasta
-    que un momento con música empieza a correr). Reutilizarlo es lo que
-    deja que en iPhone, una vez que sonó con un toque, siga sonando solo al
-    pasar al siguiente momento.
+  - Un solo <audio> para todo el visor, con preload "auto" para la pista
+    del momento actual (empieza a bajarla apenas se abre el momento, sin
+    esperar a que corra el tiempo). Reutilizarlo es lo que deja que en
+    iPhone, una vez que sonó con un toque, siga sonando solo al pasar al
+    siguiente momento.
   - `running` es "el temporizador del momento corre" (foto cargada, sin
     pausa, sin diálogos ni campo de responder): con true suena desde
     startSec + lo transcurrido (elapsedRef, en ms, el mismo del visor);
-    con false se pausa. Cada medio segundo se corrige si se desfasó más de
-    DRIFT_SEC. Al cambiar de momento o cerrar, se detiene.
+    con false se pausa. Al cambiar de momento o cerrar, se detiene.
+  - Sincronización: el temporizador del visor manda. Cada DRIFT_CHECK_MS
+    se mira el desfase y solo se corrige (salto de currentTime) si pasa de
+    DRIFT_SEC, con al menos DRIFT_COOLDOWN_MS entre correcciones y nunca
+    mientras el audio está cargando (waiting, seeking o readyState < 3).
+    En iPhone, con MP3 y red móvil, cada salto vacía el búfer y se oye un
+    corte; corregir desfases chicos seguido dejaba la música entrecortada.
   - Fundido de FADE_SEC al empezar y al terminar el tramo, con `volume`
     (iOS lo ignora: en iPhone arranca y corta en seco).
   - `muted` silencia sin cortar (sigue sincronizado). Silenciado, el
@@ -29,20 +36,28 @@ import { loadMusicLibrary } from "./musicLibrary";
     dentro del toque) lo arranca.
   - Precarga el audio del siguiente momento si tiene música.
 
-  Devuelve { track, needsTap, tapToPlay }: track es la ficha de la pista
-  del momento actual (null si no tiene música o la pista ya no existe).
+  Devuelve { track, needsTap, tapToPlay, debug }: track es la ficha de la
+  pista del momento actual (null si no tiene música o la pista ya no
+  existe). `debug` lo lee solo MomentDebugPanel.jsx (?debug=1): el
+  <audio>, startSec, el umbral, si está cargando y contadores
+  (correcciones de sincronización, play() pedidos y, solo en modo
+  diagnóstico, eventos waiting/stalled).
 */
 
 const MOMENT_SEC = MOMENT_DURATION_MS / 1000;
 const FADE_SEC = 0.4;
-const DRIFT_SEC = 0.3;
+const DRIFT_SEC = 1;
 const DRIFT_CHECK_MS = 500;
+const DRIFT_COOLDOWN_MS = 3000;
 
 export function useMomentMusic({ momentId, music, nextMusic, running, elapsedRef, muted }) {
   const [library, setLibrary] = useState(null);
   const [needsTap, setNeedsTap] = useState(false);
   const audioRef = useRef(null);
   const preloadRef = useRef(null);
+  const statsRef = useRef({ corrections: 0, plays: 0, waiting: 0, stalled: 0 });
+  const bufferingRef = useRef(false); // entre "waiting" y "playing"
+  const lastSeekRef = useRef(0); // performance.now() del último salto de currentTime
   const wantsLibrary = !!(music || nextMusic);
 
   useEffect(() => {
@@ -86,10 +101,20 @@ export function useMomentMusic({ momentId, music, nextMusic, running, elapsedRef
     if (!file) return;
     if (!audioRef.current) {
       audioRef.current = new Audio();
-      audioRef.current.preload = "none";
+      audioRef.current.preload = "auto";
+      audioRef.current.addEventListener("waiting", () => (bufferingRef.current = true));
+      audioRef.current.addEventListener("playing", () => (bufferingRef.current = false));
+      if (DEBUG) {
+        ["waiting", "stalled"].forEach((type) =>
+          audioRef.current.addEventListener(type, () => statsRef.current[type]++)
+        );
+      }
     }
     const url = new URL(file, window.location.origin).href;
-    if (audioRef.current.src !== url) audioRef.current.src = url;
+    if (audioRef.current.src !== url) {
+      bufferingRef.current = false;
+      audioRef.current.src = url;
+    }
   }, [momentId, file]);
 
   useEffect(() => {
@@ -101,9 +126,11 @@ export function useMomentMusic({ momentId, music, nextMusic, running, elapsedRef
   const play = () => {
     const audio = audioRef.current;
     if (!audio || !file) return;
+    lastSeekRef.current = performance.now();
     if (audio.readyState >= 1) audio.currentTime = expected();
     else audio.addEventListener("loadedmetadata", () => (audio.currentTime = expected()), { once: true });
     audio.muted = muted;
+    statsRef.current.plays++;
     audio.play().then(
       () => setNeedsTap(false),
       (err) => {
@@ -127,9 +154,19 @@ export function useMomentMusic({ momentId, music, nextMusic, running, elapsedRef
       const elapsed = elapsedRef.current / 1000;
       const edge = Math.min(elapsed, MOMENT_SEC - elapsed);
       audio.volume = Math.max(0, Math.min(1, edge / FADE_SEC));
-      if (now - lastCheck > DRIFT_CHECK_MS && !audio.paused && !audio.seeking && audio.readyState >= 1) {
+      if (now - lastCheck > DRIFT_CHECK_MS) {
         lastCheck = now;
-        if (Math.abs(audio.currentTime - expected()) > DRIFT_SEC) audio.currentTime = expected();
+        const loading = bufferingRef.current || audio.seeking || audio.readyState < 3;
+        if (
+          !audio.paused &&
+          !loading &&
+          now - lastSeekRef.current > DRIFT_COOLDOWN_MS &&
+          Math.abs(audio.currentTime - expected()) > DRIFT_SEC
+        ) {
+          statsRef.current.corrections++;
+          lastSeekRef.current = now;
+          audio.currentTime = expected();
+        }
       }
       frame = requestAnimationFrame(tick);
     };
@@ -152,5 +189,5 @@ export function useMomentMusic({ momentId, music, nextMusic, running, elapsedRef
     preloadRef.current = pre;
   }, [nextTrack, file]);
 
-  return { track, needsTap, tapToPlay: play };
+  return { track, needsTap, tapToPlay: play, debug: { audioRef, statsRef, bufferingRef, startSec, file, driftSec: DRIFT_SEC } };
 }

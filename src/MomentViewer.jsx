@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import Avatar from "./Avatar";
+import { DEBUG } from "./debug";
+import MomentDebugPanel from "./MomentDebugPanel";
 import MomentViewersSheet from "./MomentViewersSheet";
 import ReportButton from "./ReportButton";
 import { useBlocksContext } from "./BlocksContext";
@@ -32,7 +34,14 @@ import { notify, timeAgo } from "./utils";
   - Tocar el tercio izquierdo retrocede, el resto avanza.
   - Mantener presionado (más de HOLD_MS) pausa; soltar sigue.
   - ✕ o Escape cierran; ← / → del teclado retroceden/avanzan.
-  - El tiempo corre recién cuando la foto terminó de cargar.
+  - El tiempo corre recién cuando la foto terminó de cargar: imgLoaded no
+    es un estado aparte sino "loadedId === currentId", así que no hay que
+    reiniciarlo al cambiar de momento (en iPhone, con la foto en caché, el
+    onLoad llegaba antes que ese reinicio y el visor quedaba congelado).
+    Además se mira img.complete al montar la foto y hay una red de
+    seguridad (LOAD_RESCUE_MS / LOAD_GIVE_UP_MS).
+  - Si la pestaña pierde el foco o se oculta con la foto presionada, se
+    suelta igual (iOS no siempre manda pointercancel).
   - En tus momentos, 🗑 los borra (pide confirmar, moments.js →
     deleteMoment); en los ajenos, "⋮" los reporta (ReportButton.jsx,
     targetType "moment"). Mientras está abierta la confirmación o el
@@ -61,6 +70,10 @@ import { notify, timeAgo } from "./utils";
     silencia solo la música de este visor (empieza silenciado si
     "Silenciar sonidos" está activo en el perfil). Si el navegador no deja
     reproducir solo, aparece "Toca para escuchar".
+  - Diagnóstico: con ?debug=1 en la URL (debug.js) se ve encima de la
+    foto MomentDebugPanel.jsx, con la carga de la foto, cada motivo de
+    pausa, el tiempo y el estado del audio. Sin ese parámetro no cambia
+    nada.
 
   Props:
   - `authorUids` (array): los autores en el orden de la tira.
@@ -85,6 +98,13 @@ import { notify, timeAgo } from "./utils";
 */
 
 const HOLD_MS = 200;
+// Red de seguridad de la carga de la foto (Safari a veces no avisa): si a
+// los LOAD_RESCUE_MS la foto ya está completa y el tiempo no arrancó, se
+// da por cargada; si a los LOAD_GIVE_UP_MS sigue sin cargar, se pasa al
+// siguiente momento.
+const LOAD_CHECK_MS = 500;
+const LOAD_RESCUE_MS = 1500;
+const LOAD_GIVE_UP_MS = 10000;
 const PREV_ZONE = 1 / 3;
 const VIEWERS_NOTICE_KEY = "pt-moment-viewers-notice";
 
@@ -228,7 +248,7 @@ const styles = {
     position: "absolute",
     left: "12px",
     right: "12px",
-    bottom: "16px",
+    bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
     padding: "14px",
     borderRadius: "16px",
     background: "rgba(20,20,20,0.92)",
@@ -344,7 +364,7 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const [authorPos, setAuthorPos] = useState(startIndex);
   const [moments, setMoments] = useState(null); // null = cargando
   const [momentPos, setMomentPos] = useState(0);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [loadedId, setLoadedId] = useState(null); // id del momento cuya foto terminó de cargar
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [closeHover, setCloseHover] = useState(false);
@@ -375,21 +395,28 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const [tapHover, setTapHover] = useState(false);
 
   const elapsedRef = useRef(0);
-  // Id del momento cuya foto terminó de cargar: imgLoaded se reinicia en un
-  // efecto, así que en el primer render de un momento nuevo todavía vale
-  // true por el anterior; con esto la música no arranca antes de tiempo.
-  const loadedIdRef = useRef(null);
   const holdTimerRef = useRef(null);
   const heldRef = useRef(false);
   const blockedRef = useRef(false);
   const replyInputRef = useRef(null);
   const startMomentRef = useRef(startMomentId); // se usa una sola vez, en el primer autor
+  const imgRef = useRef(null); // la foto actual (para img.complete)
+  // Solo diagnóstico (?debug=1).
+  const debugRef = useRef({ rescuedAtMount: 0, rescuedLater: 0, gaveUp: 0, events: [] });
+  const timerRunningRef = useRef(false);
+  const debugLog = useCallback((what) => {
+    if (!DEBUG) return;
+    const events = debugRef.current.events;
+    events.push(`${(performance.now() / 1000).toFixed(2)} ${what}`);
+    if (events.length > 8) events.shift();
+  }, []);
 
   const authorUid = authorUids[authorPos];
   const author = allUsers.find((u) => u.uid === authorUid);
   const current = moments ? moments[momentPos] : null;
   const currentId = current ? current.id : null;
   const isMine = authorUid === currentUid;
+  const imgLoaded = !!currentId && loadedId === currentId;
   const me = allUsers.find((u) => u.uid === currentUid);
   // Con la confirmación de borrar, el reporte, la lista de quién vio, el
   // aviso abiertos, o mientras escribes una respuesta, todo se detiene.
@@ -438,11 +465,12 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   actionsRef.current = { next, prev, onClose, dialogOpen };
 
   const nextMoment = moments ? moments[momentPos + 1] : null;
+  const musicRunning = !!current && imgLoaded && !paused && !dialogOpen;
   const music = useMomentMusic({
     momentId: currentId,
     music: current?.music,
     nextMusic: nextMoment?.music,
-    running: !!current && imgLoaded && loadedIdRef.current === currentId && !paused && !dialogOpen,
+    running: musicRunning,
     elapsedRef,
     muted: musicMuted,
   });
@@ -494,16 +522,51 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   }, [authorUid]);
 
   // Cada momento nuevo arranca de cero y espera a que su foto cargue.
+  // (imgLoaded no se toca: depende del id, ver arriba.)
   useEffect(() => {
     elapsedRef.current = 0;
     setProgress(0);
-    setImgLoaded(false);
     setConfirmDelete(false);
     setDeleteError(false);
     setViewersOpen(false);
     setReplyText("");
     setReplyStatus(null);
   }, [currentId]);
+
+  // La foto puede estar completa (caché) antes de que llegue o se escuche
+  // su onLoad: se mira apenas se monta.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!currentId || !img || !img.complete || img.naturalWidth === 0) return;
+    setLoadedId((prevId) => {
+      if (prevId !== currentId) {
+        debugRef.current.rescuedAtMount++;
+        debugLog("foto completa al montar");
+      }
+      return currentId;
+    });
+  }, [currentId, debugLog]);
+
+  // Red de seguridad: nunca dejar el visor congelado esperando la foto.
+  useEffect(() => {
+    if (!currentId || imgLoaded) return;
+    const shownAt = performance.now();
+    const id = setInterval(() => {
+      const waited = performance.now() - shownAt;
+      const img = imgRef.current;
+      if (waited >= LOAD_RESCUE_MS && img && img.complete && img.naturalWidth > 0) {
+        debugRef.current.rescuedLater++;
+        debugLog("red de seguridad: foto completa → arranca");
+        setLoadedId(currentId);
+      } else if (waited >= LOAD_GIVE_UP_MS && !actionsRef.current.dialogOpen) {
+        clearInterval(id);
+        debugRef.current.gaveUp++;
+        debugLog("red de seguridad: no cargó en 10 s → siguiente");
+        actionsRef.current.next();
+      }
+    }, LOAD_CHECK_MS);
+    return () => clearInterval(id);
+  }, [currentId, imgLoaded, debugLog]);
 
   // En mis momentos: quién lo vio, en vivo, el más reciente primero.
   useEffect(() => {
@@ -556,6 +619,10 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   // Temporizador: corre solo con la foto cargada y sin pausa.
   useEffect(() => {
     if (!current || !imgLoaded || paused || dialogOpen) return;
+    if (DEBUG) {
+      timerRunningRef.current = true;
+      debugLog("temporizador arranca");
+    }
     let frame;
     const start = performance.now() - elapsedRef.current;
     const tick = (time) => {
@@ -568,8 +635,14 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [current, imgLoaded, paused, dialogOpen]);
+    return () => {
+      cancelAnimationFrame(frame);
+      if (DEBUG) {
+        timerRunningRef.current = false;
+        debugLog("temporizador se detiene");
+      }
+    };
+  }, [current, imgLoaded, paused, dialogOpen, debugLog]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -584,7 +657,26 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
 
   useEffect(() => () => clearTimeout(holdTimerRef.current), []);
 
-  const handlePointerDown = () => {
+  // Perder el foco u ocultarse cuenta como soltar la foto.
+  useEffect(() => {
+    const release = (e) => {
+      if (e.type === "visibilitychange" && document.visibilityState !== "hidden") return;
+      clearTimeout(holdTimerRef.current);
+      if (!heldRef.current) return;
+      debugLog(`${e.type} → suelta`);
+      heldRef.current = false;
+      setPaused(false);
+    };
+    window.addEventListener("blur", release);
+    document.addEventListener("visibilitychange", release);
+    return () => {
+      window.removeEventListener("blur", release);
+      document.removeEventListener("visibilitychange", release);
+    };
+  }, [debugLog]);
+
+  const handlePointerDown = (e) => {
+    debugLog(`${e.type} (${e.pointerType})`);
     // Un toque que cierra el menú de reportar no cuenta como avanzar.
     blockedRef.current = dialogOpen;
     if (blockedRef.current) return;
@@ -592,11 +684,13 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     clearTimeout(holdTimerRef.current);
     holdTimerRef.current = setTimeout(() => {
       heldRef.current = true;
+      debugLog("mantener presionado → pausa");
       setPaused(true);
     }, HOLD_MS);
   };
 
   const handlePointerUp = (e) => {
+    debugLog(e.type);
     if (blockedRef.current) {
       blockedRef.current = false;
       return;
@@ -612,7 +706,8 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
     else next();
   };
 
-  const handlePointerCancel = () => {
+  const handlePointerCancel = (e) => {
+    debugLog(e.type);
     clearTimeout(holdTimerRef.current);
     heldRef.current = false;
     setPaused(false);
@@ -787,20 +882,27 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
           onPointerLeave={handlePointerCancel}
-          onContextMenu={(e) => e.preventDefault()}
+          onContextMenu={(e) => {
+            debugLog("contextmenu");
+            e.preventDefault();
+          }}
         >
           {current ? (
             <img
               key={current.id}
+              ref={imgRef}
               src={current.imageURL}
               alt={current.caption || t("moments.imageAlt", { name: author?.displayName || "" })}
               style={styles.image}
               draggable={false}
               onLoad={() => {
-                loadedIdRef.current = current.id;
-                setImgLoaded(true);
+                debugLog("onLoad");
+                setLoadedId(current.id);
               }}
-              onError={next}
+              onError={() => {
+                debugLog("onError");
+                next();
+              }}
             />
           ) : (
             <span style={styles.status}>{unavailable ? t("moments.unavailable") : t("moments.loading")}</span>
@@ -886,6 +988,38 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
             </div>
           )}
         </div>
+
+        {DEBUG && (
+          <MomentDebugPanel
+            log={debugLog}
+            viewer={{
+              imgRef,
+              elapsedRef,
+              imgLoaded,
+              rescuedAtMount: debugRef.current.rescuedAtMount,
+              rescuedLater: debugRef.current.rescuedLater,
+              gaveUp: debugRef.current.gaveUp,
+              timerRunning: timerRunningRef.current,
+              durationSec: MOMENT_DURATION_MS / 1000,
+              paused,
+              held: heldRef.current,
+              reportOpen,
+              confirmDelete,
+              viewersOpen,
+              noticeOpen,
+              replyFocused,
+              replySending,
+              noticeSeen: viewersNoticeSeen() ? "sí" : "no",
+              events: debugRef.current.events,
+            }}
+            music={{
+              ...music.debug,
+              hasMusic: !!music.track,
+              running: musicRunning,
+              needsTap: music.needsTap,
+            }}
+          />
+        )}
 
         {viewersOpen && <MomentViewersSheet viewers={viewers} onClose={() => setViewersOpen(false)} />}
 
