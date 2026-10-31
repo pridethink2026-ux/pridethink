@@ -22,6 +22,14 @@ import { getHomeIcon } from "./homeIcon";
   usa las variables de tema activo (--accent / --accent2 de themes.js), asi
   que sigue respetando el tema visual elegido.
 
+  onPill (pestanas de la barra superior de escritorio): el fondo de la
+  pestana ACTIVA es claro en los 6 temas y casi del mismo tono que
+  --accent/--accent2 (en Noche Violeta la casita desaparecia). Por eso,
+  activa y sobre la pastilla, la casita sin bandera usa currentColor (el
+  --tab-active-text oscuro que ya pinta el texto, mismo truco que StoreIcon
+  en App.js); con bandera conserva sus colores y suma un contorno
+  currentColor por debajo para que se recorte del fondo.
+
   Cada instancia genera su propio id de gradiente (useId) para poder
   mostrarse a la vez en la nav de escritorio y en la barra inferior movil
   sin que los ids de <linearGradient> choquen entre si.
@@ -69,12 +77,14 @@ const SHAPES = {
   ),
 };
 
-export default function HomeIcon({ identityText, active, size = 20 }) {
+export default function HomeIcon({ identityText, active, onPill = false, size = 20 }) {
   const { shape, colors } = getHomeIcon(identityText);
   const gradId = `home-icon-grad-${useId()}`;
-  const stops = colors && colors.length > 0
-    ? colors
-    : ["var(--accent)", "var(--accent2)"];
+  const hasFlag = colors && colors.length > 0;
+  const stops = hasFlag ? colors : ["var(--accent)", "var(--accent2)"];
+  const solid = onPill && active && !hasFlag;
+  const outlined = onPill && active && hasFlag;
+  const drawing = SHAPES[shape] || SHAPES.house;
 
   return (
     <svg
@@ -82,7 +92,7 @@ export default function HomeIcon({ identityText, active, size = 20 }) {
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={`url(#${gradId})`}
+      stroke={solid ? "currentColor" : `url(#${gradId})`}
       strokeWidth="1.7"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -99,7 +109,12 @@ export default function HomeIcon({ identityText, active, size = 20 }) {
           ))}
         </linearGradient>
       </defs>
-      {SHAPES[shape] || SHAPES.house}
+      {outlined && (
+        <g stroke="currentColor" strokeWidth="3.4">
+          {drawing}
+        </g>
+      )}
+      {drawing}
     </svg>
   );
 }

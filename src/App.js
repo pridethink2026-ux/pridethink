@@ -173,8 +173,8 @@ const themeStyles = {
     border: "1.5px solid var(--theme-btn-border)",
     boxShadow: "0 2px 6px rgba(var(--shadow-rgb), 0.25)",
     borderRadius: "999px",
-    width: "38px",
-    height: "38px",
+    width: "40px",
+    height: "40px",
     fontSize: "16px",
     cursor: "pointer",
     color: "var(--text)",
@@ -184,7 +184,7 @@ const themeStyles = {
   },
   panel: {
     position: "absolute",
-    top: "46px",
+    top: "48px",
     right: 0,
     width: "200px",
     background: "var(--surface)",
@@ -214,6 +214,7 @@ const themeStyles = {
     marginBottom: "2px",
   }),
   animatedIcon: { display: "inline-block" },
+  dropIcon: { display: "flex" },
 };
 
 const bannerStyles = {
@@ -316,47 +317,121 @@ const bottomNavStyles = {
   label: { fontSize: "10px", fontWeight: 600 },
 };
 
-// Ícono del botón que abre el selector de temas: una gota de pintura con 3
-// franjas diagonales de colores fijos (rosa/amarillo/celeste). Reemplaza al
-// emoji 🎨 (2026-07-29). A propósito son solo 3 franjas grandes, no 6 como
-// el ícono descartado del tema "Arcoíris" (que a 16px se leía como "sol o
-// flor" en vez de arcoíris) — acá no hace falta leerse como un arcoíris
-// real, solo como una gota de pintura multicolor, así que menos franjas más
-// grandes se ven más claras a este tamaño. Colores fijos a propósito (misma
-// excepción que las banderas pride/el ícono de Arcoíris): no se pueden
-// derivar de las 2 variables --accent/--accent2 del tema activo.
+// Ícono del botón que abre el selector de temas: gota de acuarela con
+// degradado arcoíris (punta roja → violeta abajo) y brillo blanco curvo,
+// sobre una mancha de pintura de la que salen chorros que se afinan en
+// curva y terminan en una bolita, más unos puntitos sueltos — redibujo
+// simplificado de referencia-boton-temas.jpeg (2026-10-31). Los chorros
+// son pocos y gruesos a propósito: a 28px tienen que leerse como
+// "salpicó pintura", no como ruido. El amarillo queda solo dentro de la
+// gota porque sobre el botón blanco de Pinky se pierde. Colores fijos a
+// propósito (misma excepción que las banderas pride/el ícono de
+// Arcoíris): no se pueden derivar de las 2 variables --accent/--accent2
+// del tema activo. El SVG es estático: el rebote y la explosión al abrir el
+// menú los pone ThemeMenu (BURST_PIECES).
+const PAINT_DROP_PATH =
+  "M16 6.4C19.1 10.8 22.9 14.7 22.9 19.8A6.9 6.9 0 1 1 9.1 19.8C9.1 14.7 12.9 10.8 16 6.4z";
+
 function PaintDropIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
       <defs>
-        <linearGradient id="paint-drop-gradient" x1="4" y1="2" x2="20" y2="22" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#ff4d9e" />
-          <stop offset="33%" stopColor="#ff4d9e" />
-          <stop offset="33%" stopColor="#ffd93c" />
-          <stop offset="66%" stopColor="#ffd93c" />
-          <stop offset="66%" stopColor="#3ca7ff" />
-          <stop offset="100%" stopColor="#3ca7ff" />
+        <linearGradient id="paint-drop-rainbow" x1="13" y1="7.5" x2="20" y2="27" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ff3d57" />
+          <stop offset="22%" stopColor="#ff8a2a" />
+          <stop offset="42%" stopColor="#ffd23a" />
+          <stop offset="62%" stopColor="#36c96e" />
+          <stop offset="80%" stopColor="#2f8bff" />
+          <stop offset="100%" stopColor="#8a4dff" />
+        </linearGradient>
+        <radialGradient id="paint-drop-wash" cx="13.5" cy="14" r="8" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#fff" stopOpacity=".3" />
+          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="paint-drop-splash" x1="7" y1="0" x2="25" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#36c96e" />
+          <stop offset="30%" stopColor="#ff8a2a" />
+          <stop offset="70%" stopColor="#2f8bff" />
+          <stop offset="100%" stopColor="#8a4dff" />
         </linearGradient>
       </defs>
-      <path
-        d="M12 2.5c3.2 4.2 6.2 7.8 6.2 10.8A6.2 6.2 0 1 1 5.8 13.3C5.8 10.3 8.8 6.7 12 2.5z"
-        fill="url(#paint-drop-gradient)"
-      />
+      {/* Mancha de pintura detrás de la gota, de donde nacen los chorros */}
+      <path d="M7.4 18.6C8.6 15.2 12 14.6 16 15.4C20.2 14.6 23.6 15.4 24.6 18.4C25.6 21.6 23 24.6 19.6 25.4C17.2 26.2 14.4 26.2 12 25.4C8.8 24.4 6.4 21.6 7.4 18.6z" fill="url(#paint-drop-splash)" opacity=".92" />
+      {/* Chorros: cálidos a la izquierda, fríos a la derecha, goteos abajo */}
+      <path d="M17 12.4Q12.3 6.9 7.1 3.4L6.5 3.8Q10.6 8.2 13 15.6z" fill="#ff3d57" />
+      <circle cx="6.8" cy="3.6" r="1.2" fill="#ff3d57" />
+      <path d="M14.6 14.9Q9 12.4 4 11.1L3.6 11.7Q8 14.1 12.2 19.1z" fill="#ff8a2a" />
+      <circle cx="3.8" cy="11.4" r="1" fill="#ff8a2a" />
+      <path d="M13.3 18.6Q7.4 18.7 2.4 19.4L2.4 20.2Q7.1 20.7 12.7 23.4z" fill="#36c96e" />
+      <circle cx="2.4" cy="19.8" r="1.15" fill="#36c96e" />
+      <path d="M18.9 15.8Q22.1 8.6 26.7 4.7L26.1 4.1Q20.5 7.1 15.1 12.2z" fill="#8a4dff" />
+      <circle cx="26.4" cy="4.4" r="1.2" fill="#8a4dff" />
+      <path d="M19.3 20.3Q24.6 16.3 29.5 14.9L29.3 14.3Q24 14.4 17.9 15.7z" fill="#2f8bff" />
+      <circle cx="29.4" cy="14.6" r="1.05" fill="#2f8bff" />
+      <path d="M12.1 23.3Q10.4 26.5 9.2 29.2L9.6 29.6Q11.5 27.4 14.9 25.7z" fill="#2f8bff" />
+      <circle cx="9.4" cy="29.4" r="0.95" fill="#2f8bff" />
+      <path d="M17.7 25.5Q20.8 27.3 22.4 29.4L22.8 29Q21.8 26.4 20.3 23.5z" fill="#8a4dff" />
+      <circle cx="22.6" cy="29.2" r="0.85" fill="#8a4dff" />
+      {/* Puntitos sueltos */}
+      <circle cx="21.6" cy="3.4" r="0.95" fill="#1fb5ad" />
+      <circle cx="10.8" cy="2.6" r="0.8" fill="#b37dff" />
+      <circle cx="27.6" cy="22.6" r="1.1" fill="#ff7a5c" />
+      <circle cx="4.2" cy="25" r="0.85" fill="#1fb5ad" />
+      {/* Gota + velo de acuarela + borde apenas marcado */}
+      <path d={PAINT_DROP_PATH} fill="url(#paint-drop-rainbow)" />
+      <path d={PAINT_DROP_PATH} fill="url(#paint-drop-wash)" />
+      <path d={PAINT_DROP_PATH} fill="none" stroke="#c4123f" strokeOpacity=".35" strokeWidth=".6" />
+      {/* Brillo blanco curvo sobre el borde superior izquierdo */}
+      <path d="M14.5 10.2C13 12.3 11.8 14.6 11.6 17.4" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" opacity=".92" />
+      <circle cx="11.7" cy="20" r=".8" fill="#fff" opacity=".92" />
     </svg>
   );
 }
 
-// Puntitos del efecto "splash" al abrir el menú de temas: cada uno explota
-// en una dirección distinta (--tx/--ty, ver @keyframes pt-paint-splash en
-// index.css) — mismos colores fijos que PaintDropIcon, por el mismo motivo.
-const SPLASH_DOTS = [
-  { tx: "-16px", ty: "-14px", color: "#ff4d9e" },
-  { tx: "16px", ty: "-14px", color: "#ffd93c" },
-  { tx: "-18px", ty: "10px", color: "#3ca7ff" },
-  { tx: "18px", ty: "10px", color: "#3ddc84" },
-  { tx: "0px", ty: "-20px", color: "#a25bff" },
+// Explosión de pintura al abrir el menú de temas (2026-10-31, reemplaza a
+// los 5 puntitos de 6px que casi no se notaban). Cada pieza sale disparada
+// desde el centro del botón: "a" es el ángulo (0 = arriba, sentido
+// horario), "d" la distancia en px, "w"/"h" el tamaño y "delay" un
+// escalonado mínimo. "streak" son chorros alargados que se estiran en la
+// dirección del disparo; "dot" son puntitos y manchas que se agrandan un
+// poco. Todo se desvanece (ver @keyframes pt-paint-burst* en index.css).
+// Ángulos y distancias irregulares a propósito (más masa hacia arriba y a
+// los lados, como el abanico de la referencia): si son simétricos se lee
+// como un sol o un fuego artificial, no como pintura.
+// Mismos colores fijos que PaintDropIcon y la referencia (arcoíris +
+// turquesa, lila y coral). El amarillo es un dorado más oscuro para que no
+// se pierda sobre el rosa claro de Pinky.
+const BURST_PIECES = [
+  { kind: "streak", a: -30, d: 50, w: 5.5, h: 17, color: "#ff3d57", delay: 0 },
+  { kind: "streak", a: -8, d: 42, w: 4, h: 11, color: "#f2b100", delay: 20 },
+  { kind: "streak", a: 22, d: 52, w: 5.5, h: 17, color: "#8a4dff", delay: 0 },
+  { kind: "streak", a: -70, d: 48, w: 5, h: 15, color: "#ff8a2a", delay: 10 },
+  { kind: "streak", a: -104, d: 40, w: 4.5, h: 12, color: "#36c96e", delay: 30 },
+  { kind: "streak", a: 76, d: 46, w: 5, h: 15, color: "#2f8bff", delay: 10 },
+  { kind: "streak", a: 112, d: 38, w: 4, h: 11, color: "#b37dff", delay: 40 },
+  { kind: "streak", a: -165, d: 32, w: 4, h: 10, color: "#2f8bff", delay: 50 },
+  { kind: "dot", a: -50, d: 33, w: 12, h: 10, color: "#ff7a5c", delay: 0 },
+  { kind: "dot", a: 48, d: 30, w: 11, h: 10, color: "#1fb5ad", delay: 10 },
+  { kind: "dot", a: -132, d: 30, w: 9, h: 8, color: "#ff3d57", delay: 30 },
+  { kind: "dot", a: 150, d: 30, w: 8, h: 7, color: "#8a4dff", delay: 40 },
+  { kind: "dot", a: -18, d: 60, w: 6, h: 6, color: "#1fb5ad", delay: 20 },
+  { kind: "dot", a: 8, d: 58, w: 4, h: 4, color: "#ff7a5c", delay: 30 },
+  { kind: "dot", a: 40, d: 62, w: 5, h: 5, color: "#b37dff", delay: 20 },
+  { kind: "dot", a: -88, d: 60, w: 5, h: 5, color: "#ff3d57", delay: 40 },
+  { kind: "dot", a: 95, d: 58, w: 6, h: 6, color: "#ff8a2a", delay: 30 },
+  { kind: "dot", a: -142, d: 52, w: 5, h: 5, color: "#ff8a2a", delay: 60 },
+  { kind: "dot", a: 130, d: 54, w: 4, h: 4, color: "#36c96e", delay: 60 },
 ];
-const SPLASH_DURATION_MS = 450;
+// La pieza más tardía termina en 60 + 760 ms; se desmonta un poco después.
+const BURST_DURATION_MS = 880;
+
+function prefersReducedMotion() {
+  return (
+    typeof window !== "undefined" &&
+    !!window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
 
 // Clase de animación en reposo por cada ícono de tema dentro del menú
 // (mientras el menú está abierto, no requiere hover) — ver los
@@ -385,8 +460,17 @@ function ThemeMenu() {
   const { t } = useLanguage();
   const { themeKey: selected, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
-  const [splashing, setSplashing] = useState(false);
+  // { id, x, y } de la explosión en curso (centro del botón en la
+  // ventana), o null. El id cambia en cada apertura para reiniciar las
+  // animaciones aunque se toque de nuevo antes de que terminen.
+  const [burst, setBurst] = useState(null);
   const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!burst) return undefined;
+    const timer = setTimeout(() => setBurst(null), BURST_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [burst]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -422,32 +506,56 @@ function ThemeMenu() {
         style={themeStyles.themeBtn}
         aria-label={t("nav.theme")}
         aria-expanded={open}
-        onClick={() => {
-          setOpen((v) => {
-            const willOpen = !v;
-            // El splash solo se dispara al ABRIR (no al cerrar ni al
-            // seleccionar un tema) — mismo patrón que "likePop" en
-            // PostCard (Feed.jsx): un estado corto que se apaga solo con
-            // setTimeout, sin dejar nada animando de fondo.
-            if (willOpen) {
-              setSplashing(true);
-              setTimeout(() => setSplashing(false), SPLASH_DURATION_MS);
-            }
-            return willOpen;
-          });
+        onClick={(e) => {
+          const willOpen = !open;
+          setOpen(willOpen);
+          // La explosión solo se dispara al ABRIR (no al cerrar ni al
+          // seleccionar un tema), una vez por toque — mismo patrón que
+          // "likePop" en PostCard (Feed.jsx): un estado corto que se apaga
+          // solo, sin dejar nada animando de fondo. Con "reducir
+          // movimiento" no se monta nada.
+          if (willOpen && !prefersReducedMotion()) {
+            const r = e.currentTarget.getBoundingClientRect();
+            setBurst({ id: Date.now(), x: r.left + r.width / 2, y: r.top + r.height / 2 });
+          }
         }}
       >
-        <PaintDropIcon />
-        {splashing &&
-          SPLASH_DOTS.map((d, i) => (
+        {/* El key reinicia el rebote en cada apertura */}
+        <span
+          key={burst ? burst.id : "idle"}
+          className={burst ? "pt-paint-drop-bounce" : undefined}
+          style={themeStyles.dropIcon}
+        >
+          <PaintDropIcon />
+        </span>
+      </button>
+      {/* Capa fija (no suma scroll horizontal aunque las piezas salgan de
+          la pantalla), sin clics y por debajo del panel del menú. */}
+      {burst && (
+        <div
+          key={burst.id}
+          className="pt-paint-burst"
+          style={{ left: burst.x, top: burst.y }}
+          aria-hidden="true"
+        >
+          {BURST_PIECES.map((p, i) => (
             <span
               key={i}
-              aria-hidden="true"
-              className="pt-paint-splash-dot"
-              style={{ background: d.color, "--tx": d.tx, "--ty": d.ty }}
+              className={p.kind === "streak" ? "pt-paint-burst-streak" : "pt-paint-burst-dot"}
+              style={{
+                width: p.w,
+                height: p.h,
+                marginLeft: -p.w / 2,
+                marginTop: -p.h / 2,
+                background: p.color,
+                "--a": `${p.a}deg`,
+                "--d": `${-p.d}px`,
+                animationDelay: `${p.delay}ms`,
+              }}
             />
           ))}
-      </button>
+        </div>
+      )}
       {open && (
         <div style={themeStyles.panel}>
           {Object.entries(THEMES).map(([key, theme]) => {
@@ -763,7 +871,7 @@ function App() {
                   onClick={() => navigate(tab.key)}
                 >
                   {tab.key === "feed" && (
-                    <HomeIcon identityText={myIdentity} active={active} size={17} />
+                    <HomeIcon identityText={myIdentity} active={active} onPill size={17} />
                   )}
                   {tab.key === "tienda" && <StoreIcon size={17} />}
                   {tab.label}

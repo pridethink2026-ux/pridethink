@@ -335,25 +335,111 @@ code {
   }
 }
 
-.pt-paint-splash-dot {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+/* Explosión de pintura al abrir el menú de temas (BURST_PIECES en App.js).
+   La capa es fija y de tamaño 0, anclada al centro del botón: las piezas
+   que salen de la pantalla no suman scroll, no reciben clics y quedan por
+   debajo del panel del menú (z-index 20). Cada pieza gira a su ángulo
+   (--a) y viaja hacia "arriba" de su propio eje hasta --d (negativo): así
+   los chorros quedan siempre alineados con la dirección del disparo.
+   Solo transform y opacity; una sola vez (forwards), sin bucles. */
+.pt-paint-burst {
+  position: fixed;
+  width: 0;
+  height: 0;
+  z-index: 19;
   pointer-events: none;
-  animation: pt-paint-splash 0.45s ease-out forwards;
 }
 
-@keyframes pt-paint-splash {
+.pt-paint-burst > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 999px;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation-duration: 760ms;
+  animation-timing-function: cubic-bezier(0.12, 0.75, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+/* Gota alargada: cabeza redonda adelante (arriba en su propio eje) y cola
+   más fina atrás. */
+.pt-paint-burst > .pt-paint-burst-streak {
+  border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+  animation-name: pt-paint-burst-streak;
+}
+
+.pt-paint-burst-dot {
+  animation-name: pt-paint-burst-dot;
+}
+
+/* Chorro: sale corto y finito, se estira en pleno vuelo y se desvanece. */
+@keyframes pt-paint-burst-streak {
   0% {
-    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-12px) scale(0.5, 0.2);
+  }
+  14% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateY(calc(var(--d) * 0.7)) scale(1, 1.25);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(var(--d)) scale(0.8, 1);
+  }
+}
+
+/* Puntito o mancha: sale chico y se agranda un poco mientras se aleja. */
+@keyframes pt-paint-burst-dot {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-10px) scale(0.3);
+  }
+  14% {
+    opacity: 1;
+  }
+  60% {
     opacity: 1;
   }
   100% {
-    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1);
     opacity: 0;
+    transform: rotate(var(--a)) translateY(var(--d)) scale(1.25);
+  }
+}
+
+/* Rebote de la gota al tocar: se aplasta, salta y se asienta. */
+.pt-paint-drop-bounce {
+  transform-origin: 50% 75%;
+  animation: pt-paint-drop-bounce 520ms ease-out both;
+}
+
+@keyframes pt-paint-drop-bounce {
+  0% {
+    transform: scale(1);
+  }
+  22% {
+    transform: translateY(1px) scale(1.12, 0.82);
+  }
+  52% {
+    transform: translateY(-2px) scale(0.94, 1.12);
+  }
+  78% {
+    transform: translateY(0) scale(1.03, 0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-paint-burst {
+    display: none;
+  }
+  .pt-paint-drop-bounce {
+    animation: none;
   }
 }
 
