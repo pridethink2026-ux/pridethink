@@ -1,7 +1,6 @@
 import React from "react";
-import { doc, updateDoc, arrayUnion } from "firebase/firestore";
-import { db } from "./firebase";
 import { notify } from "./utils";
+import { followUser } from "./follows";
 import { normalizeIdentityText } from "./identityStyles";
 import { isBlockedEitherWay } from "./Blocks";
 import { useLanguage } from "./LanguageContext";
@@ -244,7 +243,7 @@ function SuggestionCard({ user, currentUid, myProfile, onOpenProfile }) {
   const handleFollow = async (e) => {
     e.stopPropagation();
     if (!currentUid) return;
-    await updateDoc(doc(db, "users", currentUid), { following: arrayUnion(user.uid) });
+    await followUser(currentUid, user.uid, myProfile?.isPrivate);
     await notify(user.uid, {
       type: "follow",
       fromUid: currentUid,

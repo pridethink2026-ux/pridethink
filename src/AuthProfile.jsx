@@ -23,6 +23,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import { useLanguage } from "./LanguageContext";
 import { useFollowerUids, useUserProfile } from "./AllUsersContext";
 import { markOffline } from "./presence";
+import { syncFollowsPrivacy } from "./follows";
 import { unblockUser, useMyBlocks } from "./Blocks";
 import { formatMonthYear, formatLongDate } from "./utils";
 import { authStyles as styles, IdentityForm } from "./AuthForms";
@@ -464,6 +465,13 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
       // desincronizados temporalmente hasta el próximo toggle, no hace
       // falta revertir el cambio que el usuario sí pidió.
       await syncPostsPrivacyField(uid, "authorIsPrivate", newValue);
+    } catch (err) {
+      // silencioso a propósito, ver comentario de arriba.
+    }
+    try {
+      // Fuga B (punto 82): misma copia en tus filas de follows. Si falla,
+      // la corrige reconcileMyFollows al próximo inicio de sesión.
+      await syncFollowsPrivacy(uid, newValue);
     } catch (err) {
       // silencioso a propósito, ver comentario de arriba.
     }

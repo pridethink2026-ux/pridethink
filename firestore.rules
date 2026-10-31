@@ -871,6 +871,50 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------
+    // follows/{followerUid}_{followedUid} (fuga B, punto 82)
+    // { follower, followed, followerIsPrivate, createdAt }
+    // Reemplaza a users/{uid}.following, que lee cualquier autenticado: así
+    // cualquiera veía a quién sigue un perfil privado. Mismo patrón de id
+    // que blocks/{blockId}. "followerIsPrivate" es copia de
+    // users/{follower}.isPrivate (como authorIsPrivate en los posts), y la
+    // lectura está en términos de resource.data para que las consultas
+    // (where follower/followed == uid, followerIsPrivate == false) sean
+    // demostrables: la fila la leen las dos personas involucradas o, si
+    // quien sigue no es privado, cualquiera.
+    // --------------------------------------------------------------------
+    match /follows/{followId} {
+      allow read: if estaAutenticado()
+        && (resource.data.follower == request.auth.uid
+          || resource.data.followed == request.auth.uid
+          || resource.data.followerIsPrivate == false);
+
+      // Solo podés seguir vos (follower), nunca a vos mismo, con el id
+      // "miUid_suUid", la privacidad real de tu perfil y la hora del
+      // servidor.
+      allow create: if estaAutenticado()
+        && request.resource.data.keys().hasOnly(['follower', 'followed', 'followerIsPrivate', 'createdAt'])
+        && request.resource.data.follower == request.auth.uid
+        && request.resource.data.followed is string
+        && request.resource.data.followed != request.auth.uid
+        && followId == request.resource.data.follower + '_' + request.resource.data.followed
+        && request.resource.data.followerIsPrivate
+          == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isPrivate', false)
+        && request.resource.data.createdAt == request.time;
+
+      // Solo se corrige la copia de la privacidad (al cambiar "perfil
+      // privado"), y tiene que coincidir con tu perfil.
+      allow update: if estaAutenticado()
+        && resource.data.follower == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followerIsPrivate'])
+        && request.resource.data.followerIsPrivate
+          == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isPrivate', false);
+
+      // Dejar de seguir: solo quien sigue. Por el id (como en blocks), así
+      // borrar una fila que no existe tampoco falla.
+      allow delete: if estaAutenticado() && request.auth.uid == followId.split('_')[0];
+    }
+
+    // --------------------------------------------------------------------
     // reports/{reportId}
     // Reportes de publicaciones o usuarios (moderación). Nadie los lee,
     // edita ni borra desde el cliente: solo se revisan a mano desde la

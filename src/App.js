@@ -10,6 +10,7 @@ import HomeIcon from "./HomeNavIcon";
 import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
 import { useOnlinePresence } from "./presence";
+import { useFollowsMigration } from "./follows";
 import { useLanguage } from "./LanguageContext";
 import { THEMES, ROTATIVO_KEY } from "./themes";
 import { useTheme } from "./ThemeContext";
@@ -707,7 +708,12 @@ function App() {
   // En vivo, para que el icono de Inicio cambie al instante si el usuario
   // edita su identidad (AuthProfile.jsx). Sale de AllUsersContext, sin un
   // listener propio sobre users/{uid} (punto 70, commit 9c).
-  const myIdentity = useUserProfile(currentUid)?.identity || "";
+  const myProfile = useUserProfile(currentUid);
+  const myIdentity = myProfile?.identity || "";
+
+  // Fuga B (punto 82, commit 1): copia tu "following" a follows/ una vez
+  // por sesión — ver follows.js.
+  useFollowsMigration(currentUid, myProfile);
 
   // Las cinco vistas superpuestas (perfil público, guardados, post
   // individual, grupo, evento) son mutuamente excluyentes: abrir cualquiera

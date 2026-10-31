@@ -8,10 +8,8 @@ import {
   onSnapshot,
   query,
   where,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
 } from "firebase/firestore";
+import { followUser, unfollowUser } from "./follows";
 import Avatar from "./Avatar";
 import { PostCard } from "./Feed";
 import { notify, formatMonthYear } from "./utils";
@@ -273,9 +271,11 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
 
   const handleToggleFollow = async () => {
     if (!currentUid || isMe) return;
-    await updateDoc(doc(db, "users", currentUid), {
-      following: isFollowing ? arrayRemove(uid) : arrayUnion(uid),
-    });
+    if (isFollowing) {
+      await unfollowUser(currentUid, uid);
+    } else {
+      await followUser(currentUid, uid, myProfile?.isPrivate);
+    }
     if (!isFollowing) {
       await notify(uid, {
         type: "follow",
