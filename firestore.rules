@@ -54,6 +54,50 @@ service cloud.firestore {
       return estaAutenticado() && (request.auth.uid in chatId.split('_'));
     }
 
+    // Resumen de una conversación en chats/{chatId} (punto 84, ver
+    // chatMessages.js): { participants, lastMessageAt, lastSenderId,
+    // lastType, lastText, writers, lastReadAt }. "antes" es el documento
+    // de antes ({} al crearlo).
+    //   - participants: exactamente los dos uids del id (en cualquier
+    //     orden: las escrituras viejas mandan [yo, el otro]).
+    //   - El último mensaje (lastMessageAt/lastSenderId/lastType/lastText)
+    //     es de alguno de los dos, con un tipo conocido, texto corto y una
+    //     hora que no puede ser futura. No se puede comprobar que coincida
+    //     con el mensaje real (las reglas no consultan): solo afecta a esa
+    //     conversación. (La migración del commit 2 escribe el de mensajes
+    //     viejos, por eso la hora puede ser pasada y el remitente el otro.)
+    //   - writers y lastReadAt: cada quien solo toca su propia entrada
+    //     (writers decidirá a quién se le puede responder, commits 4 y 5).
+    function resumenDeChatValido(chatId, antes) {
+      let d = request.resource.data;
+      let par = chatId.split('_');
+      let yo = request.auth.uid;
+      let tocaUltimo = d.diff(antes).affectedKeys().hasAny(['lastMessageAt', 'lastSenderId', 'lastType', 'lastText']);
+      return d.keys().hasOnly(['participants', 'lastMessageAt', 'lastSenderId', 'lastType', 'lastText', 'writers', 'lastReadAt'])
+        && d.participants is list
+        && d.participants.size() == 2
+        && d.participants.hasAll(par)
+        && (!tocaUltimo || (
+          d.lastMessageAt is timestamp
+          && d.lastMessageAt <= request.time
+          && d.lastSenderId in par
+          && d.lastType in ['text', 'audio', 'image', 'sticker', 'gift', 'shared_post', 'moment_reply']
+          && textoValido(d.lastText, 120)
+        ))
+        && soloMiEntrada(antes.get('writers', {}), d.get('writers', {}))
+        && d.get('writers', {}).get(yo, true) == true
+        && soloMiEntrada(antes.get('lastReadAt', {}), d.get('lastReadAt', {}))
+        // Si cambia mi lastReadAt, es la hora del servidor (no se borra).
+        && (!d.get('lastReadAt', {}).diff(antes.get('lastReadAt', {})).affectedKeys().hasAny([yo])
+          || d.get('lastReadAt', {}).get(yo, null) == request.time);
+    }
+
+    // En un mapa { uid: valor }, solo cambia (o se agrega) la entrada de
+    // quien escribe.
+    function soloMiEntrada(antes, despues) {
+      return despues is map && despues.diff(antes).affectedKeys().hasOnly([request.auth.uid]);
+    }
+
     // Respaldo del lado del servidor a la verificación de mayoría de edad
     // que ya hace el cliente (AuthProfile.jsx, calculateAge()). Sin esto,
     // alguien podía saltarse el paso 2 del registro llamando directamente
@@ -527,9 +571,25 @@ service cloud.firestore {
     // chats/{chatId}  y  chats/{chatId}/messages/{messageId}
     // --------------------------------------------------------------------
     match /chats/{chatId} {
-      // El documento "padre" del chat (solo guarda participants: [uidA,uidB])
-      // solo lo pueden leer y escribir esos dos participantes.
-      allow read, write: if esParticipanteDelChat(chatId);
+      // El documento "padre" del chat: participants y, desde el punto 84,
+      // el resumen de la conversación (ver chatMessages.js). Solo lo leen
+      // sus dos participantes. "get" por el id, como siempre; "list" (la
+      // lista de conversaciones recientes, commit 3: where participants
+      // array-contains yo) en términos de resource.data, para que la
+      // consulta sea demostrable — mismo motivo que blocks/{blockId}. Por
+      // eso participants tiene que ser siempre el par del id
+      // (resumenDeChatValido): si no, alguien podría meter un chat en la
+      // lista de otra persona.
+      allow get: if esParticipanteDelChat(chatId);
+      allow list: if estaAutenticado() && request.auth.uid in resource.data.participants;
+
+      allow create: if esParticipanteDelChat(chatId)
+        && resumenDeChatValido(chatId, {});
+      allow update: if esParticipanteDelChat(chatId)
+        && resumenDeChatValido(chatId, resource.data);
+
+      // Nadie borra una conversación (la app no lo ofrece).
+      allow delete: if false;
 
       match /messages/{messageId} {
         // Solo los dos participantes de la conversación ven los mensajes

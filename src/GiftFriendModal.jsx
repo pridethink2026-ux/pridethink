@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { db } from "./firebase";
-import { addDoc, collection, doc, increment, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, increment, serverTimestamp, updateDoc } from "firebase/firestore";
 import Avatar from "./Avatar";
-import { notify, getChatId } from "./utils";
+import { notify } from "./utils";
+import { sendChatMessage } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
@@ -16,8 +17,8 @@ import { useMyFollows } from "./FollowsContext";
   criterio de "quién es visible" que ya usa Chat.jsx, tocar un contacto
   confirma la acción): al tocar un contacto, crea el registro en
   giftShares/{giftId} Y un mensaje { type: "gift" } en
-  chats/{chatId}/messages (mismo chatId que arma Chat.jsx, vía
-  getChatId), suma 1 a products/{productId}.giftCount (carve-out de
+  chats/{chatId}/messages (con sendChatMessage de chatMessages.js, que
+  además actualiza el resumen del chat — punto 84), suma 1 a products/{productId}.giftCount (carve-out de
   firestore.rules que permite a cualquier autenticado tocar SOLO ese
   campo) y notifica como un mensaje normal — Chat.jsx (MessageBubble)
   reconoce message.type === "gift" y renderiza GiftNotification en vez
@@ -192,13 +193,7 @@ export default function GiftFriendModal({ product, currentUid, myProfile, onClos
     : visibleContacts;
 
   const handleGift = async (contact) => {
-    const chatId = getChatId(currentUid, contact.uid);
     const trimmedMessage = message.trim();
-    await setDoc(
-      doc(db, "chats", chatId),
-      { participants: [currentUid, contact.uid] },
-      { merge: true }
-    );
     const giftRef = await addDoc(collection(db, "giftShares"), {
       productId: product.id,
       productTitle: product.title,
@@ -211,15 +206,14 @@ export default function GiftFriendModal({ product, currentUid, myProfile, onClos
       status: "sent",
       createdAt: serverTimestamp(),
     });
-    await addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: currentUid,
+    // Mensaje y resumen del chat juntos (chatMessages.js, punto 84).
+    await sendChatMessage(currentUid, contact.uid, {
       type: "gift",
       giftId: giftRef.id,
       productId: product.id,
       productTitle: product.title,
       productPrice: product.price,
       message: trimmedMessage,
-      createdAt: serverTimestamp(),
     });
     await updateDoc(doc(db, "products", product.id), { giftCount: increment(1) });
     await notify(contact.uid, {

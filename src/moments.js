@@ -1,8 +1,8 @@
-import { Timestamp, addDoc, collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { Timestamp, collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { db } from "./firebase";
 import { storage } from "./firebaseStorage";
-import { getChatId } from "./utils";
+import { sendChatMessage } from "./chatMessages";
 
 /*
   moments.js
@@ -233,17 +233,14 @@ export async function publishMoment(uid, blob, myIndex, caption = "", music = nu
 // del vencimiento: Chat.jsx deja de mostrar la foto cuando el momento
 // vence, sin volver a leerlo. firestore.rules (respuestaAMomentoValida)
 // comprueba que la copia coincida y que el momento se pueda ver hoy.
+// Mensaje y resumen del chat van juntos (sendChatMessage, punto 84).
 export async function sendMomentReply(uid, moment, text) {
-  const chatId = getChatId(uid, moment.authorId);
-  await setDoc(doc(db, "chats", chatId), { participants: [uid, moment.authorId] }, { merge: true });
-  await addDoc(collection(db, "chats", chatId, "messages"), {
-    senderId: uid,
+  await sendChatMessage(uid, moment.authorId, {
     type: "moment_reply",
     text: text.slice(0, MAX_REPLY_LENGTH),
     momentId: moment.id,
     momentImageURL: moment.imageURL,
     momentExpireAt: moment.expireAt,
-    createdAt: serverTimestamp(),
   });
 }
 

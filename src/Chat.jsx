@@ -7,17 +7,15 @@ import {
   collection,
   doc,
   onSnapshot,
-  addDoc,
   query,
   orderBy,
-  serverTimestamp,
-  setDoc,
   updateDoc,
   deleteField,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Avatar from "./Avatar";
 import { notify, useIsMobile, getChatId } from "./utils";
+import { newMessageId, sendChatMessage } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
 import { isEffectivelyOnline, formatLastSeen, usePresences } from "./presence";
@@ -39,6 +37,8 @@ import ImageEditor from "./ImageEditor";
   - "chats/{chatId}/messages/{msgId}"    -> mensajes de una conversación
       chatId = los dos UID ordenados alfabéticamente y unidos con "_"
       (así dos personas siempre llegan al mismo chatId, sin duplicados)
+  - "chats/{chatId}"                     -> resumen de la conversación
+      (último mensaje, hora, quién escribió; ver chatMessages.js, punto 84)
 
   Todo es en tiempo real: usa onSnapshot, no hace falta recargar la página
   para ver mensajes nuevos ni contactos nuevos.
@@ -66,8 +66,8 @@ import ImageEditor from "./ImageEditor";
   32kbps). Sube a "chatImages/{chatId}/{messageId}/img.jpg" — el
   messageId se genera del lado del cliente ANTES de crear el mensaje
   (mismo patrón que "postId"/"productId" en Feed.jsx/
-  CreateProductScreen.jsx), así que el mensaje se crea con setDoc en vez
-  de addDoc. El envío sigue el mismo esqueleto que una nota de voz:
+  CreateProductScreen.jsx), y se le pasa a sendChatMessage (chatMessages.js,
+  punto 84), que crea el mensaje y el resumen del chat juntos. El envío sigue el mismo esqueleto que una nota de voz:
   elegir el archivo abre ImageEditor.jsx (punto 65: girar/recortar), y
   "Usar foto" lo deja "listo" para confirmar o cancelar (pendingImage),
   nunca se sube directo — ver
@@ -1246,19 +1246,10 @@ export default function Chat({
         return;
       }
 
-      const chatId = getChatId(currentUid, activeContact.uid);
-      await setDoc(
-        doc(db, "chats", chatId),
-        { participants: [currentUid, activeContact.uid] },
-        { merge: true }
-      );
-
-      await addDoc(collection(db, "chats", chatId, "messages"), {
-        senderId: currentUid,
+      await sendChatMessage(currentUid, activeContact.uid, {
         type: "audio",
         audioData: dataUrl,
         audioDuration: duration,
-        createdAt: serverTimestamp(),
       });
 
       await notify(activeContact.uid, {
@@ -1324,30 +1315,19 @@ export default function Chat({
   // genera del lado del cliente ANTES de crear el mensaje (mismo problema
   // y misma solución que "postId"/"productId" en Feed.jsx/
   // CreateProductScreen.jsx: la ruta de Storage necesita un id que
-  // Firestore recién asignaría en addDoc), así que acá se usa setDoc con
-  // ese id en vez de addDoc.
+  // Firestore recién asignaría al crearlo), así que acá se genera antes
+  // (newMessageId) y se le pasa a sendChatMessage.
   const sendPendingImage = async () => {
     if (!pendingImage || !activeContact || !currentUid) return;
     setSendingImage(true);
     try {
       const chatId = getChatId(currentUid, activeContact.uid);
-      await setDoc(
-        doc(db, "chats", chatId),
-        { participants: [currentUid, activeContact.uid] },
-        { merge: true }
-      );
-
-      const messageId = doc(collection(db, "chats", chatId, "messages")).id;
+      const messageId = newMessageId(chatId);
       const fileRef = ref(storage, `chatImages/${chatId}/${messageId}/img.jpg`);
       await uploadBytes(fileRef, pendingImage.blob, { contentType: "image/jpeg" });
       const imageUrl = await getDownloadURL(fileRef);
 
-      await setDoc(doc(db, "chats", chatId, "messages", messageId), {
-        senderId: currentUid,
-        type: "image",
-        imageUrl,
-        createdAt: serverTimestamp(),
-      });
+      await sendChatMessage(currentUid, activeContact.uid, { type: "image", imageUrl }, messageId);
 
       await notify(activeContact.uid, {
         type: "message",
@@ -1369,21 +1349,8 @@ export default function Chat({
     e.preventDefault();
     if (!text.trim() || !activeContact || !currentUid) return;
 
-    const chatId = getChatId(currentUid, activeContact.uid);
-
-    // Aseguramos que el documento "padre" del chat exista (útil a futuro
-    // para listar conversaciones recientes, no estrictamente necesario ahora)
-    await setDoc(
-      doc(db, "chats", chatId),
-      { participants: [currentUid, activeContact.uid] },
-      { merge: true }
-    );
-
-    await addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: currentUid,
-      text: text.trim(),
-      createdAt: serverTimestamp(),
-    });
+    // Mensaje y resumen de la conversación juntos (chatMessages.js, punto 84).
+    await sendChatMessage(currentUid, activeContact.uid, { text: text.trim() });
 
     // Notifica al destinatario que le llegó un mensaje nuevo
     await notify(activeContact.uid, {
@@ -1400,19 +1367,7 @@ export default function Chat({
     setStickerPanelOpen(false);
     if (!activeContact || !currentUid) return;
 
-    const chatId = getChatId(currentUid, activeContact.uid);
-    await setDoc(
-      doc(db, "chats", chatId),
-      { participants: [currentUid, activeContact.uid] },
-      { merge: true }
-    );
-
-    await addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: currentUid,
-      type: "sticker",
-      stickerId,
-      createdAt: serverTimestamp(),
-    });
+    await sendChatMessage(currentUid, activeContact.uid, { type: "sticker", stickerId });
 
     await notify(activeContact.uid, {
       type: "message",

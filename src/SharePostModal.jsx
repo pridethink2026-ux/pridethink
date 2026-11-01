@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { db } from "./firebase";
-import { collection, doc, setDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import Avatar from "./Avatar";
-import { notify, getChatId } from "./utils";
+import { notify } from "./utils";
+import { sendChatMessage } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
@@ -18,8 +17,8 @@ import { useAllUsers } from "./Mentions";
   FollowListModal.jsx, etc. para ese mismo filtro.
 
   Al elegir un contacto, crea un mensaje { senderId, type: "shared_post",
-  sharedPostId, createdAt } en chats/{chatId}/messages (mismo chatId que
-  arma Chat.jsx, importado de ahí con getChatId) y notifica como un
+  sharedPostId, createdAt } en chats/{chatId}/messages con
+  sendChatMessage (chatMessages.js, punto 84) y notifica como un
   mensaje normal. NO copia el contenido del post en el mensaje — la vista
   previa se resuelve en vivo del lado de Chat.jsx (ver SharedPostPreview).
 */
@@ -146,18 +145,8 @@ export default function SharePostModal({ post, currentUid, myProfile, onClose })
     : visibleContacts;
 
   const handleShare = async (contact) => {
-    const chatId = getChatId(currentUid, contact.uid);
-    await setDoc(
-      doc(db, "chats", chatId),
-      { participants: [currentUid, contact.uid] },
-      { merge: true }
-    );
-    await addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: currentUid,
-      type: "shared_post",
-      sharedPostId: post.id,
-      createdAt: serverTimestamp(),
-    });
+    // Mensaje y resumen del chat juntos (chatMessages.js, punto 84).
+    await sendChatMessage(currentUid, contact.uid, { type: "shared_post", sharedPostId: post.id });
     await notify(contact.uid, {
       type: "message",
       fromUid: currentUid,
