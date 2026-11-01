@@ -1,9 +1,8 @@
 import { useEffect, useRef } from "react";
 import {
-  arrayRemove,
-  arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDocs,
   query,
@@ -31,12 +30,12 @@ import { db } from "./firebase";
   la fila a las dos personas involucradas o, si quien sigue no es
   privado, a cualquiera — así las consultas siguen siendo demostrables.
 
-  Commit 1 de 4 (escritura doble): el arreglo users/{uid}.following sigue
-  siendo la fuente de verdad y lo siguen leyendo todas las pantallas; acá
-  solo se escribe, además, la fila de follows. Si esa segunda escritura
-  falla (por ejemplo, reglas sin publicar), seguir/dejar de seguir
-  funciona igual y reconcileMyFollows lo corrige al próximo inicio de
-  sesión.
+  Commit 1 de 4 escribía las dos cosas; commit 2 pasó todas las lecturas a
+  follows/ (FollowsContext.jsx). Desde el commit 3, follows/ es la única
+  fuente de verdad: seguir/dejar de seguir escribe solo la fila, y el
+  arreglo viejo se copia una última vez y se borra de users/{uid} al
+  iniciar sesión (repairMyFollows), que es lo que cierra la fuga para esa
+  cuenta.
 */
 
 export function getFollowId(followerUid, followedUid) {
@@ -44,46 +43,33 @@ export function getFollowId(followerUid, followedUid) {
 }
 
 export async function followUser(myUid, theirUid, myIsPrivate) {
-  await updateDoc(doc(db, "users", myUid), { following: arrayUnion(theirUid) });
-  try {
-    await setDoc(doc(db, "follows", getFollowId(myUid, theirUid)), {
-      follower: myUid,
-      followed: theirUid,
-      followerIsPrivate: !!myIsPrivate,
-      createdAt: serverTimestamp(),
-    });
-  } catch (err) {
-    console.error("follows: no se pudo crear la fila", err.code);
-  }
+  await setDoc(doc(db, "follows", getFollowId(myUid, theirUid)), {
+    follower: myUid,
+    followed: theirUid,
+    followerIsPrivate: !!myIsPrivate,
+    createdAt: serverTimestamp(),
+  });
 }
 
 export async function unfollowUser(myUid, theirUid) {
-  await updateDoc(doc(db, "users", myUid), { following: arrayRemove(theirUid) });
-  try {
-    await deleteDoc(doc(db, "follows", getFollowId(myUid, theirUid)));
-  } catch (err) {
-    console.error("follows: no se pudo borrar la fila", err.code);
-  }
+  await deleteDoc(doc(db, "follows", getFollowId(myUid, theirUid)));
 }
 
-// Deja tus filas de follows iguales al arreglo "following": crea las que
-// faltan, borra las que sobran y corrige followerIsPrivate. Es la
-// migración (cada cuenta se migra sola al iniciar sesión, sin claves de
-// administrador) y también repara cualquier escritura doble que haya
-// fallado. En lotes de hasta 500, como syncPostsPrivacyField.
-export async function reconcileMyFollows(myUid, following, myIsPrivate) {
-  const wanted = new Set((following || []).filter((uid) => uid && uid !== myUid));
+// Una vez por sesión: corrige followerIsPrivate en tus filas (por si
+// falló syncFollowsPrivacy) y, si tu perfil todavía tiene el arreglo
+// "following" (cuenta sin migrar, o una pestaña vieja que lo volvió a
+// escribir), crea las filas que falten y recién después borra el arreglo
+// — si algo falla antes, el arreglo queda y se reintenta al próximo
+// inicio de sesión. Nunca borra filas: desde el commit 3 el arreglo ya no
+// manda. En lotes de hasta 500, como syncPostsPrivacyField.
+export async function repairMyFollows(myUid, legacyFollowing, myIsPrivate) {
+  const wanted = new Set((legacyFollowing || []).filter((uid) => uid && uid !== myUid));
   const snap = await getDocs(query(collection(db, "follows"), where("follower", "==", myUid)));
   const ops = [];
   snap.docs.forEach((d) => {
-    const followed = d.data().followed;
-    if (!wanted.has(followed)) {
-      ops.push((batch) => batch.delete(d.ref));
-    } else {
-      wanted.delete(followed);
-      if (d.data().followerIsPrivate !== !!myIsPrivate) {
-        ops.push((batch) => batch.update(d.ref, { followerIsPrivate: !!myIsPrivate }));
-      }
+    wanted.delete(d.data().followed);
+    if (d.data().followerIsPrivate !== !!myIsPrivate) {
+      ops.push((batch) => batch.update(d.ref, { followerIsPrivate: !!myIsPrivate }));
     }
   });
   wanted.forEach((followed) => {
@@ -100,6 +86,9 @@ export async function reconcileMyFollows(myUid, following, myIsPrivate) {
     const batch = writeBatch(db);
     ops.slice(i, i + 500).forEach((op) => op(batch));
     await batch.commit();
+  }
+  if (legacyFollowing !== undefined) {
+    await updateDoc(doc(db, "users", myUid), { following: deleteField() });
   }
 }
 
@@ -123,8 +112,8 @@ export function useFollowsMigration(myUid, myProfile) {
   useEffect(() => {
     if (!myUid || !myProfile || doneFor.current === myUid) return;
     doneFor.current = myUid;
-    reconcileMyFollows(myUid, myProfile.following, myProfile.isPrivate).catch((err) =>
-      console.error("follows: no se pudo migrar", err.code)
+    repairMyFollows(myUid, myProfile.following, myProfile.isPrivate).catch((err) =>
+      console.error("follows: no se pudo reparar", err.code)
     );
   }, [myUid, myProfile]);
 }

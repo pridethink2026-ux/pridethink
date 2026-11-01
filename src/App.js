@@ -711,8 +711,8 @@ function App() {
   const myProfile = useUserProfile(currentUid);
   const myIdentity = myProfile?.identity || "";
 
-  // Fuga B (punto 82, commit 1): copia tu "following" a follows/ una vez
-  // por sesión — ver follows.js.
+  // Fuga B (punto 82): una vez por sesión, repara tus filas de follows/ y
+  // copia y borra el arreglo "following" viejo si quedó — ver follows.js.
   useFollowsMigration(currentUid, myProfile);
 
   // Las cinco vistas superpuestas (perfil público, guardados, post

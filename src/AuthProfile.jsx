@@ -473,7 +473,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     }
     try {
       // Fuga B (punto 82): misma copia en tus filas de follows. Si falla,
-      // la corrige reconcileMyFollows al próximo inicio de sesión.
+      // la corrige repairMyFollows al próximo inicio de sesión.
       await syncFollowsPrivacy(uid, newValue);
     } catch (err) {
       // silencioso a propósito, ver comentario de arriba.

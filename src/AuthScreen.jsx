@@ -458,7 +458,6 @@ export default function AuthScreen({ needsIdentity }) {
     const profile = {
       isPrivate: false,
       isWallPrivate: false,
-      following: [],
       // Timestamp de Firestore, NUNCA un string ya formateado — así se
       // puede mostrar en el idioma activo al vuelo (formatMonthYear en
       // utils.js), en vez de quedar congelado en el idioma que estaba
