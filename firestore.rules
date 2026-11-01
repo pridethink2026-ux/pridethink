@@ -132,7 +132,8 @@ service cloud.firestore {
     // en ninguna dirección, y el perfil no es privado o hay seguimiento
     // mutuo. Las reglas dependen del uid de la ruta, así que la colección
     // no se puede consultar entera: el cliente escucha documento por
-    // documento.
+    // documento. El seguimiento mutuo se mira en follows/ (fuga B, punto
+    // 82; antes, en users/{uid}.following).
     function puedeVerPresenciaDe(uid) {
       let yo = request.auth.uid;
       let perfil = get(/databases/$(database)/documents/users/$(uid)).data;
@@ -140,8 +141,8 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/blocks/$(yo + '_' + uid))
         && (
           perfil.get('isPrivate', false) != true
-          || (uid in get(/databases/$(database)/documents/users/$(yo)).data.get('following', [])
-            && yo in perfil.get('following', []))
+          || (exists(/databases/$(database)/documents/follows/$(yo + '_' + uid))
+            && exists(/databases/$(database)/documents/follows/$(uid + '_' + yo)))
         );
     }
 
@@ -260,13 +261,13 @@ service cloud.firestore {
     // Visibilidad (decisión del punto 66: "seguidores"): el autor siempre
     // ve los suyos; los demás, solo si el perfil del autor no es privado
     // (mismo criterio que isPrivateForMe en UserProfile.jsx — isWallPrivate
-    // NO oculta momentos), si lo siguen (su propio users/{uid}.following) y
-    // si no hay bloqueo en ninguna dirección.
+    // NO oculta momentos), si lo siguen (su fila follows/{yo}_{autor}, fuga
+    // B, punto 82) y si no hay bloqueo en ninguna dirección.
     function puedeVerMomentosDe(autorUid) {
       let yo = request.auth.uid;
       return autorUid == yo || (
         get(/databases/$(database)/documents/users/$(autorUid)).data.get('isPrivate', false) != true
-        && autorUid in get(/databases/$(database)/documents/users/$(yo)).data.get('following', [])
+        && exists(/databases/$(database)/documents/follows/$(yo + '_' + autorUid))
         && !exists(/databases/$(database)/documents/blocks/$(autorUid + '_' + yo))
         && !exists(/databases/$(database)/documents/blocks/$(yo + '_' + autorUid))
       );

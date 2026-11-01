@@ -81,12 +81,12 @@ export const TIERS = [
 // MyStoreScreen.jsx (botón "Publicar" de un borrador ya existente) — y
 // así ninguno de los dos repite la consulta ni el bucle.
 //
-// "Seguidor de X" = cualquier usuario cuyo "following" contenga el uid
-// de X (mismo criterio que ya usa UserProfile.jsx para contar
-// seguidores) — no existe una colección "follows" aparte, "following"
-// vive en el propio users/{uid}. Una notificación por seguidor, con
-// Promise.all (mismo patrón que ya usa Feed.jsx para notificar a varias
-// personas mencionadas a la vez).
+// "Seguidor de X" = cada fila follows/{seguidor}_{X} (fuga B, punto 82;
+// antes, una consulta array-contains sobre users/{uid}.following). Quien
+// llama es el propio vendedor, así que las reglas le dejan leer todas sus
+// filas, también las de seguidores privados. Una notificación por
+// seguidor, con Promise.all (mismo patrón que ya usa Feed.jsx para
+// notificar a varias personas mencionadas a la vez).
 export async function notifyFollowersOfNewProduct({
   sellerId,
   sellerName,
@@ -95,11 +95,11 @@ export async function notifyFollowersOfNewProduct({
   productTitle,
 }) {
   const snap = await getDocs(
-    query(collection(db, "users"), where("following", "array-contains", sellerId))
+    query(collection(db, "follows"), where("followed", "==", sellerId))
   );
   await Promise.all(
     snap.docs.map((d) =>
-      notify(d.id, {
+      notify(d.data().follower, {
         type: "newProduct",
         fromUid: sellerId,
         fromName: sellerName || "Alguien",

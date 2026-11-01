@@ -4,6 +4,7 @@ import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useBlocksContext } from "./BlocksContext";
+import { useMyFollows } from "./FollowsContext";
 import { isBlockedEitherWay } from "./Blocks";
 import { getActiveEntries } from "./moments";
 
@@ -72,6 +73,8 @@ export function MomentsProvider({ children }) {
   const dirtyRef = useRef(false);
   const allUsers = useAllUsersContext();
   const { blockedByMe, blockedMe } = useBlocksContext();
+  // A quién sigo, de follows/ (fuga B, punto 82), no de users/{uid}.following.
+  const { following } = useMyFollows();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => setCurrentUid(user ? user.uid : null));
@@ -144,8 +147,6 @@ export function MomentsProvider({ children }) {
     allUsers.forEach((u) => {
       usersMap[u.uid] = u;
     });
-    const following = usersMap[currentUid]?.following || [];
-
     const canSee = (uid) => {
       if (uid === currentUid) return true;
       const author = usersMap[uid];
@@ -199,7 +200,7 @@ export function MomentsProvider({ children }) {
       markSeen,
       flushSeen,
     };
-  }, [indexes, seen, now, allUsers, currentUid, blockedByMe, blockedMe, markSeen, flushSeen]);
+  }, [indexes, seen, now, allUsers, following, currentUid, blockedByMe, blockedMe, markSeen, flushSeen]);
 
   return <MomentsContext.Provider value={value}>{children}</MomentsContext.Provider>;
 }

@@ -21,7 +21,8 @@ import FollowListModal from "./FollowListModal";
 import ProfileAbout from "./ProfileAbout";
 import VerifiedBadge from "./VerifiedBadge";
 import { useLanguage } from "./LanguageContext";
-import { useFollowerUids, useUserProfile } from "./AllUsersContext";
+import { useUserProfile } from "./AllUsersContext";
+import { useMyFollows } from "./FollowsContext";
 import { markOffline } from "./presence";
 import { syncFollowsPrivacy } from "./follows";
 import { unblockUser, useMyBlocks } from "./Blocks";
@@ -107,14 +108,16 @@ function ProfileView({
 }) {
   const { language, setLanguage, t } = useLanguage();
   const { blockedByMe: blockedUsers } = useMyBlocks(uid);
-  // Seguidores = usuarios cuyo "following" contiene tu uid, de
-  // AllUsersContext (punto 70, commit 9c; antes, una consulta propia que
-  // cada latido de presencia de un seguidor volvía a leer).
-  const followersCount = useFollowerUids(uid).length;
+  // Seguidores y seguidos de follows/ (fuga B, punto 82), de los dos
+  // listeners que FollowsContext.jsx ya tiene abiertos para toda la app.
+  // Tus seguidores incluyen a los privados: las reglas te dejan leer toda
+  // fila que te nombra.
+  const { following: myFollowing, followers: myFollowers } = useMyFollows();
+  const followersCount = myFollowers.length;
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
   const [profileTab, setProfileTab] = useState("info"); // "info" | "posts"
   const [myPosts, setMyPosts] = useState([]);
-  const followingCount = (user.following || []).length;
+  const followingCount = myFollowing.length;
 
   // Pestaña "Posts": TODOS tus propios posts, sin filtrar por
   // authorIsPrivate/authorIsWallPrivate (sos el dueño, siempre te ves a vos

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
-import { useAllUsersReady, useFollowerUids, useUserProfile } from "./AllUsersContext";
+import { useAllUsersReady, useUserProfile } from "./AllUsersContext";
+import { useFollowUids, useMyFollows } from "./FollowsContext";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -36,8 +37,9 @@ import { useLanguage } from "./LanguageContext";
     ya se usa en Chat.jsx y Feed.jsx para ocultar contactos/posts), el
     perfil no se puede ver en absoluto.
   - Si el perfil es privado (isPrivate) y no eres tú, se muestra lo mínimo
-    (avatar, nombre, identidad, contadores) con un aviso, sin publicaciones
-    y sin la sección "Acerca de".
+    (avatar, nombre, identidad) con un aviso, sin publicaciones, sin la
+    sección "Acerca de" y, desde el punto 82, sin contadores ni listas de
+    seguidores/seguidos ("🔒 Perfil privado" en su lugar).
   - El puntito de "en línea" sobre el avatar (ver presence.js) respeta esa
     misma privacidad: si el perfil es privado, solo se muestra si hay
     seguimiento MUTUO entre vos y esa persona (`canSeeOnlineStatus`) — a
@@ -46,13 +48,12 @@ import { useLanguage } from "./LanguageContext";
     solo se escucha si `canSeeOnlineStatus` lo permite y no hay bloqueo,
     para no pedir algo que el servidor va a rechazar.
 
-  "following" vive en users/{uid}.following: [uid...]. Los seguidores de
-  un usuario NO se guardan aparte: se derivan en tiempo real con una
-  consulta array-contains sobre following. Los bloqueos, a diferencia de
-  following, viven en su propia colección "blocks/{blockerUid}_{blockedUid}"
-  (ver Blocks.js) — no en un arreglo dentro de users/{uid} — para que
-  nadie más que las dos personas involucradas pueda leer quién bloqueó a
-  quién (ver auditoría de seguridad, 2026-07-28).
+  Seguir vive en "follows/{followerUid}_{followedUid}" (fuga B, punto 82;
+  ver follows.js y FollowsContext.jsx), igual que los bloqueos viven en
+  "blocks/{blockerUid}_{blockedUid}" (ver Blocks.js): no en un arreglo
+  dentro de users/{uid}, que lee cualquier autenticado, para que nadie
+  pueda leer a quién sigue un perfil privado. Los contadores se derivan en
+  vivo de esas filas, no se guardan aparte.
 */
 
 const styles = {
@@ -181,12 +182,11 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const [currentUid, setCurrentUid] = useState(null);
   // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
   const myProfile = useUserProfile(currentUid);
-  // El perfil que se mira y sus seguidores, también de AllUsersContext
-  // (punto 70, commit 9c): antes, un listener sobre users/{uid} y una
-  // consulta de seguidores, que cada latido de presencia volvía a leer.
+  // El perfil que se mira, también de AllUsersContext (punto 70, commit
+  // 9c): antes, un listener sobre users/{uid} que cada latido de presencia
+  // volvía a leer.
   const profileUser = useUserProfile(uid);
   const profileLoading = !useAllUsersReady();
-  const followersCount = useFollowerUids(uid).length;
   const [posts, setPosts] = useState([]);
   const [followModal, setFollowModal] = useState(null); // null | "followers" | "following"
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
@@ -217,6 +217,12 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const isBlocked = isBlockedEitherWay(blockedByMe, blockedMe, uid);
   const isPrivateForMe = !!profileUser?.isPrivate && !isMe;
+  // Contadores de follows/ (fuga B, punto 82). En un perfil privado ajeno
+  // ni se piden (uid null): se ocultan, mismo criterio que "Acerca de".
+  const countsUid = isPrivateForMe ? null : uid;
+  const followersCount = useFollowUids(countsUid, "followers").uids.length;
+  const followingCount = useFollowUids(countsUid, "following").uids.length;
+  const { following: myFollowing, followers: myFollowers } = useMyFollows();
   // isWallPrivate es independiente de isPrivate: solo oculta la lista de
   // publicaciones (el resto del perfil sigue visible), mientras que
   // isPrivate ya ocultaba el muro además de otras cosas (chat, feed
@@ -259,9 +265,8 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
     return unsub;
   }, [uid, isBlocked, isWallHidden, isMe]);
 
-  const isFollowing = (myProfile?.following || []).includes(uid);
-  const followingCount = (profileUser?.following || []).length;
-  const canSeeOnline = canSeeOnlineStatus(profileUser, uid, currentUid, myProfile?.following || []);
+  const isFollowing = myFollowing.includes(uid);
+  const canSeeOnline = canSeeOnlineStatus(profileUser, uid, currentUid, myFollowing, myFollowers);
   const presence = usePresence(canSeeOnline && !isBlocked ? uid : null);
 
   const handleUnblock = async () => {
@@ -391,16 +396,22 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
             </p>
           )}
 
-          <div style={styles.countsRow}>
-            <div style={styles.countItem} onClick={() => setFollowModal("followers")}>
-              <p style={styles.countNumber}>{followersCount}</p>
-              <p style={styles.countLabel}>{t("profile.followers")}</p>
+          {isPrivateForMe ? (
+            <div style={styles.countsRow}>
+              <p style={styles.countLabel}>🔒 {t("profile.privateProfile")}</p>
             </div>
-            <div style={styles.countItem} onClick={() => setFollowModal("following")}>
-              <p style={styles.countNumber}>{followingCount}</p>
-              <p style={styles.countLabel}>{t("profile.following")}</p>
+          ) : (
+            <div style={styles.countsRow}>
+              <div style={styles.countItem} onClick={() => setFollowModal("followers")}>
+                <p style={styles.countNumber}>{followersCount}</p>
+                <p style={styles.countLabel}>{t("profile.followers")}</p>
+              </div>
+              <div style={styles.countItem} onClick={() => setFollowModal("following")}>
+                <p style={styles.countNumber}>{followingCount}</p>
+                <p style={styles.countLabel}>{t("profile.following")}</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {!isMe && currentUid && (
             <button className="pt-relief" style={styles.followBtn(isFollowing)} onClick={handleToggleFollow}>
@@ -443,7 +454,7 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
         />
       )}
 
-      {followModal && (
+      {followModal && !isPrivateForMe && (
         <FollowListModal
           mode={followModal}
           targetUid={uid}

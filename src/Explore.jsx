@@ -82,12 +82,12 @@ export function getPeopleSuggestions(
   users,
   currentUid,
   myProfile,
+  myFollowing,
   authorHashtagMap,
   blockedByMe,
   blockedMe,
   limitCount = SUGGESTIONS_LIMIT
 ) {
-  const myFollowing = myProfile?.following || [];
   const myWords = new Set(wordsOf(myProfile?.identity || ""));
   const myHashtags = authorHashtagMap[currentUid] || new Set();
 

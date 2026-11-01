@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { useAllUsersContext, useAllUsersReady, useFollowerUids, useUserProfile } from "./AllUsersContext";
+import { useAllUsersContext, useAllUsersReady } from "./AllUsersContext";
+import { useFollowUids } from "./FollowsContext";
 import Avatar from "./Avatar";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useLanguage } from "./LanguageContext";
@@ -11,17 +12,16 @@ import { useLanguage } from "./LanguageContext";
   reutilizable desde UserProfile.jsx (perfiles públicos) y AuthProfile.jsx
   (tu propio perfil).
 
-  mode="following": users/{targetUid}.following (el arreglo de uids que
-  esa persona sigue).
-  mode="followers": los usuarios cuyo "following" contiene targetUid
-  (quiénes la siguen). Ningún conteo se guarda como número aparte, todo se
-  deriva en vivo.
+  mode="following": a quién sigue targetUid; mode="followers": quiénes lo
+  siguen. Las dos listas salen de follows/ con useFollowUids
+  (FollowsContext.jsx, fuga B, punto 82) — ningún conteo se guarda como
+  número aparte, todo se deriva en vivo. UserProfile.jsx no abre este
+  modal en un perfil privado ajeno.
 
-  Todo sale de AllUsersContext (punto 70, commit 9c): antes, una consulta
-  más un onSnapshot por cada persona de la lista, que leían otra vez
-  documentos que esa lista ya tiene. Se filtra la lista final
-  para respetar bloqueos (en cualquier dirección) y perfiles privados, igual
-  que en Search.jsx y Chat.jsx.
+  Los perfiles de cada fila salen de AllUsersContext (punto 70, commit 9c).
+  Se filtra la lista final para respetar bloqueos (en cualquier dirección)
+  y perfiles privados, igual que en Search.jsx y Chat.jsx — salvo en TUS
+  seguidores, donde también ves a los privados (decisión del punto 82).
 */
 
 const styles = {
@@ -99,9 +99,8 @@ export default function FollowListModal({ mode, targetUid, currentUid, onClose, 
   const { t } = useLanguage();
   const allUsers = useAllUsersContext();
   const usersReady = useAllUsersReady();
-  const target = useUserProfile(targetUid);
-  const followerUids = useFollowerUids(targetUid);
-  const rawUids = mode === "following" ? target?.following || [] : followerUids;
+  const { uids: rawUids, ready: followsReady } = useFollowUids(targetUid, mode);
+  const showPrivate = mode === "followers" && targetUid === currentUid;
   const profiles = useMemo(() => {
     const map = {};
     allUsers.forEach((u) => {
@@ -111,13 +110,13 @@ export default function FollowListModal({ mode, targetUid, currentUid, onClose, 
   }, [allUsers]);
 
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
-  const stillResolving = !usersReady;
+  const stillResolving = !usersReady || !followsReady;
 
   const visible = rawUids
     .map((id) => profiles[id])
     .filter((p) => {
       if (!p) return false;
-      if (p.isPrivate) return false;
+      if (p.isPrivate && !showPrivate) return false;
       if (isBlockedEitherWay(blockedByMe, blockedMe, p.uid)) return false;
       return true;
     });

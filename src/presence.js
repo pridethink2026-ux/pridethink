@@ -201,12 +201,15 @@ export function formatLastSeen(user, t) {
 // Respeta la privacidad: si el perfil es privado, el estado en línea solo
 // se muestra al dueño (viéndose a sí mismo) o a alguien con seguimiento
 // MUTUO (ambos se siguen) — mismo criterio que "contacto" en esta app, que
-// no tiene un concepto de contactos separado del de seguir.
-export function canSeeOnlineStatus(targetUser, targetUid, viewerUid, viewerFollowing) {
+// no tiene un concepto de contactos separado del de seguir. viewerFollowing
+// y viewerFollowers son a quién sigue y quién sigue a quien mira
+// (useMyFollows de FollowsContext.jsx, punto 82): la lista de un perfil
+// privado ya no se puede leer, pero sí si esa persona te sigue a vos.
+export function canSeeOnlineStatus(targetUser, targetUid, viewerUid, viewerFollowing, viewerFollowers) {
   if (!targetUser) return false;
   if (viewerUid === targetUid) return true;
   if (!targetUser.isPrivate) return true;
   const iFollowThem = (viewerFollowing || []).includes(targetUid);
-  const theyFollowMe = (targetUser.following || []).includes(viewerUid);
+  const theyFollowMe = (viewerFollowers || []).includes(targetUid);
   return iFollowThem && theyFollowMe;
 }

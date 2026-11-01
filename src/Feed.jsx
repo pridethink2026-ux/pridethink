@@ -48,6 +48,7 @@ import Events from "./Events";
 import VerifiedBadge from "./VerifiedBadge";
 import WeatherWidget from "./Weather";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { useMyFollows } from "./FollowsContext";
 import { playReactionSound, playCommentSound } from "./sound";
 
 /*
@@ -85,7 +86,8 @@ import { playReactionSound, playCommentSound } from "./sound";
   se abre) y el contador es simplemente la cantidad real de documentos.
   Así nunca puede desincronizarse. Lo mismo aplica a "Siguiendo": no se
   guarda una lista de posts filtrados, se filtra en el momento comparando
-  contra myProfile.following (mismo patrón que el filtro de bloqueados).
+  contra a quién sigo (useMyFollows de FollowsContext.jsx, punto 82; antes
+  myProfile.following), mismo patrón que el filtro de bloqueados.
 
   Los hashtags se detectan al publicar (utils.extractHashtags) y se guardan
   en minúsculas en el post. Al tocar un hashtag dentro de un post se activa
@@ -1108,7 +1110,7 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     }
   };
 
-  const myFollowing = myProfile?.following || [];
+  const { following: myFollowing } = useMyFollows();
   const visiblePosts = posts.filter((p) => {
     if (p.groupId) return false; // los posts de grupo solo se ven dentro del grupo
     if (p.authorId === currentUid) return true; // siempre ves tus propios posts
@@ -1217,6 +1219,7 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
     Object.entries(usersMap).map(([uid, data]) => ({ uid, ...data })),
     currentUid,
     myProfile,
+    myFollowing,
     authorHashtagMap,
     blockedByMe,
     blockedMe

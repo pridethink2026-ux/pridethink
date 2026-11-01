@@ -46,8 +46,8 @@ import { auth, db } from "./firebase";
   Ahora salen de acá:
     - useUserProfile(uid): el perfil de uid (el tuyo u otro), null si
       todavía no llegó o no existe;
-    - useFollowerUids(uid): uids de quienes siguen a uid, los mismos que
-      devolvía esa consulta;
+    - (useFollowerUids salía de acá hasta el punto 82: seguidores y
+      seguidos ahora viven en follows/, ver FollowsContext.jsx);
     - useAllUsersReady(): ya llegó la primera respuesta (o falló), para
       distinguir "cargando" de "no existe".
 */
@@ -106,10 +106,3 @@ export function useUserProfile(uid) {
   return useMemo(() => (uid && users.find((u) => u.uid === uid)) || null, [users, uid]);
 }
 
-export function useFollowerUids(uid) {
-  const users = useContext(AllUsersContext);
-  return useMemo(
-    () => (uid ? users.filter((u) => (u.following || []).includes(uid)).map((u) => u.uid) : []),
-    [users, uid]
-  );
-}

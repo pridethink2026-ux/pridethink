@@ -6,6 +6,7 @@ import { notify, getChatId } from "./utils";
 import { useLanguage } from "./LanguageContext";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
+import { useMyFollows } from "./FollowsContext";
 
 /*
   GiftFriendModal
@@ -170,18 +171,13 @@ export default function GiftFriendModal({ product, currentUid, myProfile, onClos
 
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   // Contactos para regalar = follow MUTUO (yo sigo a esa persona Y esa
-  // persona me sigue a mí). No hay una colección "follows" aparte en esta
-  // app — "following" ya vive como campo en users/{uid} (ver
-  // UserProfile.jsx) — así que se calcula 100% en el cliente a partir de
-  // datos que ya están cargados: myProfile.following (a quién sigo) y el
-  // "following" de cada usuario en allUsers (quién me sigue a mí), sin
-  // ninguna consulta nueva a Firestore. useAllUsers() ya es un listener
-  // único compartido por toda la app (AllUsersContext.jsx), así que este
-  // cálculo tampoco agrega ninguna lectura extra ni se repite por render.
-  const myFollowing = myProfile?.following || [];
+  // persona me sigue a mí). Sale de los dos listeners de FollowsContext.jsx
+  // (fuga B, punto 82: a quién sigo y quién me sigue, de follows/), que ya
+  // están abiertos para toda la app — sin ninguna consulta nueva.
+  const { following: myFollowing, followers: myFollowers } = useMyFollows();
   const visibleContacts = allUsers.filter((c) => {
     if (!myFollowing.includes(c.uid)) return false;
-    if (!(c.following || []).includes(currentUid)) return false;
+    if (!myFollowers.includes(c.uid)) return false;
     if (isBlockedEitherWay(blockedByMe, blockedMe, c.uid)) return false;
     return true;
   });
