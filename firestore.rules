@@ -127,6 +127,17 @@ service cloud.firestore {
       return ['isOnline', 'lastSeen'];
     }
 
+    // Fuga B (punto 82, commit 4): "following" se mudó a follows/, así que
+    // no puede volver a users/{uid}: ni crearse con él, ni agregarse, ni
+    // cambiarse. A diferencia de camposDePresenciaViejos, SÍ se puede
+    // quitar: lo hace la propia app (repairMyFollows en follows.js) al
+    // iniciar sesión, después de copiarlo a follows/.
+    function noEscribeFollowingViejo() {
+      let cambios = request.resource.data.diff(resource.data);
+      return !cambios.addedKeys().hasAny(['following'])
+        && !cambios.changedKeys().hasAny(['following']);
+    }
+
     // Quién puede leer presence/{uid} (además del dueño): mismo criterio
     // que canSeeOnlineStatus (presence.js) más los bloqueos — sin bloqueo
     // en ninguna dirección, y el perfil no es privado o hay seguimiento
@@ -304,22 +315,22 @@ service cloud.firestore {
 
     // --------------------------------------------------------------------
     // users/{uid}
-    // Perfil de cada persona: nombre, identidad, privacidad, a quién
-    // bloqueaste (blockedUsers) y a quién sigues (following).
+    // Perfil público de cada persona: nombre, identidad, privacidad. A
+    // quién sigues vive en follows/ (fuga B, punto 82) y a quién
+    // bloqueaste en blocks/, no acá.
     // --------------------------------------------------------------------
     match /users/{uid} {
       // Cualquier persona con sesión iniciada puede leer cualquier perfil:
       // se necesita para el chat (lista de contactos), el muro (autores),
-      // los perfiles públicos, la búsqueda y los contadores de
-      // seguidores/seguidos (que se calculan consultando esta colección).
+      // los perfiles públicos y la búsqueda. Por eso nada privado puede
+      // vivir en este documento.
       allow read: if estaAutenticado();
 
       // Solo la propia persona puede crear o editar su documento
-      // (registro inicial, cambiar identidad, privacidad, bloquear a
-      // alguien, seguir a alguien). No se restringen campos individuales
-      // porque la app actualiza distintos subconjuntos de campos con
-      // merge:true (identidad, isPrivate, blockedUsers, following por
-      // separado) y siempre sobre tu propio documento — EXCEPTO
+      // (registro inicial, cambiar identidad, privacidad). No se
+      // restringen campos individuales porque la app actualiza distintos
+      // subconjuntos de campos con merge:true (identidad, isPrivate, etc.
+      // por separado) y siempre sobre tu propio documento — EXCEPTO
       // "isVerified" (badge de cuenta verificada), que es la única
       // excepción a propósito: nadie puede crear su documento con ese
       // campo (no puede llegar en true desde el registro), y ninguna
@@ -335,15 +346,18 @@ service cloud.firestore {
       // no puede crearse con ningún campo sensible. Al editar se mira solo
       // lo que cambia (diff), así un documento viejo que todavía tuviera
       // alguno de esos campos sigue pudiendo actualizar lo demás. Lo mismo
-      // para isOnline/lastSeen (commit 9g, camposDePresenciaViejos).
+      // para isOnline/lastSeen (commit 9g, camposDePresenciaViejos) y
+      // following (punto 82, noEscribeFollowingViejo: además se puede
+      // quitar).
       allow create: if esDueno(uid)
         && !('isVerified' in request.resource.data)
-        && !request.resource.data.keys().hasAny(camposSensiblesDePerfil().concat(camposDePresenciaViejos()))
+        && !request.resource.data.keys().hasAny(camposSensiblesDePerfil().concat(camposDePresenciaViejos()).concat(['following']))
         && privadoEsDeMayorDeEdad(uid)
         && camposDePerfilValidos(request.resource.data);
       allow update: if esDueno(uid)
         && request.resource.data.get('isVerified', false) == resource.data.get('isVerified', false)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposSensiblesDePerfil().concat(camposDePresenciaViejos()))
+        && noEscribeFollowingViejo()
         && camposDePerfilValidos(request.resource.data);
 
       // Nadie borra perfiles desde la app.
