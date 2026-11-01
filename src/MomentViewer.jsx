@@ -305,7 +305,7 @@ const styles = {
     borderRadius: "999px",
     border: "none",
     background: "var(--accent)",
-    opacity: disabled ? 0.5 : hover ? 0.85 : 1,
+    opacity: disabled ? "var(--disabled-opacity)" : hover ? 0.85 : 1, // punto 83
     color: "var(--bg)",
     fontSize: "14px",
     fontWeight: 600,
@@ -316,7 +316,9 @@ const styles = {
     margin: "0 12px 6px",
     fontSize: "12px",
     textAlign: "center",
-    color: isError ? "var(--accent2)" : "rgba(255,255,255,0.8)",
+    // --veil-error-text (punto 83): --accent2 salvo en Pinky, cuyo rosa
+    // oscuro no se lee sobre el negro del visor.
+    color: isError ? "var(--veil-error-text)" : "rgba(255,255,255,0.8)",
   }),
   viewersBtn: (hover) => ({
     padding: "8px 16px",
@@ -330,7 +332,7 @@ const styles = {
   }),
   // El botón de borrar y el error usan --accent2, como el resto de los
   // errores de la app (sobre el panel oscuro fijo de arriba).
-  confirmError: { margin: "0 0 12px", color: "var(--accent2)", fontSize: "13px" },
+  confirmError: { margin: "0 0 12px", color: "var(--veil-error-text)", fontSize: "13px" },
   confirmRow: { display: "flex", gap: "10px" },
   confirmBtn: (danger, hover) => ({
     flex: 1,

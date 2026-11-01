@@ -135,8 +135,9 @@ const styles = {
     fontWeight: 700,
     padding: "5px 12px",
     borderRadius: "999px",
-    background: isNew ? "rgba(34,197,94,0.15)" : "rgba(255,151,66,0.18)",
-    color: isNew ? "#22c55e" : "#ff9742",
+    // Variables del tema (punto 83), mismas que StoreScreen.jsx.
+    background: isNew ? "var(--badge-new-bg)" : "var(--badge-used-bg)",
+    color: isNew ? "var(--badge-new-text)" : "var(--badge-used-text)",
   }),
   pridePlusBadge: {
     fontSize: "12px",

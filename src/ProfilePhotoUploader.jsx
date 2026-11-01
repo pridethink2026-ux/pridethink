@@ -146,7 +146,7 @@ export default function ProfilePhotoUploader({ uid, photoURL }) {
     fontSize: "13px",
     fontWeight: 600,
     cursor: busy ? "default" : "pointer",
-    opacity: busy ? 0.6 : 1,
+    opacity: busy ? "var(--disabled-opacity)" : 1, // punto 83: se lee mientras sube
     display: "inline-flex",
     alignItems: "center",
     gap: "8px",

@@ -60,6 +60,26 @@ const EFFECT_DEFAULTS = {
   // propios para que se distinga de la barra en todos los temas.
   "--theme-btn-bg": "var(--surface)",
   "--theme-btn-border": "var(--text-muted)",
+  // Contraste de botones (punto 83). Opacidad de un botón desactivado
+  // (cargando, sin texto, etc.): la más baja con la que todos los
+  // desactivados de la app siguen en 4,5:1 o más; cada tema la sube si la
+  // necesita. Antes era 0,6 fijo (0,5 en "Enviar" de los Momentos), que no
+  // se leía en "Quitar" ni en "Agregar foto" en ningún tema.
+  "--disabled-opacity": "0.7",
+  // Botón activo o con hover en los editores de foto y texto de los
+  // Momentos, que van sobre un velo negro: el acento suave translúcido
+  // sirve con texto claro, pero no con el texto oscuro de un tema claro.
+  "--veil-active-bg": "var(--accent-soft)",
+  // Aviso del editor de texto de los Momentos, sobre ese mismo velo.
+  "--veil-notice-bg": "var(--accent2-soft)",
+  // Texto de error del visor de Momentos (negro y panel oscuro fijos).
+  "--veil-error-text": "var(--accent2)",
+  // Etiquetas de condición de la Tienda (Nuevo / Usado): verde y naranja
+  // fijos, como siempre; un tema claro los oscurece.
+  "--badge-new-bg": "rgba(34, 197, 94, 0.15)",
+  "--badge-new-text": "#22c55e",
+  "--badge-used-bg": "rgba(255, 151, 66, 0.18)",
+  "--badge-used-text": "#ff9742",
 };
 
 // Estrellas del fondo de Noche Violeta: puntos de degradado en dos mosaicos
@@ -126,6 +146,9 @@ const NOCHE_VARS = {
   "--unread-edge": "#ff8ac4",
   "--page-bg": "transparent",
   "--page-glare": `${NOCHE_STARS}, radial-gradient(30% 22% at 88% 6%, rgba(214, 196, 255, 0.16), rgba(214, 196, 255, 0) 70%), #0d0a24`,
+  // Punto 83: "Publicar" del editor y "Enviar" de los Momentos (lila
+  // claro con texto oscuro) piden un poco más.
+  "--disabled-opacity": "0.75",
 };
 
 // Atardecer (punto 75), "Brasas": fondo casi negro con un resplandor de
@@ -230,6 +253,10 @@ const OCEANO_VARS = {
   "--page-glare":
     "radial-gradient(140% 22% at 50% 102%, rgba(79, 240, 216, 0.13), rgba(79, 240, 216, 0) 70%), radial-gradient(120% 18% at 25% 92%, rgba(127, 212, 255, 0.1), rgba(127, 212, 255, 0) 70%), radial-gradient(130% 16% at 80% 83%, rgba(127, 212, 255, 0.07), rgba(127, 212, 255, 0) 70%), radial-gradient(120% 14% at 40% 74%, rgba(127, 212, 255, 0.04), rgba(127, 212, 255, 0) 70%), linear-gradient(180deg, #0a2a42 0%, #062033 100%)",
   "--shadow-rgb": "2, 10, 20",
+  // Punto 83: "Agregar foto" desactivado pide más sobre el azul, y el
+  // verde de "Nuevo" quedaba en 4,4 sobre las tarjetas.
+  "--disabled-opacity": "0.8",
+  "--badge-new-text": "#2fd46b",
 };
 
 // Arcoíris (punto 77), "Neón": fondo oscuro con resplandores de neón en
@@ -390,6 +417,18 @@ const PINKY_VARS = {
   "--page-glare":
     "radial-gradient(70% 40% at 15% 0%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%), radial-gradient(60% 40% at 90% 90%, rgba(255, 150, 190, 0.35), rgba(255, 150, 190, 0) 70%), #ffdbe5",
   "--shadow-rgb": "120, 20, 60",
+  // Punto 83: contraste sobre fondos claros. Desactivado casi opaco (la
+  // opacidad mezcla el texto ciruela con el rosa de atrás); en los editores
+  // de Momentos (velo negro) el botón activo es perla, como los
+  // principales; Nuevo / Usado en verde y naranja oscuros.
+  "--disabled-opacity": "0.85",
+  "--veil-active-bg": "#fff3f7",
+  "--veil-notice-bg": "#fff3f7",
+  "--veil-error-text": "#ff7fae",
+  "--badge-new-bg": "rgba(20, 107, 52, 0.14)",
+  "--badge-new-text": "#0f5a2b",
+  "--badge-used-bg": "rgba(138, 61, 0, 0.14)",
+  "--badge-used-text": "#7a3500",
 };
 
 export const THEMES = {

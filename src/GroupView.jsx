@@ -121,7 +121,9 @@ const styles = {
     border: joined ? "1px solid var(--border)" : "none",
     background: joined ? "transparent" : "var(--gradient-primary)",
     boxShadow: joined ? undefined : "var(--button-shine)",
-    color: joined ? "var(--text-muted)" : "var(--bg)",
+    // --on-primary: texto sobre --gradient-primary (punto 83; con var(--bg)
+    // salía rosa claro sobre el botón perla de Pinky).
+    color: joined ? "var(--text-muted)" : "var(--on-primary)",
     fontSize: "13px",
     fontWeight: 600,
     cursor: "pointer",

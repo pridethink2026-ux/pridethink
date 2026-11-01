@@ -88,7 +88,8 @@ const styles = {
     border: attending ? "1px solid var(--border)" : "none",
     background: attending ? "transparent" : "var(--gradient-primary)",
     boxShadow: attending ? undefined : "var(--button-shine)",
-    color: attending ? "var(--text-muted)" : "var(--bg)",
+    // --on-primary: texto sobre --gradient-primary (punto 83).
+    color: attending ? "var(--text-muted)" : "var(--on-primary)",
     fontSize: "13px",
     fontWeight: 600,
     cursor: "pointer",

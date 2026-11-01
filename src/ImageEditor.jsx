@@ -199,7 +199,7 @@ export function buttonStyle({ hovered, primary, active, disabled }) {
     fontSize: "13px",
     fontWeight: 600,
     cursor: disabled ? "default" : "pointer",
-    opacity: disabled ? 0.6 : 1,
+    opacity: disabled ? "var(--disabled-opacity)" : 1, // punto 83
     transition: "background 0.15s ease, border-color 0.15s ease",
   };
   if (primary) {
@@ -213,7 +213,9 @@ export function buttonStyle({ hovered, primary, active, disabled }) {
     };
   }
   if (active || (hovered && !disabled)) {
-    return { ...base, background: "var(--accent-soft)", borderColor: "var(--accent-soft-border)" };
+    // --veil-active-bg (punto 83): en Pinky, perla en vez de acento suave,
+    // que sobre el velo negro dejaba el texto oscuro sin contraste.
+    return { ...base, background: "var(--veil-active-bg)", borderColor: "var(--accent-soft-border)" };
   }
   return base;
 }

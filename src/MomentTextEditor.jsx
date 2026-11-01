@@ -143,7 +143,8 @@ const styles = {
     margin: 0,
     padding: "8px 12px",
     borderRadius: "10px",
-    background: "var(--accent2-soft)",
+    // --veil-notice-bg (punto 83): va sobre el velo negro; en Pinky, perla.
+    background: "var(--veil-notice-bg)",
     border: "1px solid var(--accent2-soft-border)",
     color: "var(--text)",
     fontFamily: "var(--font-body)",

@@ -226,7 +226,7 @@ export default function MultiImageUploader({
     justifyContent: "center",
     gap: "4px",
     cursor: busy ? "default" : "pointer",
-    opacity: busy ? 0.6 : 1,
+    opacity: busy ? "var(--disabled-opacity)" : 1, // punto 83: se lee mientras sube
   };
   const spinnerStyle = {
     width: "18px",

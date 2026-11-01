@@ -65,7 +65,9 @@ const styles = {
     borderRadius: "999px",
     width: "30px",
     height: "30px",
-    color: "var(--text-muted)",
+    // Con hover, texto principal (punto 83): el secundario sobre --border
+    // quedaba bajo 4,5 en Océano y Clásico.
+    color: hover ? "var(--text)" : "var(--text-muted)",
     fontSize: "14px",
     cursor: "pointer",
     flexShrink: 0,
