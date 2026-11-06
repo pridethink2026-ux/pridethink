@@ -92,6 +92,35 @@ service cloud.firestore {
           || d.get('lastReadAt', {}).get(yo, null) == request.time);
     }
 
+    // Punto 84, commit 5: quién puede escribirle al otro participante del
+    // chat. "writers" es el mapa del resumen de ANTES de esta escritura (en
+    // un batch, get() devuelve el estado previo; igual nadie puede tocar la
+    // entrada del otro, ver soloMiEntrada).
+    //   - Sin bloqueo en ninguna dirección.
+    //   - Si el otro es privado: hay seguimiento mutuo (conversación nueva,
+    //     mismo criterio que puedeVerPresenciaDe) o el otro ya escribió en
+    //     este chat (responderle a un privado que te escribió).
+    // Si el perfil del otro no existe, get() falla y se rechaza.
+    function puedeEscribirEnChat(chatId, writers) {
+      let yo = request.auth.uid;
+      let par = chatId.split('_');
+      let otro = par[0] == yo ? par[1] : par[0];
+      return !exists(/databases/$(database)/documents/blocks/$(yo + '_' + otro))
+        && !exists(/databases/$(database)/documents/blocks/$(otro + '_' + yo))
+        && (
+          get(/databases/$(database)/documents/users/$(otro)).data.get('isPrivate', false) != true
+          || writers.get(otro, false) == true
+          || (exists(/databases/$(database)/documents/follows/$(yo + '_' + otro))
+            && exists(/databases/$(database)/documents/follows/$(otro + '_' + yo)))
+        );
+    }
+
+    // Writers de chats/{chatId} antes de la escritura ({} si no existe).
+    function writersDelChat(chatId) {
+      let ruta = /databases/$(database)/documents/chats/$(chatId);
+      return exists(ruta) ? get(ruta).data.get('writers', {}) : {};
+    }
+
     // En un mapa { uid: valor }, solo cambia (o se agrega) la entrada de
     // quien escribe.
     function soloMiEntrada(antes, despues) {
@@ -583,10 +612,26 @@ service cloud.firestore {
       allow get: if esParticipanteDelChat(chatId);
       allow list: if estaAutenticado() && request.auth.uid in resource.data.participants;
 
+      // Commit 5: crear la conversación, o cambiar su último mensaje,
+      // exige poder escribirle al otro (puedeEscribirEnChat), para que
+      // nadie meta un resumen en la lista de quien lo bloqueó o de un
+      // privado que no lo sigue. Excepción: los chats de antes del
+      // commit 1 que todavía no tienen lastMessageAt (la migración del
+      // commit 2 copia su último mensaje real aunque hoy haya bloqueo).
+      // Esos chats ya no se pueden crear: todo chat nuevo nace con
+      // lastMessageAt. Marcar writers o lastReadAt no cambia el último
+      // mensaje y no lo exige.
       allow create: if esParticipanteDelChat(chatId)
-        && resumenDeChatValido(chatId, {});
+        && resumenDeChatValido(chatId, {})
+        && puedeEscribirEnChat(chatId, {});
       allow update: if esParticipanteDelChat(chatId)
-        && resumenDeChatValido(chatId, resource.data);
+        && resumenDeChatValido(chatId, resource.data)
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['lastMessageAt', 'lastSenderId', 'lastType', 'lastText'])
+          || !('lastMessageAt' in resource.data)
+          || puedeEscribirEnChat(chatId, resource.data.get('writers', {}))
+        );
 
       // Nadie borra una conversación (la app no lo ofrece).
       allow delete: if false;
@@ -607,8 +652,12 @@ service cloud.firestore {
         // audio, que en base64 pesa ≈ 320KB (ver CONTEXTO.md para el
         // cálculo completo) — sigue muy por debajo del límite de 1MB por
         // documento de Firestore.
+        // Commit 5 (punto 84): además, sin bloqueo en ninguna dirección
+        // y, si el otro es privado, seguimiento mutuo o que ya te haya
+        // escrito (puedeEscribirEnChat).
         allow create: if esParticipanteDelChat(chatId)
           && request.resource.data.senderId == request.auth.uid
+          && puedeEscribirEnChat(chatId, writersDelChat(chatId))
           && (!('text' in request.resource.data) || textoValido(request.resource.data.text, 2000))
           && (!('audioData' in request.resource.data) || textoValido(request.resource.data.audioData, 500000))
           // Respuesta a un momento (commit 7): validación extra, ver
