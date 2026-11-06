@@ -11,6 +11,7 @@ import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
 import { useOnlinePresence } from "./presence";
 import { useFollowsMigration } from "./follows";
+import { useChatsMigration } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
 import { THEMES, ROTATIVO_KEY } from "./themes";
 import { useTheme } from "./ThemeContext";
@@ -714,6 +715,10 @@ function App() {
   // Fuga B (punto 82): una vez por sesión, repara tus filas de follows/ y
   // copia y borra el arreglo "following" viejo si quedó — ver follows.js.
   useFollowsMigration(currentUid, myProfile);
+
+  // Punto 84, commit 2: una vez por sesión, completa el resumen de tus
+  // conversaciones de antes en chats/{chatId} — ver chatMessages.js.
+  useChatsMigration(currentUid);
 
   // Las cinco vistas superpuestas (perfil público, guardados, post
   // individual, grupo, evento) son mutuamente excluyentes: abrir cualquiera
