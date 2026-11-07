@@ -183,9 +183,10 @@ export function useRecentChats(myUid, max) {
   };
 }
 
-// El resumen de UNA conversación, en vivo (null si todavía no existe). Lo
-// usa la conversación abierta para marcarla leída aunque no esté entre las
-// que trajo la lista.
+// El resumen de UNA conversación, en vivo: null si todavía no existe (o no
+// se pudo leer), undefined mientras carga. Lo usa la conversación abierta
+// para marcarla leída aunque no esté entre las que trajo la lista, y para
+// saber si el otro ya te escribió (writers, commit 4).
 export function useChatSummary(chatId) {
   const [state, setState] = useState({ chatId: null, data: null });
   useEffect(() => {
@@ -199,7 +200,8 @@ export function useChatSummary(chatId) {
       }
     );
   }, [chatId]);
-  return chatId && state.chatId === chatId ? state.data : null;
+  if (!chatId) return null;
+  return state.chatId === chatId ? state.data : undefined;
 }
 
 // No leída = el último mensaje es de la otra persona y llegó después de la

@@ -60,9 +60,10 @@ import { notify, timeAgo } from "./utils";
   - Responder (commit 7): en los momentos ajenos, el campo de abajo manda
     la respuesta como mensaje al chat con el autor (moments.js →
     sendMomentReply, notificación "message"). Mientras el campo tiene el
-    foco o se está enviando, el tiempo se pausa. Con perfil privado se
-    avisa que el autor no podrá contestarte por chat (Chat.jsx no muestra
-    perfiles privados).
+    foco o se está enviando, el tiempo se pausa. Aunque tu perfil sea
+    privado, el autor puede contestarte: al responder quedás en `writers`
+    del chat (punto 84, commit 4), así que la conversación le aparece en
+    la lista.
   - Música (punto 79, commit C): si el momento tiene `music`, suena ese
     tramo sincronizado con el tiempo del momento (useMomentMusic.js): se
     pausa con todo lo que pausa el tiempo y se detiene al avanzar o
@@ -914,11 +915,6 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
         {current && !isMine && replyStatus && (
           <p style={styles.replyNote(replyStatus === "error")} role="status">
             {replyStatus === "sent" ? t("moments.replySent") : t("moments.replyError")}
-          </p>
-        )}
-        {current && !isMine && replyFocused && me?.isPrivate && (
-          <p style={styles.replyNote(false)}>
-            {t("moments.replyPrivateNotice", { name: author?.displayName || "" })}
           </p>
         )}
 

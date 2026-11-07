@@ -65,7 +65,11 @@ import ImageEditor from "./ImageEditor";
   conversación aparece en la lista recién con el primer mensaje.
   Quién aparece (en la lista, en el buscador y al llegar desde una
   notificación), canChatWith: sin bloqueo en ninguna dirección y, si es
-  privado, solo con seguimiento mutuo. Quien ya no existe no se muestra.
+  privado, con seguimiento mutuo o si ya te escribió en ese chat
+  (`writers`, commit 4; en el buscador solo el seguimiento mutuo). Quien
+  ya no existe no se muestra. Si con la conversación abierta deja de
+  cumplirse (bloqueo, por ejemplo), el campo de texto se cambia por un
+  aviso (activeWriteState); si un envío falla, se avisa (sendError).
 
   DISEÑO RESPONSIVO:
   En pantallas angostas (celular) se muestra una sola columna a la vez
@@ -469,6 +473,16 @@ const styles = {
     padding: "14px 0 10px 12px",
   },
   listNote: { padding: "16px", fontSize: "13px", color: "var(--text-muted)", margin: 0 },
+  // Aviso sobre el campo de texto (commit 4): no se pudo enviar, o ya no
+  // se puede escribir en esta conversación (en lugar del campo).
+  composerNote: {
+    margin: 0,
+    padding: "12px 16px",
+    fontSize: "13px",
+    textAlign: "center",
+    color: "var(--text-muted)",
+    borderTop: "1px solid var(--border)",
+  },
   chatHeaderInfo: {
     flex: 1,
     minWidth: 0,
@@ -1146,16 +1160,19 @@ export default function Chat({
     [allUsersRaw, currentUid]
   );
 
-  // Con quién se puede chatear (lista, buscador y notificación, punto 84):
-  // sin bloqueo en ninguna dirección y, si es privado, con seguimiento
-  // mutuo. Mismo criterio que las reglas (puedeEscribirEnChat); quien ya
-  // te escribió siendo privado llega en el commit 4 (writers).
+  // Con quién se puede chatear (lista, buscador, notificación y la
+  // conversación abierta, punto 84): sin bloqueo en ninguna dirección y, si
+  // es privado, con seguimiento mutuo o si ya te escribió en ese chat
+  // (`writers` del resumen, commit 4). Mismo criterio que las reglas
+  // (puedeEscribirEnChat). El buscador de "Nueva conversación" no pasa
+  // `writers`: ahí solo cuenta el seguimiento mutuo.
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const { following, followers, ready: followsReady } = useMyFollows();
-  const canChatWith = (user) => {
+  const canChatWith = (user, writers) => {
     if (!user || user.uid === currentUid) return false;
     if (isBlockedEitherWay(blockedByMe, blockedMe, user.uid)) return false;
     if (!user.isPrivate) return true;
+    if (writers?.[user.uid] === true) return true;
     return following.includes(user.uid) && followers.includes(user.uid);
   };
 
@@ -1181,7 +1198,7 @@ export default function Chat({
       const otherUid = (chat.participants || []).find((uid) => uid !== currentUid);
       return { chat, user: usersByUid[otherUid] };
     })
-    .filter((row) => canChatWith(row.user) && matchesSearch(row.user));
+    .filter((row) => canChatWith(row.user, row.chat.writers) && matchesSearch(row.user));
 
   // Buscador de "Nueva conversación": todas las personas con las que se
   // puede chatear (sin presencia).
@@ -1230,10 +1247,28 @@ export default function Chat({
     );
   }, [activeChatId, activeSummary, currentUid, pageVisible]);
 
+  // ¿Todavía se puede escribir en la conversación abierta? (commit 4) Si
+  // mientras está abierta hay un bloqueo, o un privado deja de seguirte y
+  // nunca te escribió, el campo de texto se cambia por un aviso: las
+  // reglas rechazarían el envío. Mientras el resumen o los seguimientos
+  // cargan, se asume que sí (no parpadea el aviso al abrir).
+  const activeWriteState = !liveActiveContact
+    ? "ok"
+    : blockedByMe.includes(liveActiveContact.uid)
+    ? "blockedByMe"
+    : activeSummary === undefined || !followsReady || canChatWith(liveActiveContact, activeSummary?.writers)
+    ? "ok"
+    : "unavailable";
+
+  // Error al enviar texto o sticker (por ejemplo, un bloqueo que todavía
+  // no llegó a esta pestaña). Se borra al cambiar de conversación.
+  const [sendError, setSendError] = useState(false);
+
   // Abrir una conversación desde la lista o el buscador.
   const openConversation = (user) => {
     if (recordingState !== "idle") return;
     setActiveContact(user);
+    setSendError(false);
     setStickerPanelOpen(false);
     setChatUnavailable(false);
     setListMode("recent");
@@ -1248,11 +1283,20 @@ export default function Chat({
   // seguimiento mutuo, hay bloqueo en cualquier dirección o ya no existe,
   // no se abre nada y se muestra un aviso genérico — el mismo texto en
   // los tres casos, para no revelar quién bloqueó a quién.
+  // Además espera el resumen de ese chat: un privado que ya te escribió
+  // (writers) también se abre.
+  const pendingChatId =
+    initialContactUid && currentUid && initialContactUid !== currentUid
+      ? getChatId(currentUid, initialContactUid)
+      : null;
+  const pendingSummary = useChatSummary(pendingChatId);
   useEffect(() => {
     if (!initialContactUid || !currentUid || allUsersRaw.length === 0 || !followsReady) return;
+    if (pendingChatId && pendingSummary === undefined) return;
     const target = allUsersRaw.find((u) => u.uid === initialContactUid);
-    const available = canChatWith(target);
+    const available = canChatWith(target, pendingSummary?.writers);
     if (available) {
+      setSendError(false);
       setActiveContact(target);
       setStickerPanelOpen(false);
       setChatUnavailable(false);
@@ -1263,7 +1307,7 @@ export default function Chat({
     onConsumeInitialContactUid?.();
     // canChatWith depende de lo mismo que ya está en la lista.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialContactUid, currentUid, allUsersRaw, blockedByMe, blockedMe, followsReady, following, followers, onConsumeInitialContactUid]);
+  }, [initialContactUid, currentUid, allUsersRaw, blockedByMe, blockedMe, followsReady, following, followers, pendingChatId, pendingSummary, onConsumeInitialContactUid]);
 
   const handleToggleBlock = async () => {
     if (!activeContact || !currentUid) return;
@@ -1531,7 +1575,16 @@ export default function Chat({
     if (!text.trim() || !activeContact || !currentUid) return;
 
     // Mensaje y resumen de la conversación juntos (chatMessages.js, punto 84).
-    await sendChatMessage(currentUid, activeContact.uid, { text: text.trim() });
+    // Si las reglas lo rechazan (bloqueo o privacidad, commit 5), se avisa
+    // y el texto queda en el campo.
+    try {
+      await sendChatMessage(currentUid, activeContact.uid, { text: text.trim() });
+    } catch (err) {
+      console.error("chat: no se pudo enviar el mensaje", err.code);
+      setSendError(true);
+      return;
+    }
+    setSendError(false);
 
     // Notifica al destinatario que le llegó un mensaje nuevo
     await notify(activeContact.uid, {
@@ -1548,7 +1601,14 @@ export default function Chat({
     setStickerPanelOpen(false);
     if (!activeContact || !currentUid) return;
 
-    await sendChatMessage(currentUid, activeContact.uid, { type: "sticker", stickerId });
+    try {
+      await sendChatMessage(currentUid, activeContact.uid, { type: "sticker", stickerId });
+    } catch (err) {
+      console.error("chat: no se pudo enviar el sticker", err.code);
+      setSendError(true);
+      return;
+    }
+    setSendError(false);
 
     await notify(activeContact.uid, {
       type: "message",
@@ -1771,7 +1831,18 @@ export default function Chat({
                   ))}
                   <div ref={messagesEndRef} />
                 </div>
-                {pendingImage ? (
+                {sendError && activeWriteState === "ok" && (
+                  <p style={styles.composerNote} role="alert">
+                    {t("chat.sendError")}
+                  </p>
+                )}
+                {/* Con una nota de voz en curso se deja su fila (para poder
+                    cancelarla y apagar el micrófono). */}
+                {activeWriteState !== "ok" && recordingState === "idle" ? (
+                  <p style={styles.composerNote} role="status">
+                    {activeWriteState === "blockedByMe" ? t("chat.youBlocked") : t("chat.cannotWrite")}
+                  </p>
+                ) : pendingImage ? (
                   <div style={styles.imagePreviewRow}>
                     <img src={pendingImage.previewUrl} alt="" style={styles.imagePreviewThumb} />
                     <span style={styles.recordingLabel}>{t("chat.imageReady")}</span>
