@@ -13,10 +13,11 @@ import { useOnlinePresence } from "./presence";
 import { useFollowsMigration } from "./follows";
 import { useChatsMigration } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
-import { THEMES, ROTATIVO_KEY } from "./themes";
+import { THEMES, ROTATIVO_KEY, resolveThemeKey } from "./themes";
 import { useTheme } from "./ThemeContext";
 import { playThemeSound } from "./themeSounds";
 import PinkyHeartIcon from "./PinkyHeartIcon";
+import AngelWingsIcon from "./AngelWingsIcon";
 
 /*
   App
@@ -102,6 +103,54 @@ function StoreIcon({ size = 18 }) {
   );
 }
 
+// Íconos de línea de la barra inferior para los temas con lineIcons
+// (punto 85, solo Ángel): mismo trazo que StoreIcon, en currentColor
+// (monocromos, el color activo/inactivo del botón). En los otros temas
+// siguen los emojis de getBottomTabs.
+const LINE_ICON_PATHS = {
+  buscar: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </>
+  ),
+  chat: (
+    <>
+      <path d="M4 12a8 7 0 1 1 3.6 5.9L4 19.5l1.1-3.6A6.6 6.6 0 0 1 4 12z" />
+      <path d="M8.5 12h.01M12 12h.01M15.5 12h.01" />
+    </>
+  ),
+  notificaciones: (
+    <>
+      <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15L6 16.5z" />
+      <path d="M10 20.5a2.2 2.2 0 0 0 4 0" />
+    </>
+  ),
+  perfil: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
+    </>
+  ),
+};
+
+function LineNavIcon({ name, size = 19 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {LINE_ICON_PATHS[name]}
+    </svg>
+  );
+}
+
 const navStyles = {
   bar: {
     display: "flex",
@@ -127,7 +176,7 @@ const navStyles = {
     gap: "8px",
     padding: "8px 20px",
     borderRadius: "999px",
-    border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
+    border: `1px solid ${active ? "var(--tab-active-border)" : "var(--border)"}`,
     background: active ? "var(--tab-active-bg)" : "var(--tab-bg)",
     boxShadow: active ? "var(--button-shine)" : "var(--chip-shine)",
     color: active ? "var(--tab-active-text)" : "var(--text-muted)",
@@ -164,6 +213,8 @@ const navStyles = {
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
     color: "transparent",
+    // Profundidad del título (punto 85, Ángel); "none" en los otros temas.
+    filter: "var(--logo-depth)",
   },
 };
 
@@ -209,6 +260,8 @@ const themeStyles = {
     padding: "10px 12px",
     borderRadius: "10px",
     background: active ? "var(--accent2-soft)" : "transparent",
+    // Anillo de 3:1 en la elegida (punto 85, solo Ángel; ver themes.js).
+    boxShadow: active ? "var(--control-ring)" : "none",
     color: active ? "var(--accent2)" : "var(--text)",
     fontSize: "13px",
     fontWeight: active ? 600 : 500,
@@ -271,6 +324,7 @@ const bannerStyles = {
     borderRadius: "999px",
     border: "none",
     background: "rgba(0,0,0,0.15)",
+    boxShadow: "var(--control-ring)",
     color: "var(--on-primary)",
     fontSize: "15px",
     lineHeight: 1,
@@ -294,6 +348,7 @@ const bottomNavStyles = {
     zIndex: 30,
   },
   btn: (active) => ({
+    position: "relative",
     flex: 1,
     background: "none",
     border: "none",
@@ -303,8 +358,21 @@ const bottomNavStyles = {
     alignItems: "center",
     gap: "2px",
     cursor: "pointer",
-    color: active ? "var(--accent2)" : "var(--text-muted)",
+    color: active ? "var(--nav-active-color)" : "var(--text-muted)",
   }),
+  // Marca de la pestaña activa (punto 85): una línea arcoíris abajo en
+  // Ángel; en los otros temas --nav-active-mark es "none" y no se ve.
+  activeMark: {
+    position: "absolute",
+    bottom: "3px",
+    left: "50%",
+    width: "28px",
+    height: "3px",
+    marginLeft: "-14px",
+    borderRadius: "2px",
+    background: "var(--nav-active-mark)",
+    pointerEvents: "none",
+  },
   iconWrap: { position: "relative", fontSize: "19px", lineHeight: 1 },
   dot: {
     position: "absolute",
@@ -456,6 +524,8 @@ const THEME_ICON_ANIM_CLASS = {
 // animación): no se suman animaciones en bucle.
 const THEME_SVG_ICONS = {
   pinky: PinkyHeartIcon,
+  // Ángel (punto 85): dos alas con puntas arcoíris, también quieta.
+  angel: AngelWingsIcon,
 };
 
 function ThemeMenu() {
@@ -604,6 +674,8 @@ function ThemeMenu() {
 
 function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
   const { t } = useLanguage();
+  const { themeKey } = useTheme();
+  const lineIcons = !!THEMES[resolveThemeKey(themeKey)].lineIcons;
   return (
     <nav style={bottomNavStyles.bar} aria-label={t("nav.main")}>
       {getBottomTabs(t).map((tab) => {
@@ -622,12 +694,15 @@ function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
                 <HomeIcon identityText={myIdentity} active={isActive} size={19} />
               ) : tab.key === "tienda" ? (
                 <StoreIcon size={19} />
+              ) : lineIcons && LINE_ICON_PATHS[tab.key] ? (
+                <LineNavIcon name={tab.key} size={19} />
               ) : (
                 tab.icon
               )}
               {hasUnread && <span style={bottomNavStyles.dot} />}
             </span>
             <span style={bottomNavStyles.label}>{tab.label}</span>
+            {isActive && <span style={bottomNavStyles.activeMark} aria-hidden="true" />}
           </button>
         );
       })}

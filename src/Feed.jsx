@@ -216,7 +216,7 @@ const styles = {
   tabBtn: (active) => ({
     padding: "7px 16px",
     borderRadius: "999px",
-    border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
+    border: `1px solid ${active ? "var(--tab-active-border)" : "var(--border)"}`,
     background: active ? "var(--tab-active-bg)" : "var(--tab-bg)",
     boxShadow: active ? "var(--button-shine)" : "var(--chip-shine)",
     color: active ? "var(--tab-active-text)" : "var(--text-muted)",

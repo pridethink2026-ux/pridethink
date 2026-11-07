@@ -651,6 +651,9 @@ const styles = {
     fontSize: "12px",
     flexShrink: 0,
     background: mine ? "var(--bg)" : "var(--accent2)",
+    // En la burbuja propia, anillo de 3:1 (punto 85, solo Ángel: --bg
+    // perla sobre el tornasol claro no se distingue).
+    boxShadow: mine ? "var(--control-ring)" : "none",
     color: mine ? "var(--accent2)" : "var(--bg)",
   }),
   // Barras de la waveform: contraste distinto según la burbuja sea propia

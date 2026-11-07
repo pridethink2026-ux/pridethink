@@ -60,7 +60,9 @@ const styles = {
     margin: 0,
   },
   closeBtn: (hover) => ({
-    background: hover ? "var(--border)" : "var(--surface-alt)",
+    // --close-hover-bg (punto 85): --border salvo en Ángel, cuyo borde gris
+    // de 3:1 es demasiado oscuro para fondo.
+    background: hover ? "var(--close-hover-bg)" : "var(--surface-alt)",
     border: "1px solid var(--border)",
     borderRadius: "999px",
     width: "30px",

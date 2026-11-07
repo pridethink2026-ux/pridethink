@@ -80,6 +80,142 @@ const EFFECT_DEFAULTS = {
   "--badge-new-text": "#22c55e",
   "--badge-used-bg": "rgba(255, 151, 66, 0.18)",
   "--badge-used-text": "#ff9742",
+  // Punto 85 (Ángel). Borde de la pestaña activa (arriba en App.js y en el
+  // Muro, Feed.jsx): el acento, como siempre.
+  "--tab-active-border": "var(--accent2)",
+  // Profundidad del título "Pridethink" (filter; con background-clip:
+  // text, text-shadow se dibujaría encima del degradado).
+  "--logo-depth": "none",
+  // Aro de Momentos sin ver (Avatar.jsx): el destello fijo y el que pulsa,
+  // los de siempre; más una capa de fondo detrás del aro (imagen y halo),
+  // vacía salvo en Ángel (arcoíris, que un box-shadow no puede dibujar).
+  "--moment-unseen-shadow":
+    "0 0 0 2px var(--surface), 0 0 0 4px var(--accent2), 0 0 10px 4px var(--accent2-soft-border)",
+  "--moment-glow-shadow":
+    "0 0 0 2px var(--surface), 0 0 0 4px var(--accent), 0 0 14px 6px var(--accent-soft-border)",
+  "--moment-ring-image": "none",
+  "--moment-ring-halo": "none",
+  // Barra inferior (App.js): color de la pestaña activa y marca debajo
+  // (ninguna salvo en Ángel).
+  "--nav-active-color": "var(--accent2)",
+  "--nav-active-mark": "none",
+  // Fondo del ✕ de la lista "quién vio" con hover (MomentViewersSheet).
+  "--close-hover-bg": "var(--border)",
+  // Anillo de los controles sin borde (ver ANGEL_VARS): ninguno salvo en
+  // Ángel.
+  "--control-ring": "0 0 0 0 transparent",
+};
+
+// Ángel (punto 85): blanco perla con relieve suave (neumorfismo) y el
+// arcoíris solo en los puntos clave. ANGEL_RAINBOW es el brillante (líneas,
+// aro, cristales: decoración); ANGEL_RAINBOW_DARK, el del título, oscuro
+// para que cada letra pase 4,5 sobre la barra.
+const ANGEL_RAINBOW = "#ff3d57, #ff8a2a, #ffd23a, #36c96e, #2f8bff, #8a4dff";
+const ANGEL_RAINBOW_DARK = "#c0122f, #b04a00, #8a6400, #1d7a3a, #1f55d1, #6a22b8";
+// Borde gris de 3:1 sobre el fondo y las tarjetas: con blanco sobre blanco
+// es lo que hace reconocible a un control (pestañas, botones secundarios,
+// campos y, como anillo en --button-shine, los principales).
+const ANGEL_EDGE = "#7f7a91";
+
+// Cristal tornasol para el fondo: SVG en línea (data:, sin pedir nada a
+// la red), estático.
+const ANGEL_CRYSTAL = `url("data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 32">' +
+    '<defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#ffd6e7"/><stop offset=".35" stop-color="#fff3c4"/>' +
+    '<stop offset=".65" stop-color="#cdeeff"/><stop offset="1" stop-color="#dccbff"/></linearGradient></defs>' +
+    '<path d="M10 0L20 9L10 32L0 9Z" fill="url(#a)"/>' +
+    '<path d="M10 0L20 9L10 12L0 9Z" fill="#fff" fill-opacity=".7"/>' +
+    '<path d="M10 12L20 9L10 32Z" fill="#9b8fd6" fill-opacity=".25"/>' +
+    '<path d="M10 0L20 9L10 32L0 9Z" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width=".8"/></svg>'
+)}")`;
+const crystal = (x, y, w) => `${ANGEL_CRYSTAL} ${x} ${y} / ${w}px auto no-repeat`;
+
+const ANGEL_VARS = {
+  "--bg": "#efedf1",
+  "--surface": "#f8f7fa",
+  "--surface-alt": "#e6e3ea",
+  "--accent": "#5a37c4",
+  "--accent2": "#8a2a8f",
+  "--text": "#1d1a2b",
+  "--text-muted": "#4f4a63",
+  "--border": ANGEL_EDGE,
+  "--accent2-soft": "rgba(138, 42, 143, 0.1)",
+  "--accent2-softer": "rgba(138, 42, 143, 0.07)",
+  // 0,7: los bordes suaves también delimitan controles (chips, °C/°F)
+  // y tienen que llegar a 3:1.
+  "--accent2-soft-border": "rgba(138, 42, 143, 0.7)",
+  "--accent-soft": "rgba(90, 55, 196, 0.1)",
+  "--accent-softer": "rgba(90, 55, 196, 0.07)",
+  "--accent-soft-border": "rgba(90, 55, 196, 0.7)",
+  "--gradient-text": `linear-gradient(90deg, ${ANGEL_RAINBOW_DARK})`,
+  "--logo-depth": "drop-shadow(0 1px 0 rgba(255, 255, 255, 0.9)) drop-shadow(0 2px 2px rgba(70, 62, 100, 0.3))",
+  "--on-primary": "#26184f",
+  // Relieve: luz blanca arriba a la izquierda, sombra gris lila abajo a
+  // la derecha; los campos, al revés y hacia adentro (hundidos). El brillo
+  // de las tarjetas (--surface-sheen) está más abajo, con el tornasol.
+  "--shine":
+    "-6px -6px 14px rgba(255, 255, 255, 0.95), 6px 6px 16px rgba(70, 62, 100, 0.16), inset 0 1px 0 #ffffff",
+  "--field-shine": "inset 3px 3px 6px rgba(70, 62, 100, 0.16), inset -3px -3px 6px rgba(255, 255, 255, 0.95)",
+  "--chip-shine": "-3px -3px 7px rgba(255, 255, 255, 0.95), 3px 3px 8px rgba(70, 62, 100, 0.16)",
+  // Se hunden al presionar: la sombra pasa a ser interior.
+  "--button-shine-pressed":
+    `inset 3px 3px 6px rgba(70, 62, 100, 0.22), inset -3px -3px 6px rgba(255, 255, 255, 0.9), 0 0 0 1px ${ANGEL_EDGE}`,
+  "--tab-bg": "linear-gradient(145deg, #ffffff, #f3f1f6)",
+  // Pestaña activa: blanca, con una línea arcoíris arriba y otra abajo
+  // (el borde redondeado las curva en las puntas). Sin borde propio: el
+  // anillo gris lo pone --button-shine.
+  "--tab-active-bg":
+    `linear-gradient(90deg, ${ANGEL_RAINBOW}) 0 0 / 100% 2.5px no-repeat, linear-gradient(90deg, ${ANGEL_RAINBOW}) 0 100% / 100% 2.5px no-repeat, linear-gradient(180deg, #ffffff, #f5f3f8)`,
+  "--tab-active-border": "transparent",
+  "--tab-active-text": "#1d1a2b",
+  "--bar-bg": "#fbfafc",
+  "--theme-btn-bg": "#ffffff",
+  "--bottom-bar-bg": "#ffffff",
+  "--bottom-bar-shine": "0 -4px 14px rgba(70, 62, 100, 0.1)",
+  "--nav-active-color": "#1d1a2b",
+  "--nav-active-mark": `linear-gradient(90deg, ${ANGEL_RAINBOW})`,
+  "--unread-edge": "#6a22b8",
+  "--page-bg": "transparent",
+  "--moment-unseen-shadow": "0 0 0 2px var(--surface)",
+  "--moment-ring-image": `conic-gradient(from 0deg, ${ANGEL_RAINBOW}, #ff3d57)`,
+  "--shadow-rgb": "70, 62, 100",
+  "--close-hover-bg": "#dcd8e3",
+  // Lo mismo que Pinky (punto 83) para un tema claro.
+  "--disabled-opacity": "0.85",
+  "--veil-active-bg": "#f8f7fa",
+  "--veil-notice-bg": "#f8f7fa",
+  "--veil-error-text": "#c9b6ff",
+  "--badge-new-bg": "rgba(20, 107, 52, 0.14)",
+  "--badge-new-text": "#0f5a2b",
+  "--badge-used-bg": "rgba(138, 61, 0, 0.14)",
+  "--badge-used-text": "#7a3500",
+  // Anillo gris de 3:1 para los controles sin borde propio (opción elegida
+  // del menú de temas, ✕ del banner, ▶ del audio propio, acciones del
+  // producto con hover): blanco sobre blanco no se distinguirían.
+  "--control-ring": `0 0 0 1px ${ANGEL_EDGE}`,
+  // Tornasol pastel vivo con halo iridiscente en los botones principales,
+  // destello lila y cristales fijos en el fondo.
+  "--gradient-primary":
+    "radial-gradient(60% 24% at 50% 10%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 100%), linear-gradient(115deg, #ffd6e0 0%, #ffe6c7 20%, #fff4c2 38%, #d4f5dc 56%, #d1e4ff 76%, #e6d6ff 100%)",
+  "--button-shine":
+    `-3px -3px 8px rgba(255, 255, 255, 0.95), 4px 4px 10px rgba(70, 62, 100, 0.2), inset 0 1px 1px #ffffff, 0 0 0 1px ${ANGEL_EDGE}, 0 0 16px rgba(170, 130, 255, 0.35)`,
+  "--sweep-color": "rgba(214, 190, 255, 0.6)",
+  "--surface-sheen":
+    "radial-gradient(120% 60% at 100% 0%, rgba(214, 196, 255, 0.14), rgba(214, 196, 255, 0) 60%), linear-gradient(145deg, #fdfcfe, #f4f3f7)",
+  "--moment-ring-halo": "0 0 12px 2px rgba(138, 77, 255, 0.35)",
+  "--moment-glow-shadow": "0 0 0 2px var(--surface), 0 0 16px 6px rgba(138, 77, 255, 0.3)",
+  "--page-glare": [
+    crystal("6%", "18%", 14),
+    crystal("94%", "34%", 11),
+    crystal("4%", "71%", 10),
+    crystal("90%", "83%", 16),
+    crystal("52%", "96%", 8),
+    "radial-gradient(70% 40% at 10% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%)",
+    "radial-gradient(50% 30% at 100% 30%, rgba(214, 196, 255, 0.28), rgba(214, 196, 255, 0) 70%)",
+    "radial-gradient(50% 30% at 0% 80%, rgba(255, 214, 230, 0.3), rgba(255, 214, 230, 0) 70%)",
+    "#efedf1",
+  ].join(", "),
 };
 
 // Estrellas del fondo de Noche Violeta: puntos de degradado en dos mosaicos
@@ -482,6 +618,16 @@ export const THEMES = {
     relief: true,
     metaColor: "#ffd0dc",
   },
+  // Ángel (punto 85): clave "angel" (sin tilde), en firestore.rules. Ícono
+  // propio (AngelWingsIcon.jsx) y, solo en este tema, íconos de línea en la
+  // barra inferior (lineIcons, App.js).
+  angel: {
+    labelKey: "theme.angel",
+    vars: ANGEL_VARS,
+    relief: true,
+    lineIcons: true,
+    metaColor: "#fbfafc",
+  },
 };
 
 // Paleta fija de marca para la pantalla de entrada (AuthScreen.jsx, punto
@@ -548,14 +694,54 @@ export function isThemeKey(key) {
   return key === ROTATIVO_KEY || Object.prototype.hasOwnProperty.call(THEMES, key);
 }
 
-// Elige un tema distinto cada día del año, en un ciclo fijo entre todos los
-// temas de THEMES (hoy 6, con Pinky).
-export function getRotativeThemeKey() {
+// Generador pseudoaleatorio fijo (mulberry32): misma semilla, misma serie.
+function seededRandom(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Orden de los temas en el bloque número "block" (una mezcla fija por
+// bloque, Fisher-Yates con la semilla del bloque).
+function rotativeBlockOrder(keys, block) {
+  const order = keys.slice();
+  const rand = seededRandom(Math.imul(block, 2654435761) ^ 0x9e3779b9);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
+// Tema del día del Rotativo (punto 85). Los días se cuentan desde
+// 1970-01-01 por fecha del calendario local (sin saltos por el horario de
+// verano) y se agrupan en bloques de tantos días como temas: cada bloque
+// usa todos los temas una vez, en un orden mezclado distinto. Antes era
+// día del año % cantidad de temas, que con 7 temas dejaba cada tema
+// siempre en el mismo día de la semana. Si un bloque empieza con el tema
+// con el que terminó el anterior, se cambian sus dos primeros, así nunca
+// se repite el mismo tema dos días seguidos.
+export function getRotativeThemeKey(date = new Date()) {
   const keys = getThemeKeys();
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  const dayOfYear = Math.floor((now - start) / 86400000);
-  return keys[dayOfYear % keys.length];
+  const n = keys.length;
+  const day = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+  const block = Math.floor(day / n);
+  const order = rotativeBlockOrder(keys, block);
+  if (n > 1 && order[0] === rotativeBlockOrder(keys, block - 1)[n - 1]) {
+    [order[0], order[1]] = [order[1], order[0]];
+  }
+  return order[day - block * n];
+}
+
+// Clave del tema que se ve: la elegida, o la del día si es "rotativo".
+export function resolveThemeKey(key) {
+  const resolved = key === ROTATIVO_KEY ? getRotativeThemeKey() : key;
+  return THEMES[resolved] ? resolved : DEFAULT_THEME_KEY;
 }
 
 // Duración del fundido al cambiar de tema: la de las transiciones de
@@ -573,8 +759,7 @@ let transitionTimer = null;
 // globales, así que el primer pintado (initTheme) y el resto del uso de
 // la app no animan nada de más.
 export function applyTheme(key, { animate = false } = {}) {
-  const resolvedKey = key === ROTATIVO_KEY ? getRotativeThemeKey() : key;
-  const theme = THEMES[resolvedKey] || THEMES.noche;
+  const theme = THEMES[resolveThemeKey(key)];
   const root = document.documentElement;
   if (animate) {
     root.classList.add("pt-theme-transition");

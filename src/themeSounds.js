@@ -66,7 +66,19 @@ function playPinkySound(ctx) {
   playTone(ctx, { freq: 780, type: "sine", start: 0.09, duration: 0.1, peakGain: 0.05, attack: 0.004, freqRampTo: 1560 });
 }
 
+// Campanilleo (punto 85, Ángel): tres campanitas agudas y suaves que suben
+// (Mi, Sol#, Si de la sexta octava, un acorde de Mi mayor) en cascada, cada
+// una con un brillo bajito una octava arriba. Menos de 0,5 s en total.
+function playAngelSound(ctx) {
+  [1318.5, 1661.2, 1975.5].forEach((freq, i) => {
+    const start = i * 0.07;
+    playTone(ctx, { freq, type: "sine", start, duration: 0.3, peakGain: 0.045, attack: 0.004, filterFreq: 7000 });
+    playTone(ctx, { freq: freq * 2, type: "sine", start, duration: 0.14, peakGain: 0.012, attack: 0.003, filterFreq: 8000 });
+  });
+}
+
 const SOUND_BUILDERS = {
+  angel: playAngelSound,
   noche: playNocheSound,
   arcoiris: playArcoirisSound,
   oceano: playOceanoSound,

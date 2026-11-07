@@ -199,6 +199,8 @@ const styles = {
   },
   actionBtn: (active, hovered) => ({
     background: hovered ? "var(--surface-alt)" : "transparent",
+    // Con hover, anillo de 3:1 (punto 85, solo Ángel; ver themes.js).
+    boxShadow: hovered ? "var(--control-ring)" : "none",
     border: "none",
     borderRadius: "999px",
     cursor: "pointer",

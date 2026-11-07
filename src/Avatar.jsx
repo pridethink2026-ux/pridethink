@@ -74,8 +74,13 @@ import { getIdentityColors } from "./identityStyles";
   Tamaños: "sm" (comentarios), "md" (posts, contactos), "lg" (perfil).
 */
 
+// "unseen" y el destello que pulsa vienen del tema (--moment-unseen-shadow,
+// --moment-glow-shadow; por defecto, los de siempre). En Ángel (punto 85)
+// el aro es arcoíris: una capa de fondo detrás del avatar
+// (--moment-ring-image, vacía en los otros temas) asoma entre el corte de
+// --surface y el borde de 4px.
 const MOMENT_RING_SHADOW = {
-  unseen: "0 0 0 2px var(--surface), 0 0 0 4px var(--accent2), 0 0 10px 4px var(--accent2-soft-border)",
+  unseen: "var(--moment-unseen-shadow)",
   seen: "0 0 0 2px var(--surface), 0 0 0 3px var(--border)",
 };
 
@@ -93,9 +98,20 @@ const glowLayerStyle = {
   position: "absolute",
   inset: 0,
   borderRadius: "50%",
-  boxShadow: "0 0 0 2px var(--surface), 0 0 0 4px var(--accent), 0 0 14px 6px var(--accent-soft-border)",
+  boxShadow: "var(--moment-glow-shadow)",
   pointerEvents: "none",
   opacity: 0,
+};
+
+// Aro arcoíris de Ángel, detrás del avatar (va antes en el DOM y el aro es
+// position: relative, así que queda abajo). 4px más grande por lado.
+const ringImageStyle = {
+  position: "absolute",
+  inset: "-4px",
+  borderRadius: "50%",
+  background: "var(--moment-ring-image)",
+  boxShadow: "var(--moment-ring-halo)",
+  pointerEvents: "none",
 };
 
 const SIZES = {
@@ -233,6 +249,7 @@ export default function Avatar({
   // overflow: hidden la recortaría.
   return (
     <div style={glowWrapStyle(box)}>
+      <span style={ringImageStyle} aria-hidden="true" />
       {avatar}
       <span className="pt-moment-glow" style={glowLayerStyle} aria-hidden="true" />
     </div>
