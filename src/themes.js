@@ -86,6 +86,9 @@ const EFFECT_DEFAULTS = {
   // Profundidad del título "Pridethink" (filter; con background-clip:
   // text, text-shadow se dibujaría encima del degradado).
   "--logo-depth": "none",
+  // Relieve de los títulos de sección (los de --gradient-text): ninguno
+  // salvo en Ángel mejorado.
+  "--title-depth": "none",
   // Aro de Momentos sin ver (Avatar.jsx): el destello fijo y el que pulsa,
   // los de siempre; más una capa de fondo detrás del aro (imagen y halo),
   // vacía salvo en Ángel (arcoíris, que un box-shadow no puede dibujar).
@@ -106,39 +109,127 @@ const EFFECT_DEFAULTS = {
   "--control-ring": "0 0 0 0 transparent",
 };
 
-// Ángel (punto 85): blanco perla con relieve suave (neumorfismo) y el
-// arcoíris solo en los puntos clave. ANGEL_RAINBOW es el brillante (líneas,
-// aro, cristales: decoración); ANGEL_RAINBOW_DARK, el del título, oscuro
-// para que cada letra pase 4,5 sobre la barra.
+// Ángel (punto 85): perla pulida con relieve (neumorfismo con volumen) y
+// el arcoíris solo en los puntos clave. ANGEL_RAINBOW es el brillante
+// (líneas, aro: decoración); ANGEL_RAINBOW_DARK, el de los títulos, oscuro
+// para que cada letra pase 4,5 (6,8 o más) sobre la barra y las tarjetas.
 const ANGEL_RAINBOW = "#ff3d57, #ff8a2a, #ffd23a, #36c96e, #2f8bff, #8a4dff";
-const ANGEL_RAINBOW_DARK = "#c0122f, #b04a00, #8a6400, #1d7a3a, #1f55d1, #6a22b8";
-// Borde gris de 3:1 sobre el fondo y las tarjetas: con blanco sobre blanco
-// es lo que hace reconocible a un control (pestañas, botones secundarios,
-// campos y, como anillo en --button-shine, los principales).
-const ANGEL_EDGE = "#7f7a91";
+const ANGEL_RAINBOW_DARK = "#a00d27, #933c00, #6f5000, #156530, #1942ad, #561a98";
+// Fondo perla, un poco más oscuro que las tarjetas casi blancas para que
+// resalten.
+const ANGEL_BG = "#e5e2ec";
+// Borde de los controles (4,2:1 o más sobre el fondo y las tarjetas): con
+// blanco sobre blanco es lo que hace reconocible a un control (pestañas,
+// botones secundarios, campos y, como anillo en --button-shine, los
+// principales).
+const ANGEL_EDGE = "#6c6684";
+// Color de las sombras, un violeta hondo, en "r, g, b".
+const ANGEL_SHADOW = "50, 40, 90";
+// Índigo profundo para el texto (en vez del casi negro) y el secundario
+// en la misma familia.
+const ANGEL_INK = "#140a36";
+const ANGEL_INK_MUTED = "#3d3364";
 
-// Cristal tornasol para el fondo: SVG en línea (data:, sin pedir nada a
-// la red), estático.
-const ANGEL_CRYSTAL = `url("data:image/svg+xml,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 32">' +
-    '<defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1">' +
-    '<stop offset="0" stop-color="#ffd6e7"/><stop offset=".35" stop-color="#fff3c4"/>' +
-    '<stop offset=".65" stop-color="#cdeeff"/><stop offset="1" stop-color="#dccbff"/></linearGradient></defs>' +
-    '<path d="M10 0L20 9L10 32L0 9Z" fill="url(#a)"/>' +
-    '<path d="M10 0L20 9L10 12L0 9Z" fill="#fff" fill-opacity=".7"/>' +
-    '<path d="M10 12L20 9L10 32Z" fill="#9b8fd6" fill-opacity=".25"/>' +
-    '<path d="M10 0L20 9L10 32L0 9Z" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width=".8"/></svg>'
-)}")`;
-const crystal = (x, y, w) => `${ANGEL_CRYSTAL} ${x} ${y} / ${w}px auto no-repeat`;
+// Cielo de cristales, con la misma técnica que las estrellas de Noche
+// Violeta: dos mosaicos de tamaños distintos (173 y 251 px) que se repiten,
+// así no se nota el patrón. Cada mosaico es UN SVG en línea (data:,
+// estático) con unas pocas gemas; cada gema se dibuja una sola vez como
+// <symbol> (talla alargada y brillante redondo, con su destello) y se
+// reusa con <use>, para que el SVG pese poco.
+const svgUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+// Destello: núcleo blanco brillante con cuatro rayos largos (con un filo
+// lila fino, si no el blanco se pierde sobre el perla) y dos cortos en
+// diagonal, sobre un halo. "g" es el halo blanco lila; "h", el
+// tornasol (rosa, amarillo y celeste) que llevan algunas gemas.
+const sparkleAt = (x, y, r, halo) =>
+  `<circle cx="${x}" cy="${y}" r="${r * 1.7}" fill="url(#${halo})"/>` +
+  `<path d="M${x} ${y - r}L${x + r * 0.18} ${y - r * 0.18}L${x + r} ${y}L${x + r * 0.18} ${y + r * 0.18}L${x} ${y + r}L${x - r * 0.18} ${y + r * 0.18}L${x - r} ${y}L${x - r * 0.18} ${y - r * 0.18}Z" fill="#fff" stroke="#8f80d0" stroke-opacity=".75" stroke-width=".6" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` +
+  `<path d="M${x - r * 0.5} ${y - r * 0.5}L${x + r * 0.5} ${y + r * 0.5}M${x + r * 0.5} ${y - r * 0.5}L${x - r * 0.5} ${y + r * 0.5}" stroke="#fff" stroke-width="${r * 0.14}" stroke-linecap="round"/>` +
+  `<circle cx="${x}" cy="${y}" r="${r * 0.22}" fill="#fff"/>`;
+// Contorno índigo lila (#6a5ca8, 4,4:1 o más contra el fondo perla y sus
+// brillos), de 1 px a cualquier tamaño (non-scaling-stroke). Facetas con
+// luz y sombra marcadas: mesa casi blanca, cara izquierda clara, cara
+// derecha en sombra lila, para que se vean talladas.
+const GEM_OUTLINE = 'fill="none" stroke="#6a5ca8" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"';
+const gemLong = (halo) =>
+  '<path d="M12 6L22 15L12 38L2 15Z" fill="url(#a)"/>' +
+  '<path d="M12 6L22 15L12 18L2 15Z" fill="#fff" fill-opacity=".92"/>' +
+  '<path d="M12 18L2 15L12 38Z" fill="#fff" fill-opacity=".45"/>' +
+  '<path d="M12 18L22 15L12 38Z" fill="#5a4aa8" fill-opacity=".45"/>' +
+  '<path d="M12 6L12 18M2 15L12 18L22 15" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width=".8"/>' +
+  `<path d="M12 6L22 15L12 38L2 15Z" ${GEM_OUTLINE}/>` +
+  sparkleAt(22, 7, 6.5, halo);
+const gemRound = (halo) =>
+  '<path d="M8 12L13 6H23L28 12L18 32Z" fill="url(#a)"/>' +
+  '<path d="M13 6H23L20 12H16Z" fill="#fff" fill-opacity=".95"/>' +
+  '<path d="M8 12L13 6L16 12Z" fill="#fff" fill-opacity=".6"/>' +
+  '<path d="M23 6L28 12H20Z" fill="#5a4aa8" fill-opacity=".3"/>' +
+  '<path d="M8 12H18L18 32Z" fill="#fff" fill-opacity=".4"/>' +
+  '<path d="M18 12H28L18 32Z" fill="#5a4aa8" fill-opacity=".45"/>' +
+  '<path d="M13 6L16 12L18 32L20 12L23 6M8 12H28" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width=".6"/>' +
+  `<path d="M8 12L13 6H23L28 12L18 32Z" ${GEM_OUTLINE}/>` +
+  sparkleAt(27, 6, 5.5, halo);
+const ANGEL_GEM_DEFS =
+  '<linearGradient id="a" x1="0" y1="0" x2="1" y2="1">' +
+  '<stop offset="0" stop-color="#ffd6e7"/><stop offset=".35" stop-color="#fff3c4"/>' +
+  '<stop offset=".65" stop-color="#cdeeff"/><stop offset="1" stop-color="#dccbff"/></linearGradient>' +
+  '<radialGradient id="g"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#e6d6ff" stop-opacity="0"/></radialGradient>' +
+  '<radialGradient id="h"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#ffe0f0" stop-opacity=".9"/><stop offset=".6" stop-color="#d8f3ff" stop-opacity=".6"/><stop offset="1" stop-color="#fff4c2" stop-opacity="0"/></radialGradient>' +
+  // Sombra de apoyo de las medianas: una elipse que se desvanece (sin
+  // filtros de desenfoque, que cuestan más al pintar).
+  '<radialGradient id="s"><stop offset="0" stop-color="#3c2f78" stop-opacity=".28"/><stop offset="1" stop-color="#3c2f78" stop-opacity="0"/></radialGradient>' +
+  `<symbol id="L" viewBox="0 0 30 40">${gemLong("g")}</symbol>` +
+  `<symbol id="R" viewBox="0 0 36 34">${gemRound("g")}</symbol>` +
+  `<symbol id="LI" viewBox="0 0 30 40">${gemLong("h")}</symbol>` +
+  `<symbol id="RI" viewBox="0 0 36 34">${gemRound("h")}</symbol>`;
+// [forma, x, y, ancho] dentro del mosaico (nunca cortadas por el borde).
+// Forma "L"/"R" con destello blanco, "LI"/"RI" con destello tornasol.
+// Las medianas (15 px o más) llevan su sombra de apoyo debajo.
+const gemTile = (size, gems) =>
+  `${svgUrl(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
+      `<defs>${ANGEL_GEM_DEFS}</defs>` +
+      gems
+        .map(([k, x, y, w]) => {
+          const h = Math.round(w * (k[0] === "L" ? 40 / 30 : 34 / 36));
+          // Punta de abajo de la gema: ~95% del alto de su viewBox.
+          const shadow =
+            w >= 15
+              ? `<ellipse cx="${x + w * (k[0] === "L" ? 0.4 : 0.5)}" cy="${y + h * 0.95}" rx="${w * 0.42}" ry="${w * 0.13}" fill="url(#s)"/>`
+              : "";
+          return `${shadow}<use href="#${k}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+        })
+        .join("") +
+      "</svg>"
+  )} 0 0 / ${size}px ${size}px`;
+// La mayoría chicas (7 a 10 px) y algunas medianas (15 a 18 px); misma
+// cantidad y posiciones que antes, 4 con destello tornasol.
+const ANGEL_GEM_SKY = [
+  gemTile(173, [
+    ["L", 14, 18, 9],
+    ["RI", 98, 6, 8],
+    ["L", 136, 70, 15],
+    ["R", 46, 94, 7],
+    ["LI", 92, 140, 8],
+  ]),
+  gemTile(251, [
+    ["RI", 22, 176, 17],
+    ["L", 188, 24, 10],
+    ["R", 118, 58, 7],
+    ["L", 64, 104, 18],
+    ["R", 200, 196, 9],
+    ["LI", 166, 126, 7],
+  ]),
+].join(", ");
 
 const ANGEL_VARS = {
-  "--bg": "#efedf1",
-  "--surface": "#f8f7fa",
-  "--surface-alt": "#e6e3ea",
+  "--bg": ANGEL_BG,
+  "--surface": "#fafafc",
+  "--surface-alt": "#e2dfe9",
   "--accent": "#5a37c4",
   "--accent2": "#8a2a8f",
-  "--text": "#1d1a2b",
-  "--text-muted": "#4f4a63",
+  "--text": ANGEL_INK,
+  "--text-muted": ANGEL_INK_MUTED,
   "--border": ANGEL_EDGE,
   "--accent2-soft": "rgba(138, 42, 143, 0.1)",
   "--accent2-softer": "rgba(138, 42, 143, 0.07)",
@@ -148,39 +239,66 @@ const ANGEL_VARS = {
   "--accent-soft": "rgba(90, 55, 196, 0.1)",
   "--accent-softer": "rgba(90, 55, 196, 0.07)",
   "--accent-soft-border": "rgba(90, 55, 196, 0.7)",
+  "--shadow-rgb": ANGEL_SHADOW,
+  // Títulos con el arcoíris oscuro y en relieve (luz blanca arriba, sombra
+  // corta y nítida abajo); el logo, con más profundidad.
   "--gradient-text": `linear-gradient(90deg, ${ANGEL_RAINBOW_DARK})`,
-  "--logo-depth": "drop-shadow(0 1px 0 rgba(255, 255, 255, 0.9)) drop-shadow(0 2px 2px rgba(70, 62, 100, 0.3))",
-  "--on-primary": "#26184f",
-  // Relieve: luz blanca arriba a la izquierda, sombra gris lila abajo a
-  // la derecha; los campos, al revés y hacia adentro (hundidos). El brillo
-  // de las tarjetas (--surface-sheen) está más abajo, con el tornasol.
-  "--shine":
-    "-6px -6px 14px rgba(255, 255, 255, 0.95), 6px 6px 16px rgba(70, 62, 100, 0.16), inset 0 1px 0 #ffffff",
-  "--field-shine": "inset 3px 3px 6px rgba(70, 62, 100, 0.16), inset -3px -3px 6px rgba(255, 255, 255, 0.95)",
-  "--chip-shine": "-3px -3px 7px rgba(255, 255, 255, 0.95), 3px 3px 8px rgba(70, 62, 100, 0.16)",
-  // Se hunden al presionar: la sombra pasa a ser interior.
-  "--button-shine-pressed":
-    `inset 3px 3px 6px rgba(70, 62, 100, 0.22), inset -3px -3px 6px rgba(255, 255, 255, 0.9), 0 0 0 1px ${ANGEL_EDGE}`,
-  "--tab-bg": "linear-gradient(145deg, #ffffff, #f3f1f6)",
-  // Pestaña activa: blanca, con una línea arcoíris arriba y otra abajo
-  // (el borde redondeado las curva en las puntas). Sin borde propio: el
-  // anillo gris lo pone --button-shine.
-  "--tab-active-bg":
-    `linear-gradient(90deg, ${ANGEL_RAINBOW}) 0 0 / 100% 2.5px no-repeat, linear-gradient(90deg, ${ANGEL_RAINBOW}) 0 100% / 100% 2.5px no-repeat, linear-gradient(180deg, #ffffff, #f5f3f8)`,
+  "--title-depth": `drop-shadow(0 1px 0 #ffffff) drop-shadow(0 2px 1px rgba(${ANGEL_SHADOW}, 0.45))`,
+  "--logo-depth": `drop-shadow(0 1px 0 #ffffff) drop-shadow(0 2px 1px rgba(${ANGEL_SHADOW}, 0.45)) drop-shadow(0 4px 6px rgba(${ANGEL_SHADOW}, 0.22))`,
+  // Tarjetas: reflejo especular en el borde superior (franja blanca y una
+  // mancha de luz arriba a la izquierda), halo blanco en el borde y una
+  // sombra inferior nítida y honda. Los campos, hundidos.
+  "--surface-sheen":
+    "linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0px, rgba(255, 255, 255, 0) 26px), radial-gradient(70% 40% at 12% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%), radial-gradient(120% 60% at 100% 0%, rgba(214, 196, 255, 0.16), rgba(214, 196, 255, 0) 60%), linear-gradient(165deg, #ffffff, #f8f7fb 55%, #f2f0f6)",
+  "--shine": `0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 12px rgba(255, 255, 255, 0.7), -5px -5px 12px rgba(255, 255, 255, 0.85), 0 2px 3px rgba(${ANGEL_SHADOW}, 0.2), 8px 12px 24px rgba(${ANGEL_SHADOW}, 0.26), inset 0 1px 0 #ffffff, inset 0 2px 5px rgba(255, 255, 255, 0.9), inset 0 -2px 6px rgba(${ANGEL_SHADOW}, 0.06)`,
+  "--field-shine": `inset 3px 3px 6px rgba(${ANGEL_SHADOW}, 0.2), inset -3px -3px 6px rgba(255, 255, 255, 0.95)`,
+  // Pestañas inactivas y botones secundarios: domo (luz arriba, sombra
+  // abajo por dentro) y sombra inferior nítida.
+  "--tab-bg":
+    "radial-gradient(120% 70% at 50% 0%, #ffffff, rgba(255, 255, 255, 0) 65%), linear-gradient(180deg, #ffffff 0%, #f5f3f8 60%, #e9e6ef 100%)",
+  "--chip-shine": `-3px -3px 7px rgba(255, 255, 255, 0.9), 0 1px 1px rgba(${ANGEL_SHADOW}, 0.28), 3px 5px 10px rgba(${ANGEL_SHADOW}, 0.28), inset 0 2px 2px #ffffff, inset 0 -3px 6px rgba(${ANGEL_SHADOW}, 0.1)`,
+  // Pestaña activa: el mismo domo con una línea arcoíris arriba y otra
+  // abajo (el borde redondeado las curva en las puntas). Sin borde propio:
+  // el anillo lo pone --button-shine.
+  "--tab-active-bg": `linear-gradient(90deg, ${ANGEL_RAINBOW}) 0 0 / 100% 2.5px no-repeat, linear-gradient(90deg, ${ANGEL_RAINBOW}) 0 100% / 100% 2.5px no-repeat, radial-gradient(120% 70% at 50% 0%, #ffffff, rgba(255, 255, 255, 0) 65%), linear-gradient(180deg, #ffffff 0%, #f6f4f9 55%, #ebe8f1 100%)`,
   "--tab-active-border": "transparent",
-  "--tab-active-text": "#1d1a2b",
+  "--tab-active-text": ANGEL_INK,
+  // Publicar, Enviar, banner: domo de perla tornasol (reflejo grande
+  // arriba, sombreado abajo), sombra inferior nítida, el anillo de 3:1 y
+  // el halo lila. Se hunden al presionar (sombra interior) y llevan el
+  // destello lila claro.
+  "--gradient-primary":
+    "radial-gradient(75% 48% at 50% 0%, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0) 100%), linear-gradient(180deg, rgba(120, 100, 170, 0) 55%, rgba(120, 100, 170, 0.12) 100%), linear-gradient(115deg, #ffd6e0 0%, #ffe6c7 20%, #fff4c2 38%, #d4f5dc 56%, #d1e4ff 76%, #e6d6ff 100%)",
+  "--on-primary": ANGEL_INK,
+  "--button-shine": `0 0 0 1px ${ANGEL_EDGE}, inset 0 2px 2px #ffffff, inset 0 -4px 8px rgba(${ANGEL_SHADOW}, 0.14), -4px -4px 10px rgba(255, 255, 255, 0.9), 0 2px 2px rgba(${ANGEL_SHADOW}, 0.3), 4px 7px 14px rgba(${ANGEL_SHADOW}, 0.3), 0 0 18px rgba(170, 130, 255, 0.4)`,
+  "--button-shine-pressed": `0 0 0 1px ${ANGEL_EDGE}, inset 4px 4px 8px rgba(${ANGEL_SHADOW}, 0.32), inset -3px -3px 6px rgba(255, 255, 255, 0.9)`,
+  "--sweep-color": "rgba(232, 220, 255, 0.8)",
+  // Anillo de 3:1 para los controles sin borde propio (opción elegida del
+  // menú de temas, ✕ del banner, ▶ del audio propio, acciones del producto
+  // con hover): blanco sobre blanco no se distinguirían.
+  "--control-ring": `0 0 0 1px ${ANGEL_EDGE}`,
   "--bar-bg": "#fbfafc",
   "--theme-btn-bg": "#ffffff",
   "--bottom-bar-bg": "#ffffff",
-  "--bottom-bar-shine": "0 -4px 14px rgba(70, 62, 100, 0.1)",
-  "--nav-active-color": "#1d1a2b",
+  "--bottom-bar-shine": `0 -4px 14px rgba(${ANGEL_SHADOW}, 0.14), inset 0 1px 0 #ffffff`,
+  "--nav-active-color": ANGEL_INK,
   "--nav-active-mark": `linear-gradient(90deg, ${ANGEL_RAINBOW})`,
   "--unread-edge": "#6a22b8",
+  // Fondo perla: el cielo de cristales sobre un brillo nacarado suave.
   "--page-bg": "transparent",
+  "--page-glare": [
+    ANGEL_GEM_SKY,
+    "radial-gradient(70% 40% at 10% 0%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 70%)",
+    "radial-gradient(50% 30% at 100% 30%, rgba(214, 196, 255, 0.3), rgba(214, 196, 255, 0) 70%)",
+    "radial-gradient(50% 30% at 0% 80%, rgba(255, 214, 230, 0.32), rgba(255, 214, 230, 0) 70%)",
+    ANGEL_BG,
+  ].join(", "),
+  // Aro arcoíris de Momentos.
   "--moment-unseen-shadow": "0 0 0 2px var(--surface)",
   "--moment-ring-image": `conic-gradient(from 0deg, ${ANGEL_RAINBOW}, #ff3d57)`,
-  "--shadow-rgb": "70, 62, 100",
-  "--close-hover-bg": "#dcd8e3",
+  "--moment-ring-halo": "0 0 12px 2px rgba(138, 77, 255, 0.35)",
+  "--moment-glow-shadow": "0 0 0 2px var(--surface), 0 0 16px 6px rgba(138, 77, 255, 0.3)",
+  "--close-hover-bg": "#d6d2df",
   // Lo mismo que Pinky (punto 83) para un tema claro.
   "--disabled-opacity": "0.85",
   "--veil-active-bg": "#f8f7fa",
@@ -190,32 +308,6 @@ const ANGEL_VARS = {
   "--badge-new-text": "#0f5a2b",
   "--badge-used-bg": "rgba(138, 61, 0, 0.14)",
   "--badge-used-text": "#7a3500",
-  // Anillo gris de 3:1 para los controles sin borde propio (opción elegida
-  // del menú de temas, ✕ del banner, ▶ del audio propio, acciones del
-  // producto con hover): blanco sobre blanco no se distinguirían.
-  "--control-ring": `0 0 0 1px ${ANGEL_EDGE}`,
-  // Tornasol pastel vivo con halo iridiscente en los botones principales,
-  // destello lila y cristales fijos en el fondo.
-  "--gradient-primary":
-    "radial-gradient(60% 24% at 50% 10%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 100%), linear-gradient(115deg, #ffd6e0 0%, #ffe6c7 20%, #fff4c2 38%, #d4f5dc 56%, #d1e4ff 76%, #e6d6ff 100%)",
-  "--button-shine":
-    `-3px -3px 8px rgba(255, 255, 255, 0.95), 4px 4px 10px rgba(70, 62, 100, 0.2), inset 0 1px 1px #ffffff, 0 0 0 1px ${ANGEL_EDGE}, 0 0 16px rgba(170, 130, 255, 0.35)`,
-  "--sweep-color": "rgba(214, 190, 255, 0.6)",
-  "--surface-sheen":
-    "radial-gradient(120% 60% at 100% 0%, rgba(214, 196, 255, 0.14), rgba(214, 196, 255, 0) 60%), linear-gradient(145deg, #fdfcfe, #f4f3f7)",
-  "--moment-ring-halo": "0 0 12px 2px rgba(138, 77, 255, 0.35)",
-  "--moment-glow-shadow": "0 0 0 2px var(--surface), 0 0 16px 6px rgba(138, 77, 255, 0.3)",
-  "--page-glare": [
-    crystal("6%", "18%", 14),
-    crystal("94%", "34%", 11),
-    crystal("4%", "71%", 10),
-    crystal("90%", "83%", 16),
-    crystal("52%", "96%", 8),
-    "radial-gradient(70% 40% at 10% 0%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%)",
-    "radial-gradient(50% 30% at 100% 30%, rgba(214, 196, 255, 0.28), rgba(214, 196, 255, 0) 70%)",
-    "radial-gradient(50% 30% at 0% 80%, rgba(255, 214, 230, 0.3), rgba(255, 214, 230, 0) 70%)",
-    "#efedf1",
-  ].join(", "),
 };
 
 // Estrellas del fondo de Noche Violeta: puntos de degradado en dos mosaicos

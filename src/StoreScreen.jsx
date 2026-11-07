@@ -76,6 +76,7 @@ const styles = {
     fontWeight: 700,
     margin: 0,
     background: "var(--gradient-text)",
+    filter: "var(--title-depth)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",

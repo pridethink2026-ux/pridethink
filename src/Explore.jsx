@@ -146,6 +146,7 @@ const styles = {
     fontWeight: 700,
     fontFamily: "var(--font-display)",
     background: "var(--gradient-text)",
+    filter: "var(--title-depth)",
     WebkitBackgroundClip: "text",
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
