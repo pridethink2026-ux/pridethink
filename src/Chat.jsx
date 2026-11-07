@@ -14,11 +14,20 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Avatar from "./Avatar";
-import { notify, useIsMobile, getChatId } from "./utils";
-import { newMessageId, sendChatMessage } from "./chatMessages";
+import { notify, useIsMobile, getChatId, timeAgo } from "./utils";
+import {
+  newMessageId,
+  sendChatMessage,
+  useRecentChats,
+  useChatSummary,
+  isChatUnread,
+  markChatRead,
+  RECENT_CHATS_PAGE,
+} from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
-import { isEffectivelyOnline, formatLastSeen, usePresences } from "./presence";
+import { isEffectivelyOnline, formatLastSeen, usePresences, canSeeOnlineStatus } from "./presence";
+import { useMyFollows } from "./FollowsContext";
 import { StickerImage, StickerPicker } from "./Stickers";
 import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
@@ -42,6 +51,21 @@ import ImageEditor from "./ImageEditor";
 
   Todo es en tiempo real: usa onSnapshot, no hace falta recargar la página
   para ver mensajes nuevos ni contactos nuevos.
+
+  LISTA DE CONVERSACIONES (punto 84, commit 3): la columna izquierda
+  muestra tus conversaciones recientes (useRecentChats, chatMessages.js:
+  una consulta sobre chats/{chatId}, la más reciente primero, de a
+  RECENT_CHATS_PAGE con "Cargar más"), sin abrir los mensajes. Cada fila:
+  avatar con punto de en línea, nombre, vista previa del último mensaje
+  (chatPreview), hora relativa y, si no la leíste (isChatUnread), un punto
+  y el nombre en negrita. Al abrir una conversación con mensajes sin leer
+  se escribe tu lastReadAt (useChatSummary + markChatRead, una vez por
+  mensaje). Nombre y foto salen de AllUsersContext (sin lecturas extra).
+  "Nueva conversación" cambia la columna a un buscador de personas; la
+  conversación aparece en la lista recién con el primer mensaje.
+  Quién aparece (en la lista, en el buscador y al llegar desde una
+  notificación), canChatWith: sin bloqueo en ninguna dirección y, si es
+  privado, solo con seguimiento mutuo. Quien ya no existe no se muestra.
 
   DISEÑO RESPONSIVO:
   En pantallas angostas (celular) se muestra una sola columna a la vez
@@ -118,12 +142,12 @@ import ImageEditor from "./ImageEditor";
   en el encabezado de la conversación activa (`isEffectivelyOnline`, que
   ya combina el flag guardado con la frescura de "lastSeen" — ver
   presence.js). La presencia sale de presence/{uid} (commit 9g) con
-  `usePresences`: un listener por cada contacto de la lista en pantalla
-  (filtrada por la búsqueda) más el de la conversación activa, solo
-  mientras el Chat está abierto. No hace falta filtrar por privacidad acá:
-  `visibleContacts` YA excluye del todo a cualquier perfil privado y a los
-  bloqueados (ver más abajo), y las reglas igual rechazan lo que no se
-  puede ver (queda sin punto). Si no está en línea, debajo del nombre se muestra
+  `usePresences`: un listener por cada fila de la lista de conversaciones
+  en pantalla (filtrada por la búsqueda; como mucho las que trajo la
+  lista) más el de la conversación activa, solo mientras el Chat está
+  abierto. El buscador de "Nueva conversación" no pide presencia. Se
+  filtra con canSeeOnlineStatus para no abrir listeners que las reglas
+  van a rechazar. Si no está en línea, debajo del nombre se muestra
   "Últ. vez hace X" (`formatLastSeen`, reutiliza `timeAgo()` — formato
   relativo en español, igual que los posts).
 */
@@ -323,7 +347,8 @@ const styles = {
     overflow: "hidden",
   },
   contactsCol: (isMobile) => ({
-    width: isMobile ? "100%" : "240px",
+    // 280 (antes 240): la fila lleva vista previa y hora.
+    width: isMobile ? "100%" : "280px",
     borderRight: isMobile ? "none" : "1px solid var(--border)",
     display: "flex",
     flexDirection: "column",
@@ -363,17 +388,87 @@ const styles = {
     flex: 1,
     overflowY: "auto",
   },
+  // Cada fila es un <button> (se abre con el teclado): sin borde propio
+  // salvo el de la izquierda, con la fuente y el color de la app.
   contactItem: (active) => ({
     display: "flex",
     alignItems: "center",
     gap: "10px",
+    width: "100%",
     padding: "12px 16px",
     cursor: "pointer",
-    background: active ? "var(--surface-alt)" : "transparent",
+    border: "none",
     borderLeft: active ? "3px solid var(--accent2)" : "3px solid transparent",
+    background: active ? "var(--surface-alt)" : "transparent",
+    color: "var(--text)",
+    fontFamily: "inherit",
+    textAlign: "left",
+    boxSizing: "border-box",
   }),
-  contactName: { fontSize: "14px", fontWeight: 600, margin: 0 },
+  contactText: { flex: 1, minWidth: 0 },
+  contactTopLine: { display: "flex", alignItems: "baseline", gap: "8px" },
+  contactName: (unread) => ({
+    flex: 1,
+    minWidth: 0,
+    fontSize: "14px",
+    fontWeight: unread ? 800 : 600,
+    margin: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  }),
+  contactTime: { fontSize: "11px", color: "var(--text-muted)", flexShrink: 0 },
+  contactBottomLine: { display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" },
+  contactPreview: (unread) => ({
+    flex: 1,
+    minWidth: 0,
+    fontSize: "12px",
+    margin: 0,
+    color: unread ? "var(--text)" : "var(--text-muted)",
+    fontWeight: unread ? 600 : 400,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  }),
+  unreadDot: {
+    width: "9px",
+    height: "9px",
+    borderRadius: "50%",
+    background: "var(--accent2)",
+    flexShrink: 0,
+  },
   contactIdentity: { fontSize: "12px", color: "var(--text-muted)", margin: "2px 0 0" },
+  // "Nueva conversación" (arriba de la lista) y "Cargar más" (abajo).
+  listActionBtn: {
+    display: "block",
+    width: "calc(100% - 24px)",
+    margin: "10px 12px 0",
+    padding: "8px 12px",
+    borderRadius: "999px",
+    border: "1px solid var(--border)",
+    background: "var(--surface-alt)",
+    boxShadow: "var(--chip-shine)",
+    color: "var(--text)",
+    fontFamily: "inherit",
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  listHeaderRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    borderBottom: "1px solid var(--border)",
+  },
+  listBackBtn: {
+    background: "none",
+    border: "none",
+    color: "var(--text)",
+    fontSize: "18px",
+    cursor: "pointer",
+    padding: "14px 0 10px 12px",
+  },
+  listNote: { padding: "16px", fontSize: "13px", color: "var(--text-muted)", margin: 0 },
   chatHeaderInfo: {
     flex: 1,
     minWidth: 0,
@@ -968,6 +1063,26 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
   );
 }
 
+// Vista previa del último mensaje de una conversación (fila de la lista),
+// con "Tú:" si lo enviaste vos. Los tipos sin texto llevan una etiqueta;
+// la respuesta a un momento, la misma frase que su burbuja.
+function chatPreview(chat, myUid, t) {
+  const mine = chat.lastSenderId === myUid;
+  if (chat.lastType === "moment_reply") {
+    const label = t(mine ? "chat.momentReplyMine" : "chat.momentReplyTheirs");
+    return chat.lastText ? `${label}: ${chat.lastText}` : label;
+  }
+  const labels = {
+    audio: "chat.previewAudio",
+    image: "chat.previewPhoto",
+    sticker: "chat.previewSticker",
+    gift: "chat.previewGift",
+    shared_post: "chat.previewSharedPost",
+  };
+  const body = labels[chat.lastType] ? t(labels[chat.lastType]) : chat.lastText || "";
+  return mine ? t("chat.previewMine", { text: body }) : body;
+}
+
 export default function Chat({
   onOpenProfile,
   onOpenPost,
@@ -1031,22 +1146,46 @@ export default function Chat({
     [allUsersRaw, currentUid]
   );
 
-  // Contactos visibles: sin perfiles privados, sin bloqueos en ninguna dirección
+  // Con quién se puede chatear (lista, buscador y notificación, punto 84):
+  // sin bloqueo en ninguna dirección y, si es privado, con seguimiento
+  // mutuo. Mismo criterio que las reglas (puedeEscribirEnChat); quien ya
+  // te escribió siendo privado llega en el commit 4 (writers).
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
-  const visibleContacts = allUsers.filter((c) => {
-    if (c.isPrivate) return false;
-    if (isBlockedEitherWay(blockedByMe, blockedMe, c.uid)) return false;
-    return true;
-  });
+  const { following, followers, ready: followsReady } = useMyFollows();
+  const canChatWith = (user) => {
+    if (!user || user.uid === currentUid) return false;
+    if (isBlockedEitherWay(blockedByMe, blockedMe, user.uid)) return false;
+    if (!user.isPrivate) return true;
+    return following.includes(user.uid) && followers.includes(user.uid);
+  };
+
+  // "recent": tus conversaciones; "new": buscador de "Nueva conversación".
+  const [listMode, setListMode] = useState("recent");
+  const [maxChats, setMaxChats] = useState(RECENT_CHATS_PAGE);
+  const recent = useRecentChats(currentUid, maxChats);
+  const usersByUid = useMemo(() => {
+    const map = {};
+    allUsersRaw.forEach((u) => (map[u.uid] = u));
+    return map;
+  }, [allUsersRaw]);
 
   const searchLower = search.trim().toLowerCase();
-  const contacts = searchLower
-    ? visibleContacts.filter(
-        (c) =>
-          (c.displayName || "").toLowerCase().includes(searchLower) ||
-          (c.identity || "").toLowerCase().includes(searchLower)
-      )
-    : visibleContacts;
+  const matchesSearch = (u) =>
+    !searchLower ||
+    (u.displayName || "").toLowerCase().includes(searchLower) ||
+    (u.identity || "").toLowerCase().includes(searchLower);
+
+  // Filas de la lista: la otra persona de cada chat, con su perfil.
+  const recentRows = recent.chats
+    .map((chat) => {
+      const otherUid = (chat.participants || []).find((uid) => uid !== currentUid);
+      return { chat, user: usersByUid[otherUid] };
+    })
+    .filter((row) => canChatWith(row.user) && matchesSearch(row.user));
+
+  // Buscador de "Nueva conversación": todas las personas con las que se
+  // puede chatear (sin presencia).
+  const newContacts = listMode === "new" ? allUsers.filter((u) => canChatWith(u) && matchesSearch(u)) : [];
 
   const isBlocked = activeContact ? blockedByMe.includes(activeContact.uid) : false;
 
@@ -1057,25 +1196,62 @@ export default function Chat({
     ? allUsers.find((u) => u.uid === activeContact.uid) || activeContact
     : null;
 
-  const presenceByUid = usePresences([...contacts.map((c) => c.uid), activeContact?.uid]);
+  // Presencia solo de las filas en pantalla y de la conversación activa,
+  // y solo de quien se puede ver (canSeeOnlineStatus).
+  const canSeePresence = (user) => canSeeOnlineStatus(user, user?.uid, currentUid, following, followers);
+  const presenceUids = [
+    ...(listMode === "recent" ? recentRows.filter((r) => canSeePresence(r.user)).map((r) => r.user.uid) : []),
+    liveActiveContact && canSeePresence(liveActiveContact) ? liveActiveContact.uid : null,
+  ];
+  const presenceByUid = usePresences(presenceUids);
   const activePresence = activeContact ? presenceByUid[activeContact.uid] : null;
+
+  // Marcar leída la conversación abierta (punto 84, commit 3): si el último
+  // mensaje es de la otra persona y es posterior a tu lastReadAt, se
+  // escribe la hora — una sola vez por mensaje (markedReadRef), aunque el
+  // resumen vuelva a llegar con la hora local estimada, y solo con la
+  // pestaña visible (si no, quedaría leído algo que no viste).
+  const activeChatId = currentUid && activeContact ? getChatId(currentUid, activeContact.uid) : null;
+  const activeSummary = useChatSummary(activeChatId);
+  const markedReadRef = useRef("");
+  const [pageVisible, setPageVisible] = useState(() => document.visibilityState !== "hidden");
+  useEffect(() => {
+    const onChange = () => setPageVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  }, []);
+  useEffect(() => {
+    if (!activeChatId || !pageVisible || !isChatUnread(activeSummary, currentUid)) return;
+    const markKey = `${activeChatId}:${activeSummary.lastMessageAt.toMillis()}`;
+    if (markedReadRef.current === markKey) return;
+    markedReadRef.current = markKey;
+    markChatRead(currentUid, activeChatId).catch((err) =>
+      console.error("chats: no se pudo marcar como leída", err.code)
+    );
+  }, [activeChatId, activeSummary, currentUid, pageVisible]);
+
+  // Abrir una conversación desde la lista o el buscador.
+  const openConversation = (user) => {
+    if (recordingState !== "idle") return;
+    setActiveContact(user);
+    setStickerPanelOpen(false);
+    setChatUnavailable(false);
+    setListMode("recent");
+    setSearch("");
+  };
 
   // Abrir una conversación puntual al llegar desde una notificación de
   // mensaje (App.js -> openChat, mismo patrón que initialProductId en
-  // StoreScreen.jsx). Espera a que llegue la lista de usuarios para no
-  // marcar "no disponible" mientras todavía está cargando. Mismo criterio
-  // que visibleContacts de arriba: si la persona tiene perfil privado, hay
-  // bloqueo en cualquier dirección o ya no existe, no se abre nada y se
-  // muestra un aviso genérico — el mismo texto en los tres casos, para no
-  // revelar quién bloqueó a quién.
+  // StoreScreen.jsx). Espera a que lleguen la lista de usuarios y tus
+  // seguimientos para no marcar "no disponible" mientras todavía cargan.
+  // Mismo criterio que la lista (canChatWith): si es privado sin
+  // seguimiento mutuo, hay bloqueo en cualquier dirección o ya no existe,
+  // no se abre nada y se muestra un aviso genérico — el mismo texto en
+  // los tres casos, para no revelar quién bloqueó a quién.
   useEffect(() => {
-    if (!initialContactUid || !currentUid || allUsersRaw.length === 0) return;
+    if (!initialContactUid || !currentUid || allUsersRaw.length === 0 || !followsReady) return;
     const target = allUsersRaw.find((u) => u.uid === initialContactUid);
-    const available =
-      !!target &&
-      target.uid !== currentUid &&
-      !target.isPrivate &&
-      !isBlockedEitherWay(blockedByMe, blockedMe, target.uid);
+    const available = canChatWith(target);
     if (available) {
       setActiveContact(target);
       setStickerPanelOpen(false);
@@ -1085,7 +1261,9 @@ export default function Chat({
       setChatUnavailable(true);
     }
     onConsumeInitialContactUid?.();
-  }, [initialContactUid, currentUid, allUsersRaw, blockedByMe, blockedMe, onConsumeInitialContactUid]);
+    // canChatWith depende de lo mismo que ya está en la lista.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialContactUid, currentUid, allUsersRaw, blockedByMe, blockedMe, followsReady, following, followers, onConsumeInitialContactUid]);
 
   const handleToggleBlock = async () => {
     if (!activeContact || !currentUid) return;
@@ -1402,9 +1580,41 @@ export default function Chat({
       <div style={styles.shell}>
         {showContactsList && (
           <div style={styles.contactsCol(isMobile)}>
-            <p style={styles.contactsHeader}>{t("chat.peopleHeader")}</p>
+            {listMode === "recent" ? (
+              <>
+                <p style={styles.contactsHeader}>{t("chat.conversationsHeader")}</p>
+                <button
+                  type="button"
+                  style={styles.listActionBtn}
+                  onClick={() => {
+                    setListMode("new");
+                    setSearch("");
+                  }}
+                >
+                  ✏️ {t("chat.newConversation")}
+                </button>
+              </>
+            ) : (
+              <div style={styles.listHeaderRow}>
+                <button
+                  type="button"
+                  style={styles.listBackBtn}
+                  onClick={() => {
+                    setListMode("recent");
+                    setSearch("");
+                  }}
+                  aria-label={t("chat.backToConversations")}
+                  title={t("chat.backToConversations")}
+                >
+                  ←
+                </button>
+                <p style={{ ...styles.contactsHeader, borderBottom: "none", paddingLeft: "4px" }}>
+                  {t("chat.newConversation")}
+                </p>
+              </div>
+            )}
             {chatUnavailable && (
-              <p style={{ padding: "0 16px 8px", fontSize: "13px", color: "var(--text-muted)" }}>
+              <p style={{ padding: "8px 16px 0", fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
                 {t("chat.conversationUnavailable")}
               </p>
             )}
@@ -1412,43 +1622,100 @@ export default function Chat({
               <input
                 style={styles.searchInput}
                 type="text"
-                placeholder={t("chat.searchPlaceholder")}
+                placeholder={t(listMode === "recent" ? "chat.searchConversations" : "chat.searchPlaceholder")}
+                aria-label={t(listMode === "recent" ? "chat.searchConversations" : "chat.searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <div style={styles.contactsList}>
-              {contacts.length === 0 && (
-                <p style={{ padding: "16px", fontSize: "13px", color: "var(--text-muted)" }}>
-                  {search ? t("chat.noSearchResults") : t("chat.noContacts")}
-                </p>
+              {listMode === "recent" ? (
+                <>
+                  {recent.loading && <p style={styles.listNote}>{t("chat.loadingConversations")}</p>}
+                  {recent.error && <p style={styles.listNote}>{t("chat.conversationsError")}</p>}
+                  {!recent.loading && !recent.error && recentRows.length === 0 && (
+                    <p style={styles.listNote}>
+                      {search ? t("chat.noSearchResults") : t("chat.noConversations")}
+                    </p>
+                  )}
+                  {recentRows.map(({ chat, user: c }) => {
+                    const unread = isChatUnread(chat, currentUid);
+                    return (
+                      <button
+                        type="button"
+                        key={chat.id}
+                        style={styles.contactItem(activeContact?.uid === c.uid)}
+                        onClick={() => openConversation(c)}
+                      >
+                        <Avatar
+                          uid={c.uid}
+                          name={c.displayName || c.identity}
+                          identity={c.identity}
+                          photoURL={c.photoURL}
+                          size="md"
+                          online={isEffectivelyOnline(presenceByUid[c.uid])}
+                        />
+                        <span style={styles.contactText}>
+                          <span style={styles.contactTopLine}>
+                            <span style={styles.contactName(unread)}>{c.displayName || t("chat.defaultName")}</span>
+                            <span style={styles.contactTime}>{timeAgo(chat.lastMessageAt, t)}</span>
+                          </span>
+                          <span style={styles.contactBottomLine}>
+                            <span style={styles.contactPreview(unread)}>{chatPreview(chat, currentUid, t)}</span>
+                            {unread && (
+                              <span
+                                style={styles.unreadDot}
+                                role="img"
+                                aria-label={t("chat.unread")}
+                                title={t("chat.unread")}
+                              />
+                            )}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {recent.hasMore && (
+                    <button
+                      type="button"
+                      style={{ ...styles.listActionBtn, margin: "10px 12px 14px" }}
+                      onClick={() => setMaxChats((n) => n + RECENT_CHATS_PAGE)}
+                    >
+                      {t("chat.loadMore")}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {newContacts.length === 0 && (
+                    <p style={styles.listNote}>
+                      {search ? t("chat.noSearchResults") : t("chat.noContacts")}
+                    </p>
+                  )}
+                  {newContacts.map((c) => (
+                    <button
+                      type="button"
+                      key={c.uid}
+                      style={styles.contactItem(activeContact?.uid === c.uid)}
+                      onClick={() => openConversation(c)}
+                    >
+                      <Avatar
+                        uid={c.uid}
+                        name={c.displayName || c.identity}
+                        identity={c.identity}
+                        photoURL={c.photoURL}
+                        size="md"
+                      />
+                      <span style={styles.contactText}>
+                        <span style={{ ...styles.contactName(false), display: "block" }}>
+                          {c.displayName || t("chat.defaultName")}
+                        </span>
+                        <span style={{ ...styles.contactIdentity, display: "block" }}>{c.identity}</span>
+                      </span>
+                    </button>
+                  ))}
+                </>
               )}
-              {contacts.map((c) => (
-                <div
-                  key={c.uid}
-                  style={styles.contactItem(activeContact?.uid === c.uid)}
-                  onClick={() => {
-                    if (recordingState === "idle") {
-                      setActiveContact(c);
-                      setStickerPanelOpen(false);
-                      setChatUnavailable(false);
-                    }
-                  }}
-                >
-                  <Avatar
-                    uid={c.uid}
-                    name={c.displayName || c.identity}
-                    identity={c.identity}
-                    photoURL={c.photoURL}
-                    size="md"
-                    online={isEffectivelyOnline(presenceByUid[c.uid])}
-                  />
-                  <div>
-                    <p style={styles.contactName}>{c.displayName || t("chat.defaultName")}</p>
-                    <p style={styles.contactIdentity}>{c.identity}</p>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         )}

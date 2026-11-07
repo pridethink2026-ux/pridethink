@@ -1,13 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   collection,
   doc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -32,7 +34,8 @@ import { getChatId } from "./utils";
     lastText: string               hasta LAST_TEXT_MAX; solo texto y
                                    respuesta a un momento, vacío en el resto
     writers: { [uid]: true }       quién escribió alguna vez en el chat
-    lastReadAt: { [uid]: Timestamp }  (commit 3, no leídos)
+    lastReadAt: { [uid]: Timestamp }  hasta cuándo leyó cada uno (commit 3:
+                                   punto de no leído, ver isChatUnread)
 
   La lista de conversaciones recientes (commit 3) lee solo estos
   documentos, sin abrir los mensajes. Las reglas no pueden comprobar que
@@ -121,6 +124,97 @@ export async function repairMyChats(myUid) {
       await setDoc(chatDoc.ref, update, { merge: true });
     }
   }
+}
+
+// ---------------------------------------------------------------------
+// Commit 3 (punto 84): lista de conversaciones recientes y no leídos.
+// ---------------------------------------------------------------------
+
+// Cuántas conversaciones trae la lista de una vez ("Cargar más" suma
+// otra tanda).
+export const RECENT_CHATS_PAGE = 30;
+
+// Hora de un campo Timestamp en milisegundos (0 si falta).
+const millis = (ts) => (ts && ts.toMillis ? ts.toMillis() : 0);
+
+// Tus conversaciones, la más reciente primero, en vivo. Una sola consulta
+// (participants array-contains vos + lastMessageAt desc), con el índice
+// compuesto creado en la consola (commit 2). Los chats sin lastMessageAt
+// (de antes del commit 1 y todavía sin migrar) no salen. Mientras se
+// pide una tanda más, se sigue mostrando la anterior.
+//   → { chats: [{ id, participants, lastMessageAt, ... }], loading, hasMore, error }
+export function useRecentChats(myUid, max) {
+  const key = myUid ? `${myUid}:${max}` : null;
+  const [state, setState] = useState({ key: null, uid: null, chats: [], error: null });
+
+  useEffect(() => {
+    if (!myUid) return;
+    const q = query(
+      collection(db, "chats"),
+      where("participants", "array-contains", myUid),
+      orderBy("lastMessageAt", "desc"),
+      limit(max)
+    );
+    return onSnapshot(
+      q,
+      (snap) =>
+        setState({
+          key: `${myUid}:${max}`,
+          uid: myUid,
+          // "estimate": un mensaje recién enviado (hora del servidor todavía
+          // pendiente) ya sale con la hora local en vez de null.
+          chats: snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })),
+          error: null,
+        }),
+      (err) => {
+        console.error("chats: no se pudo cargar la lista de conversaciones", err.code);
+        setState({ key: `${myUid}:${max}`, uid: myUid, chats: [], error: err.code || "error" });
+      }
+    );
+  }, [myUid, max]);
+
+  const chats = state.uid === myUid ? state.chats : [];
+  const ready = state.key === key;
+  return {
+    chats,
+    loading: !ready && chats.length === 0,
+    hasMore: ready && chats.length >= max,
+    error: ready ? state.error : null,
+  };
+}
+
+// El resumen de UNA conversación, en vivo (null si todavía no existe). Lo
+// usa la conversación abierta para marcarla leída aunque no esté entre las
+// que trajo la lista.
+export function useChatSummary(chatId) {
+  const [state, setState] = useState({ chatId: null, data: null });
+  useEffect(() => {
+    if (!chatId) return;
+    return onSnapshot(
+      doc(db, "chats", chatId),
+      (snap) => setState({ chatId, data: snap.exists() ? snap.data({ serverTimestamps: "estimate" }) : null }),
+      (err) => {
+        console.error("chats: no se pudo leer el resumen", err.code);
+        setState({ chatId, data: null });
+      }
+    );
+  }, [chatId]);
+  return chatId && state.chatId === chatId ? state.data : null;
+}
+
+// No leída = el último mensaje es de la otra persona y llegó después de la
+// última vez que la abriste (o nunca la abriste).
+export function isChatUnread(chat, myUid) {
+  if (!chat || !chat.lastSenderId || chat.lastSenderId === myUid) return false;
+  const last = millis(chat.lastMessageAt);
+  return last > 0 && last > millis(chat.lastReadAt?.[myUid]);
+}
+
+// Marca la conversación leída hasta ahora (hora del servidor; las reglas
+// solo dejan tocar tu propia entrada). Solo sobre un chat que ya existe:
+// updateDoc falla si no, en vez de crearlo.
+export function markChatRead(myUid, chatId) {
+  return updateDoc(doc(db, "chats", chatId), { [`lastReadAt.${myUid}`]: serverTimestamp() });
 }
 
 // Una vez por sesión, al iniciar (App.js, mismo patrón que
