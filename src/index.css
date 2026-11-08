@@ -173,6 +173,33 @@ code {
   }
 }
 
+/* Lluvia de estrellas (punto 86, StarRain.jsx): cada estrella cae
+   --pt-star-fall con una deriva y un giro propios, que pone el componente
+   en línea. Solo transform y opacity, para que vaya en la GPU. Con
+   "reducir movimiento" el componente no se monta (y la regla global del
+   final la dejaría invisible igual). */
+.pt-star-rain-star {
+  will-change: transform, opacity;
+}
+
+@keyframes pt-star-fall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--pt-star-drift, 0px), var(--pt-star-fall, 70vh), 0)
+      rotate(var(--pt-star-spin, 180deg)) scale(1);
+    opacity: 0;
+  }
+}
+
 /* Esqueleto de carga: el brillo es una franja (::after) que se mueve con
    transform, que el navegador anima en la GPU (punto 68: antes se
    animaba background-position, que repinta en cada cuadro). */

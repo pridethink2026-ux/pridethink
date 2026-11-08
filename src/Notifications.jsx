@@ -8,6 +8,7 @@ import {
   query,
   orderBy,
   limit,
+  updateDoc,
   writeBatch,
 } from "firebase/firestore";
 import Avatar from "./Avatar";
@@ -20,7 +21,8 @@ import { useLanguage } from "./LanguageContext";
   -------------
   Campanita con contador de notificaciones no leídas (likes, comentarios,
   mensajes nuevos, seguidores nuevos). Al abrir el panel se muestran las
-  más recientes; al abrirlo se marcan todas como leídas.
+  más recientes; al abrirlo se marcan todas como leídas, salvo las
+  estrellas de Momentos, que se marcan al tocarlas (punto 86, abajo).
 
   Estructura en Firestore:
   - "notifications/{uid}/items/{itemId}"
@@ -50,7 +52,19 @@ import { useLanguage } from "./LanguageContext";
     barra superior en escritorio.
   - NotificationsScreen: la misma lista pero como pantalla completa, para
     la barra de navegación inferior en móvil.
+
+  Lluvia de estrellas (punto 86): las "momentLike" NO se marcan como
+  leídas al abrir la lista (markAllRead las deja afuera), sino al tocarlas.
+  Si al tocarla estaba sin leer, se marca (markRead, solo "read": lo que
+  permite firestore.rules) y el momento se abre con la lluvia
+  (onOpenMoment(momentId, { starRain: true }) → MomentViewer
+  starRainOnOpen). Así cae una sola vez por notificación, en cualquier
+  dispositivo. Mientras no la toques sigue resaltada y en el contador.
+  `celebratedIds` cubre el caso en que guardar el "leída" falle (sin
+  conexión): no se repite en la misma sesión.
 */
+
+const celebratedIds = new Set();
 
 // Cada función recibe la notificación y "t" (de useLanguage) para armar el
 // texto traducido con el nombre de quien la generó (fromName NO se
@@ -200,18 +214,27 @@ export function useNotifications(uid) {
 
   const unreadCount = items.filter((n) => !n.read).length;
 
+  // Las estrellas ("momentLike") quedan afuera: se marcan al tocarlas
+  // (markRead), que es cuando cae su lluvia de estrellas (punto 86).
   const markAllRead = async () => {
-    if (!uid || unreadCount === 0) return;
+    if (!uid) return;
+    const toMark = items.filter((n) => !n.read && n.type !== "momentLike");
+    if (toMark.length === 0) return;
     const batch = writeBatch(db);
-    items
-      .filter((n) => !n.read)
-      .forEach((n) => {
-        batch.update(doc(db, "notifications", uid, "items", n.id), { read: true });
-      });
+    toMark.forEach((n) => {
+      batch.update(doc(db, "notifications", uid, "items", n.id), { read: true });
+    });
     await batch.commit();
   };
 
   return { items, unreadCount, markAllRead };
+}
+
+// Marca UNA notificación como leída (punto 86: la estrella, al tocarla).
+function markRead(n) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  updateDoc(doc(db, "notifications", uid, "items", n.id), { read: true }).catch(() => {});
 }
 
 /*
@@ -255,7 +278,14 @@ function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduc
       return;
     }
     if (n.type === "momentLike" && n.momentId && onOpenMoment) {
-      onOpenMoment(n.momentId);
+      // Punto 86: la primera vez que la tocás (sin leer), lluvia de
+      // estrellas dentro del momento; después ya no.
+      const starRain = !n.read && !celebratedIds.has(n.id);
+      if (!n.read) {
+        celebratedIds.add(n.id);
+        markRead(n);
+      }
+      onOpenMoment(n.momentId, { starRain });
       return;
     }
     if (n.fromUid) onOpenProfile?.(n.fromUid);

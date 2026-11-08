@@ -23,6 +23,7 @@ import {
   setMomentLike,
 } from "./moments";
 import { notify, timeAgo } from "./utils";
+import { triggerStarRain } from "./StarRain";
 
 /*
   MomentViewer
@@ -56,7 +57,8 @@ import { notify, timeAgo } from "./utils";
     (moments.js → setMomentLike, sobre tu propio documento de
     momentViewers, que se escucha en vivo); solo la primera estrella
     notifica al autor (notify tipo "momentLike"). En tus momentos el botón
-    pasa a "👁 N · ⭐ M", con el mismo filtro de la lista.
+    pasa a "👁 N · ⭐ M", con el mismo filtro de la lista. Al ponerla cae
+    una lluvia de estrellas (punto 86, StarRain.jsx).
   - Responder (commit 7): en los momentos ajenos, el campo de abajo manda
     la respuesta como mensaje al chat con el autor (moments.js →
     sendMomentReply, notificación "message"). Mientras el campo tiene el
@@ -86,6 +88,10 @@ import { notify, timeAgo } from "./utils";
   - `startMomentId` (opcional): abrir en ese momento del primer autor (lo
     usa App.js al tocar una notificación "momentLike"). Si ya no está
     activo, se muestra "Este momento ya no está disponible".
+  - `starRainOnOpen` (opcional, punto 86): con `startMomentId`, cae una
+    lluvia de estrellas (StarRain.jsx) una vez, cuando ese momento ya se
+    muestra. App.js lo pone la primera vez que tocás una notificación
+    "momentLike" (sin leer).
   - `onClose()` (obligatoria).
 
   Los ids salen de MomentsContext (momentIndex) y cada momento se lee de a
@@ -349,7 +355,14 @@ const styles = {
   }),
 };
 
-export default function MomentViewer({ authorUids, startIndex = 0, continueToNext = false, startMomentId, onClose }) {
+export default function MomentViewer({
+  authorUids,
+  startIndex = 0,
+  continueToNext = false,
+  startMomentId,
+  starRainOnOpen = false,
+  onClose,
+}) {
   const { t, language } = useLanguage();
   const {
     currentUid,
@@ -403,6 +416,8 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const blockedRef = useRef(false);
   const replyInputRef = useRef(null);
   const startMomentRef = useRef(startMomentId); // se usa una sola vez, en el primer autor
+  // Punto 86: lluvia pendiente para el momento de la notificación (una vez).
+  const starRainPendingRef = useRef(starRainOnOpen && !!startMomentId);
   const imgRef = useRef(null); // la foto actual (para img.complete)
   // Solo diagnóstico (?debug=1).
   const debugRef = useRef({ rescuedAtMount: 0, rescuedLater: 0, gaveUp: 0, events: [] });
@@ -610,6 +625,13 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
       if (!viewersNoticeSeen()) setNoticeOpen(true);
     }
     markSeen(authorUid, current.indexCreatedAt);
+    // Punto 86: abierto desde una estrella sin leer → lluvia de estrellas
+    // apenas se muestra ese momento (ya cargado, con el tiempo corriendo),
+    // una sola vez aunque vuelvas a él.
+    if (starRainPendingRef.current && current.id === startMomentId) {
+      starRainPendingRef.current = false;
+      triggerStarRain();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imgLoaded, currentId]);
 
@@ -719,6 +741,9 @@ export default function MomentViewer({ authorUids, startIndex = 0, continueToNex
   const toggleLike = async () => {
     if (likeBusy || myView === undefined || !current) return;
     const moment = current;
+    // Punto 86: al poner la estrella (no al quitarla), lluvia de estrellas
+    // al instante, sin esperar a Firestore.
+    if (!myView?.liked) triggerStarRain();
     setLikeBusy(true);
     try {
       const first = await setMomentLike(currentUid, moment, !myView?.liked, myView);

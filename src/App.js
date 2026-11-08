@@ -6,6 +6,7 @@ import AuthProfile from "./AuthProfile";
 import Feed from "./Feed";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import MomentViewer from "./MomentViewer";
+import { StarRainHost } from "./StarRain";
 import HomeIcon from "./HomeNavIcon";
 import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
@@ -763,8 +764,13 @@ function App() {
   const [chatContactUid, setChatContactUid] = useState(null);
   // Momento propio a abrir al tocar una notificación "momentLike" (punto
   // 66, commit 6). El visor se abre encima de cualquier pantalla, sin
-  // cambiar de pestaña.
+  // cambiar de pestaña. { id, starRain, openedAt }: starRain (punto 86) es
+  // true la primera vez que se toca esa notificación (lluvia de estrellas
+  // dentro del momento); openedAt hace que cada apertura monte el visor
+  // de cero.
   const [momentToOpen, setMomentToOpen] = useState(null);
+  const openMoment = (id, { starRain = false } = {}) =>
+    setMomentToOpen({ id, starRain, openedAt: Date.now() });
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const { unreadCount } = useNotifications(currentUid);
 
@@ -923,7 +929,7 @@ function App() {
         onOpenPost={openPost}
         onOpenProduct={openStoreProduct}
         onOpenChat={openChat}
-        onOpenMoment={setMomentToOpen}
+        onOpenMoment={openMoment}
       />
     );
   } else {
@@ -974,7 +980,7 @@ function App() {
               onOpenPost={openPost}
               onOpenProduct={openStoreProduct}
               onOpenChat={openChat}
-              onOpenMoment={setMomentToOpen}
+              onOpenMoment={openMoment}
             />
           )}
         </div>
@@ -1009,9 +1015,10 @@ function App() {
 
       {currentUid && momentToOpen && (
         <MomentViewer
-          key={momentToOpen}
+          key={momentToOpen.openedAt}
           authorUids={[currentUid]}
-          startMomentId={momentToOpen}
+          startMomentId={momentToOpen.id}
+          starRainOnOpen={momentToOpen.starRain}
           onClose={() => setMomentToOpen(null)}
         />
       )}
@@ -1024,6 +1031,10 @@ function App() {
           myIdentity={myIdentity}
         />
       )}
+
+      {/* Punto 86: lluvia de estrellas (StarRain.jsx), una sola vez acá,
+          por encima de todo; la dispara MomentViewer. */}
+      <StarRainHost />
     </div>
   );
 }

@@ -107,6 +107,13 @@ const EFFECT_DEFAULTS = {
   // Anillo de los controles sin borde (ver ANGEL_VARS): ninguno salvo en
   // Ángel.
   "--control-ring": "0 0 0 0 transparent",
+  // Lluvia de estrellas (punto 86, StarRain.jsx): los dos acentos del tema
+  // y un dorado. La mezcla se ve tanto sobre el negro fijo del visor de
+  // Momentos (donde un acento oscuro se pierde, el dorado no) como sobre
+  // el fondo claro de un tema claro (al revés).
+  "--star-rain-1": "var(--accent)",
+  "--star-rain-2": "var(--accent2)",
+  "--star-rain-3": "#ffd23f",
 };
 
 // Ángel (punto 85): perla pulida con relieve (neumorfismo con volumen) y
