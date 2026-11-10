@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <g transform="translate(78 66) rotate(14) scale(0.52) translate(-60 -60)">
+    <path d="M60 104 C20 78 8 54 14 36 C20 18 46 14 60 34 C74 14 100 18 106 36 C112 54 100 78 60 104 Z" fill="#b388ff" stroke="#4a2b3f" stroke-width="5.5" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(42 66) rotate(-14) scale(0.52) translate(-60 -60)">
+    <path d="M60 104 C20 78 8 54 14 36 C20 18 46 14 60 34 C74 14 100 18 106 36 C112 54 100 78 60 104 Z" fill="#ff5c8a" stroke="#4a2b3f" stroke-width="5.5" stroke-linejoin="round"/>
+  </g>
+  <path d="M30 60 q4 -5 8 0 M44 58 q4 -5 8 0" fill="none" stroke="#4a2b3f" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M36 66 q5 6 10 0" fill="none" stroke="#4a2b3f" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M74 58 q4 -5 8 0 M88 60 q4 -5 8 0" fill="none" stroke="#4a2b3f" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M80 66 q5 6 10 0" fill="none" stroke="#4a2b3f" stroke-width="2.6" stroke-linecap="round"/>
+  <ellipse cx="30" cy="68" rx="4" ry="2.6" fill="#ffb3c8"/>
+  <ellipse cx="96" cy="68" rx="4" ry="2.6" fill="#e0ccff"/>
+  <path d="M54 74 q12 6 22 -4" fill="none" stroke="#4a2b3f" stroke-width="9" stroke-linecap="round"/>
+  <path d="M54 74 q12 6 22 -4" fill="none" stroke="#ff5c8a" stroke-width="5" stroke-linecap="round"/>
+  <path d="M66 72 q-10 6 -20 -2" fill="none" stroke="#4a2b3f" stroke-width="9" stroke-linecap="round"/>
+  <path d="M66 72 q-10 6 -20 -2" fill="none" stroke="#b388ff" stroke-width="5" stroke-linecap="round"/>
+  <g class="pt-sk-twinkle">
+    <path d="M60 30 C52 25 52 18 56 18 C58 18 60 20 60 20 C60 20 62 18 64 18 C68 18 68 25 60 30 Z" fill="#ff8fb1" stroke="#4a2b3f" stroke-width="1.8" stroke-linejoin="round"/>
+  </g>
+</svg>

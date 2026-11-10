@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-  <g fill="#ff9f1c" stroke="#ff9f1c" stroke-width="5" stroke-linejoin="round">
+  <g class="pt-sk-spin" fill="#ff9f1c" stroke="#ff9f1c" stroke-width="5" stroke-linejoin="round">
     <path d="M60 6 L67 22 L53 22 Z"/>
     <path d="M60 6 L67 22 L53 22 Z" transform="rotate(45 60 60)"/>
     <path d="M60 6 L67 22 L53 22 Z" transform="rotate(90 60 60)"/>

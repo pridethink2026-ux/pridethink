@@ -546,6 +546,8 @@ code {
 .pt-emoji--twinkle { animation-name: pt-emoji-twinkle; }
 .pt-emoji--flame { animation-name: pt-emoji-flame; animation-duration: 1.2s; transform-origin: 50% 100%; }
 .pt-emoji--breathe { animation-name: pt-emoji-breathe; animation-duration: 3s; }
+.pt-emoji--tremble { animation-name: pt-emoji-tremble; animation-duration: 1.8s; }
+.pt-emoji--tear { animation-name: pt-emoji-tear; animation-duration: 2.4s; }
 
 @keyframes pt-emoji-beat {
   0%, 40%, 100% { transform: scale(1); }
@@ -584,8 +586,156 @@ code {
   50% { transform: scale(1.08); }
 }
 
+@keyframes pt-emoji-tremble {
+  0%, 50%, 100% { transform: translateX(0); }
+  10%, 30% { transform: translateX(-1.5px); }
+  20%, 40% { transform: translateX(1.5px); }
+}
+@keyframes pt-emoji-tear {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(1.5px) scale(0.96); }
+}
+
+/* Stickers animados (punto 88): los 30 se mueven suave, igual en el panel
+   y en las burbujas. .pt-sticker--* mueve el sticker entero; .pt-sk-* va
+   DENTRO del SVG y mueve una parte (con transform-box: fill-box, el
+   origen es la propia parte y no el lienzo entero). Un elemento con
+   .pt-sk-* nunca lleva atributo transform propio: la animación lo
+   pisaría, por eso se envuelve en un <g>. */
+.pt-sticker {
+  animation-duration: 2.4s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  transform-origin: 50% 60%;
+}
+.pt-sticker--beat { animation-name: pt-st-beat; animation-duration: 1.6s; }
+.pt-sticker--sway { animation-name: pt-st-sway; animation-duration: 3s; transform-origin: 50% 90%; }
+.pt-sticker--bounce { animation-name: pt-st-bounce; animation-duration: 1.8s; }
+.pt-sticker--float { animation-name: pt-st-float; animation-duration: 3.2s; }
+.pt-sticker--squeeze { animation-name: pt-st-squeeze; animation-duration: 2.2s; transform-origin: 50% 100%; }
+.pt-sticker--shake { animation-name: pt-st-shake; animation-duration: 1.6s; }
+.pt-sticker--tremble { animation-name: pt-st-tremble; animation-duration: 2s; }
+.pt-sticker--hop { animation-name: pt-st-hop; animation-duration: 2s; transform-origin: 50% 100%; }
+.pt-sticker--breathe { animation-name: pt-st-breathe; animation-duration: 3.4s; transform-origin: 50% 100%; }
+
+.pt-sk-blink, .pt-sk-paw, .pt-sk-zz, .pt-sk-spin, .pt-sk-flag, .pt-sk-twinkle,
+.pt-sk-twinkle-alt, .pt-sk-pop, .pt-sk-beat, .pt-sk-tear, .pt-sk-steam,
+.pt-sk-flame, .pt-sk-wave, .pt-sk-sway {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-duration: 2.4s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.pt-sk-blink { animation-name: pt-sk-blink; animation-duration: 3.2s; }
+.pt-sk-paw { animation-name: pt-sk-paw; animation-duration: 1.6s; transform-origin: 0% 100%; }
+.pt-sk-wave { animation-name: pt-sk-paw; animation-duration: 1.6s; transform-origin: 30% 100%; }
+.pt-sk-zz { animation-name: pt-sk-zz; animation-duration: 2.8s; }
+.pt-sk-spin { animation-name: pt-sk-spin; animation-duration: 14s; animation-timing-function: linear; }
+.pt-sk-flag { animation-name: pt-sk-flag; animation-duration: 2.4s; transform-origin: 0% 50%; }
+.pt-sk-twinkle { animation-name: pt-sk-twinkle; animation-duration: 2s; }
+.pt-sk-twinkle-alt { animation-name: pt-sk-twinkle; animation-duration: 2s; animation-delay: -1s; }
+.pt-sk-pop { animation-name: pt-sk-pop; animation-duration: 2.2s; }
+.pt-sk-beat { animation-name: pt-st-beat; animation-duration: 1.4s; }
+.pt-sk-tear { animation-name: pt-sk-tear; animation-duration: 2.4s; animation-timing-function: ease-in; }
+.pt-sk-steam { animation-name: pt-sk-steam; animation-duration: 2.6s; }
+.pt-sk-flame { animation-name: pt-sk-flame; animation-duration: 1.1s; transform-origin: 50% 100%; }
+.pt-sk-sway { animation-name: pt-st-sway; animation-duration: 3s; }
+
+@keyframes pt-st-beat {
+  0%, 45%, 100% { transform: scale(1); }
+  15% { transform: scale(1.08); }
+  30% { transform: scale(1.03); }
+}
+@keyframes pt-st-sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes pt-st-bounce {
+  0%, 55%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-5%); }
+}
+@keyframes pt-st-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-5%) rotate(2deg); }
+}
+@keyframes pt-st-squeeze {
+  0%, 60%, 100% { transform: scale(1, 1); }
+  25% { transform: scale(1.06, 0.95); }
+  40% { transform: scale(0.98, 1.02); }
+}
+@keyframes pt-st-shake {
+  0%, 55%, 100% { transform: rotate(0); }
+  10%, 30% { transform: rotate(-6deg); }
+  20%, 40% { transform: rotate(6deg); }
+}
+@keyframes pt-st-tremble {
+  0%, 50%, 100% { transform: translateX(0); }
+  10%, 30% { transform: translateX(-2%); }
+  20%, 40% { transform: translateX(2%); }
+}
+@keyframes pt-st-hop {
+  0%, 50%, 100% { transform: translateY(0) scale(1, 1); }
+  10% { transform: translateY(0) scale(1.05, 0.95); }
+  25% { transform: translateY(-8%) scale(0.97, 1.03); }
+  40% { transform: translateY(0) scale(1.03, 0.97); }
+}
+@keyframes pt-st-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.03, 0.97); }
+}
+@keyframes pt-sk-blink {
+  0%, 86%, 100% { transform: scaleY(1); }
+  90%, 94% { transform: scaleY(0.12); }
+}
+@keyframes pt-sk-paw {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(12deg); }
+}
+@keyframes pt-sk-zz {
+  0% { transform: translate(-3px, 4px); opacity: 0; }
+  30%, 70% { opacity: 1; }
+  100% { transform: translate(3px, -6px); opacity: 0; }
+}
+@keyframes pt-sk-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pt-sk-flag {
+  0%, 100% { transform: skewY(0) scaleX(1); }
+  50% { transform: skewY(-5deg) scaleX(0.96); }
+}
+@keyframes pt-sk-twinkle {
+  0%, 100% { transform: scale(1) rotate(0); opacity: 1; }
+  50% { transform: scale(0.75) rotate(15deg); opacity: 0.6; }
+}
+@keyframes pt-sk-pop {
+  0% { transform: translate(-10px, 10px) scale(0.5); opacity: 0; }
+  35%, 80% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(4px, -6px) scale(1); opacity: 0; }
+}
+@keyframes pt-sk-tear {
+  0%, 20% { transform: translateY(0); opacity: 0; }
+  35% { opacity: 1; }
+  90% { transform: translateY(10px); opacity: 1; }
+  100% { transform: translateY(12px); opacity: 0; }
+}
+@keyframes pt-sk-steam {
+  0% { transform: translateY(4px); opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { transform: translateY(-6px); opacity: 0.2; }
+}
+@keyframes pt-sk-flame {
+  0%, 100% { transform: scale(1, 1); }
+  33% { transform: scale(0.88, 1.12); }
+  66% { transform: scale(1.08, 0.92); }
+}
+
+/* "Reducir movimiento": ni emojis ni stickers se mueven; cada uno queda
+   quieto en su forma normal (no en un fotograma de la animación). */
 @media (prefers-reduced-motion: reduce) {
-  .pt-emoji {
+  .pt-emoji,
+  .pt-sticker,
+  .pt-sticker * {
     animation: none !important;
   }
 }

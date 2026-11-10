@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
   <rect x="14" y="14" width="7" height="96" rx="3.5" fill="#b0805a" stroke="#4a2b3f" stroke-width="2.5"/>
   <circle cx="17.5" cy="12" r="6" fill="#ffd23f" stroke="#4a2b3f" stroke-width="2.5"/>
+  <g class="pt-sk-flag">
   <path d="M21 24 q20 -8 40 0 t40 0 L101 36 q-20 8 -40 0 t-40 0 Z" fill="#5bcefa"/>
   <path d="M21 36 q20 -8 40 0 t40 0 L101 48 q-20 8 -40 0 t-40 0 Z" fill="#f5a9b8"/>
   <path d="M21 48 q20 -8 40 0 t40 0 L101 60 q-20 8 -40 0 t-40 0 Z" fill="#ffffff"/>
@@ -14,5 +15,6 @@
   <circle cx="57.2" cy="49.8" r="1.2" fill="#fff"/>
   <circle cx="77.2" cy="47.8" r="1.2" fill="#fff"/>
   <path d="M60 58 q6 7 12 -1" fill="none" stroke="#4a2b3f" stroke-width="2.8" stroke-linecap="round"/>
-  <path d="M106 94 l2.5 6 6 2.5 -6 2.5 -2.5 6 -2.5 -6 -6 -2.5 6 -2.5 Z" fill="#f5a9b8" stroke="#4a2b3f" stroke-width="1.5" stroke-linejoin="round"/>
+  </g>
+  <path class="pt-sk-twinkle" d="M106 94 l2.5 6 6 2.5 -6 2.5 -2.5 6 -2.5 -6 -6 -2.5 6 -2.5 Z" fill="#f5a9b8" stroke="#4a2b3f" stroke-width="1.5" stroke-linejoin="round"/>
 </svg>

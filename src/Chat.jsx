@@ -28,7 +28,13 @@ import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
 import { isEffectivelyOnline, formatLastSeen, usePresences, canSeeOnlineStatus } from "./presence";
 import { useMyFollows } from "./FollowsContext";
-import { StickerImage, StickerPicker, AnimatedEmojiText } from "./Stickers";
+import {
+  StickerImage,
+  StickerPicker,
+  AnimatedEmojiText,
+  DEFAULT_PICKER_TAB,
+  DEFAULT_EMOJI_CATEGORY,
+} from "./Stickers";
 import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
 import { playReactionSound } from "./sound";
@@ -1129,6 +1135,18 @@ export default function Chat({
   const [search, setSearch] = useState("");
   const [stickerPanelOpen, setStickerPanelOpen] = useState(false);
   const stickerPanelRef = useRef(null);
+  // Última pestaña del panel ("stickers"/"emojis") y última categoría de
+  // emojis usadas DENTRO del chat abierto: el panel se cierra al enviar,
+  // pero al reabrirlo vuelve donde estabas. Solo en memoria (nada en el
+  // dispositivo ni en Firestore): se reinician al cambiar de chat, al
+  // salir del chat (activeContact null) y al recargar.
+  const [stickerPickerTab, setStickerPickerTab] = useState(DEFAULT_PICKER_TAB);
+  const [stickerPickerCategory, setStickerPickerCategory] = useState(DEFAULT_EMOJI_CATEGORY);
+  const activeContactUid = activeContact ? activeContact.uid : null;
+  useEffect(() => {
+    setStickerPickerTab(DEFAULT_PICKER_TAB);
+    setStickerPickerCategory(DEFAULT_EMOJI_CATEGORY);
+  }, [activeContactUid]);
   const messagesEndRef = useRef(null);
 
   // Estado del grabador de notas de voz: "idle" | "recording" | "ready"
@@ -1920,7 +1938,14 @@ export default function Chat({
                         <StickerIcon />
                       </button>
                       {stickerPanelOpen && (
-                        <StickerPicker onSelect={handleSendSticker} onPickEmoji={handlePickEmoji} />
+                        <StickerPicker
+                          onSelect={handleSendSticker}
+                          onPickEmoji={handlePickEmoji}
+                          tab={stickerPickerTab}
+                          onTabChange={setStickerPickerTab}
+                          emojiCategory={stickerPickerCategory}
+                          onEmojiCategoryChange={setStickerPickerCategory}
+                        />
                       )}
                     </div>
                     <input

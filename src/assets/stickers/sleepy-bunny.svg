@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <ellipse cx="44" cy="32" rx="9" ry="24" fill="#f4f0ff" stroke="#4a2b3f" stroke-width="3" transform="rotate(-10 44 32)"/>
+  <ellipse cx="44" cy="34" rx="4" ry="15" fill="#ffb3c8" transform="rotate(-10 44 34)"/>
+  <ellipse cx="80" cy="40" rx="9" ry="24" fill="#f4f0ff" stroke="#4a2b3f" stroke-width="3" transform="rotate(40 80 40)"/>
+  <ellipse cx="79" cy="41" rx="4" ry="15" fill="#ffb3c8" transform="rotate(40 79 41)"/>
+  <ellipse cx="58" cy="76" rx="36" ry="31" fill="#f4f0ff" stroke="#4a2b3f" stroke-width="3"/>
+  <ellipse cx="40" cy="84" rx="6.5" ry="4" fill="#ffb3c8"/>
+  <ellipse cx="76" cy="84" rx="6.5" ry="4" fill="#ffb3c8"/>
+  <path d="M40 74 q5 5 10 0 M66 74 q5 5 10 0" fill="none" stroke="#4a2b3f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M55 82 h6 l-3 3 Z" fill="#ff8fb1" stroke="#ff8fb1" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M54 89 q4 3 8 0" fill="none" stroke="#4a2b3f" stroke-width="2.2" stroke-linecap="round"/>
+  <g class="pt-sk-zz" fill="#7a6cff" font-family="'Trebuchet MS','Arial Rounded MT Bold',sans-serif" font-weight="800">
+    <text x="92" y="64" font-size="16">z</text>
+    <text x="103" y="50" font-size="12">z</text>
+  </g>
+</svg>

@@ -16,7 +16,7 @@
   <ellipse cx="82" cy="76" rx="6" ry="3.8" fill="#ffb3c8"/>
   <path d="M46 67 q5 5 10 0 M66 67 q5 5 10 0" fill="none" stroke="#4a2b3f" stroke-width="3" stroke-linecap="round"/>
   <ellipse cx="61" cy="80" rx="3.5" ry="3" fill="#4a2b3f"/>
-  <g fill="#7a6cff" font-family="'Trebuchet MS','Arial Rounded MT Bold',sans-serif" font-weight="800">
+  <g class="pt-sk-zz" fill="#7a6cff" font-family="'Trebuchet MS','Arial Rounded MT Bold',sans-serif" font-weight="800">
     <text x="88" y="36" font-size="18">z</text>
     <text x="101" y="22" font-size="13">z</text>
   </g>
