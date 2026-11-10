@@ -998,7 +998,19 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   );
 }
 
-export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
+// Punto 87: el filtro del muro (feedTab) y el hashtag elegido
+// (activeHashtag) viven en App.js y llegan como props, así no se pierden al
+// ir a otra pestaña y volver (el muro se desmonta al cambiar de pantalla).
+// Solo en memoria durante la sesión: al recargar vuelven a "todos"/null.
+export default function Feed({
+  onOpenProfile,
+  onOpenGroup,
+  onOpenEvent,
+  feedTab,
+  setFeedTab,
+  activeHashtag,
+  setActiveHashtag,
+}) {
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
   // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
@@ -1017,8 +1029,6 @@ export default function Feed({ onOpenProfile, onOpenGroup, onOpenEvent }) {
   // no, el segundo post subiría sus fotos a la carpeta del primero y
   // pisaría sus archivos.
   const [composerPostId, setComposerPostId] = useState(() => doc(collection(db, "posts")).id);
-  const [feedTab, setFeedTab] = useState("todos"); // "todos" | "siguiendo"
-  const [activeHashtag, setActiveHashtag] = useState(null);
   const allUsers = useAllUsers();
   // Mismos datos de allUsers (AllUsersContext, ver Mentions.jsx), como mapa
   // por uid para lookup O(1) por autor (antes era su propio onSnapshot

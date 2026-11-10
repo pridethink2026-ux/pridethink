@@ -163,6 +163,20 @@ const navStyles = {
     background: "var(--bar-bg)",
     borderBottom: "1px solid var(--border)",
   },
+  // Punto 87: en escritorio la barra queda fija arriba al hacer scroll.
+  // "sticky" (no "fixed") para que siga ocupando su lugar: no tapa el
+  // inicio del contenido ni da un salto al empezar a bajar. --bar-bg es
+  // opaco en todos los temas (themes.js), así que no se transparenta lo de
+  // abajo. z-index 45: arriba de los menús del contenido (reacciones 30,
+  // menciones 40) y abajo de los modales (50), el visor de Momentos (60) y
+  // la lluvia de estrellas (70). En celular no se aplica.
+  stickyBar: (scrolled) => ({
+    position: "sticky",
+    top: 0,
+    zIndex: 45,
+    boxShadow: scrolled ? "0 4px 14px rgba(var(--shadow-rgb), 0.18)" : "none",
+    transition: "box-shadow 0.2s ease",
+  }),
   buttonsGroup: {
     display: "flex",
     flexWrap: "wrap",
@@ -772,7 +786,23 @@ function App() {
   const openMoment = (id, { starRain = false } = {}) =>
     setMomentToOpen({ id, starRain, openedAt: Date.now() });
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  // Punto 87: filtro del muro ("todos" | "siguiendo" | "explorar" |
+  // "grupos" | "eventos") y hashtag elegido. Viven acá y no en Feed.jsx
+  // para que sigan iguales al ir a otra pestaña y volver al Muro. Solo en
+  // memoria (como bannerDismissed): al recargar vuelven a "todos"/null.
+  const [feedTab, setFeedTab] = useState("todos");
+  const [activeHashtag, setActiveHashtag] = useState(null);
+  // Sombra de la barra fija de escritorio solo cuando ya se bajó un poco.
+  const [scrolled, setScrolled] = useState(false);
   const { unreadCount } = useNotifications(currentUid);
+
+  useEffect(() => {
+    if (isMobile) return undefined;
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isMobile]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setCurrentUid(u ? u.uid : null));
@@ -860,6 +890,33 @@ function App() {
     setChatContactUid(null);
   };
 
+  // Para el resaltado de pestaña activa: ninguna pestaña se ve "activa"
+  // mientras haya una vista superpuesta abierta (perfil público, guardados,
+  // un post individual, un grupo o un evento). También lo usa
+  // handleNavClick para saber si ya estás viendo el Muro.
+  const anyOverlayOpen =
+    !!viewingProfileUid || viewingSaved || !!viewingPostId || !!viewingGroupId || !!viewingEventId;
+
+  // Punto 87: botón Muro como en Facebook (barra superior de escritorio y
+  // barra inferior de celular). Si ya estás en el Muro, sin ninguna vista
+  // superpuesta, sube suave hasta la publicación más reciente. Si venís de
+  // otra pestaña o de una vista superpuesta, te lleva al Muro arriba del
+  // todo (sin animación: es un cambio de pantalla). El filtro y el hashtag
+  // no se tocan. Las otras pestañas siguen igual que antes.
+  const handleNavClick = (key) => {
+    if (key !== "feed") {
+      navigate(key);
+      return;
+    }
+    const alreadyOnWall = view === "feed" && !anyOverlayOpen;
+    if (alreadyOnWall) {
+      window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+      return;
+    }
+    navigate("feed");
+    window.scrollTo(0, 0);
+  };
+
   // Desde un mensaje de regalo en el chat (GiftNotification.jsx): cambia
   // a la pestaña Tienda y le pide a StoreScreen que abra ESE producto
   // directamente, sin pasar por su lista principal.
@@ -900,7 +957,17 @@ function App() {
       <UserProfile uid={viewingProfileUid} onBack={closeProfile} onOpenProfile={openProfile} />
     );
   } else if (view === "feed") {
-    content = <Feed onOpenProfile={openProfile} onOpenGroup={openGroup} onOpenEvent={openEvent} />;
+    content = (
+      <Feed
+        onOpenProfile={openProfile}
+        onOpenGroup={openGroup}
+        onOpenEvent={openEvent}
+        feedTab={feedTab}
+        setFeedTab={setFeedTab}
+        activeHashtag={activeHashtag}
+        setActiveHashtag={setActiveHashtag}
+      />
+    );
   } else if (view === "chat") {
     content = (
       <Chat
@@ -936,15 +1003,9 @@ function App() {
     content = <AuthProfile onOpenProfile={openProfile} onOpenSaved={openSaved} />;
   }
 
-  // Para el resaltado de pestaña activa: ninguna pestaña se ve "activa"
-  // mientras haya una vista superpuesta abierta (perfil público, guardados,
-  // un post individual, un grupo o un evento).
-  const anyOverlayOpen =
-    !!viewingProfileUid || viewingSaved || !!viewingPostId || !!viewingGroupId || !!viewingEventId;
-
   return (
     <div style={{ paddingBottom: isMobile ? "62px" : 0 }}>
-      <header style={navStyles.bar}>
+      <header style={isMobile ? navStyles.bar : { ...navStyles.bar, ...navStyles.stickyBar(scrolled) }}>
         <div style={navStyles.logoSlot}>
           {/* alt vacío: el nombre ya está escrito al lado */}
           <img src="/logo-icon.webp" alt="" width="30" height="30" style={navStyles.logoImg} />
@@ -960,7 +1021,7 @@ function App() {
                   className="pt-relief"
                   style={navStyles.button(active)}
                   aria-current={active ? "page" : undefined}
-                  onClick={() => navigate(tab.key)}
+                  onClick={() => handleNavClick(tab.key)}
                 >
                   {tab.key === "feed" && (
                     <HomeIcon identityText={myIdentity} active={active} onPill size={17} />
@@ -1027,7 +1088,7 @@ function App() {
         <BottomNav
           active={anyOverlayOpen ? null : view}
           unreadCount={unreadCount}
-          onNavigate={navigate}
+          onNavigate={handleNavClick}
           myIdentity={myIdentity}
         />
       )}
