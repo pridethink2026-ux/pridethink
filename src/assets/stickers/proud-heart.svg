@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <clipPath id="pt-sticker-proud-heart-clip">
+      <path d="M60 104 C20 78 8 54 14 36 C20 18 46 14 60 34 C74 14 100 18 106 36 C112 54 100 78 60 104 Z"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#pt-sticker-proud-heart-clip)">
+    <rect x="0" y="14" width="120" height="16" fill="#e40303"/>
+    <rect x="0" y="30" width="120" height="15" fill="#ff8c00"/>
+    <rect x="0" y="45" width="120" height="15" fill="#ffed00"/>
+    <rect x="0" y="60" width="120" height="15" fill="#008026"/>
+    <rect x="0" y="75" width="120" height="15" fill="#24408e"/>
+    <rect x="0" y="90" width="120" height="16" fill="#732982"/>
+  </g>
+  <path d="M60 104 C20 78 8 54 14 36 C20 18 46 14 60 34 C74 14 100 18 106 36 C112 54 100 78 60 104 Z" fill="none" stroke="#4a2b3f" stroke-width="3" stroke-linejoin="round"/>
+  <ellipse cx="32" cy="34" rx="7" ry="4" fill="#fff" opacity="0.6" transform="rotate(-35 32 34)"/>
+  <circle cx="44" cy="52" r="8" fill="#fff" stroke="#4a2b3f" stroke-width="2"/>
+  <circle cx="76" cy="52" r="8" fill="#fff" stroke="#4a2b3f" stroke-width="2"/>
+  <circle cx="45" cy="53" r="4.2" fill="#4a2b3f"/>
+  <circle cx="77" cy="53" r="4.2" fill="#4a2b3f"/>
+  <circle cx="46.3" cy="51.6" r="1.4" fill="#fff"/>
+  <circle cx="78.3" cy="51.6" r="1.4" fill="#fff"/>
+  <path d="M47 67 q13 15 26 0 Z" fill="#fff" stroke="#4a2b3f" stroke-width="3" stroke-linejoin="round"/>
+</svg>

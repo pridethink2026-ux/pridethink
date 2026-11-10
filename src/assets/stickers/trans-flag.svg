@@ -1,12 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <defs>
-    <clipPath id="trans-flag-clip"><rect x="2" y="3" width="20" height="18" rx="3"/></clipPath>
-  </defs>
-  <g clip-path="url(#trans-flag-clip)">
-    <rect x="2" y="3" width="20" height="3.6" fill="#5BCEFA"/>
-    <rect x="2" y="6.6" width="20" height="3.6" fill="#F5A9B8"/>
-    <rect x="2" y="10.2" width="20" height="3.6" fill="#FFFFFF"/>
-    <rect x="2" y="13.8" width="20" height="3.6" fill="#F5A9B8"/>
-    <rect x="2" y="17.4" width="20" height="3.6" fill="#5BCEFA"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <rect x="14" y="14" width="7" height="96" rx="3.5" fill="#b0805a" stroke="#4a2b3f" stroke-width="2.5"/>
+  <circle cx="17.5" cy="12" r="6" fill="#ffd23f" stroke="#4a2b3f" stroke-width="2.5"/>
+  <path d="M21 24 q20 -8 40 0 t40 0 L101 36 q-20 8 -40 0 t-40 0 Z" fill="#5bcefa"/>
+  <path d="M21 36 q20 -8 40 0 t40 0 L101 48 q-20 8 -40 0 t-40 0 Z" fill="#f5a9b8"/>
+  <path d="M21 48 q20 -8 40 0 t40 0 L101 60 q-20 8 -40 0 t-40 0 Z" fill="#ffffff"/>
+  <path d="M21 60 q20 -8 40 0 t40 0 L101 72 q-20 8 -40 0 t-40 0 Z" fill="#f5a9b8"/>
+  <path d="M21 72 q20 -8 40 0 t40 0 L101 84 q-20 8 -40 0 t-40 0 Z" fill="#5bcefa"/>
+  <path d="M21 24 q20 -8 40 0 t40 0 L101 84 q-20 8 -40 0 t-40 0 Z" fill="none" stroke="#4a2b3f" stroke-width="3" stroke-linejoin="round"/>
+  <ellipse cx="50" cy="60" rx="5" ry="3.2" fill="#ff7f9f"/>
+  <ellipse cx="82" cy="58" rx="5" ry="3.2" fill="#ff7f9f"/>
+  <circle cx="56" cy="51" r="3.8" fill="#4a2b3f"/>
+  <circle cx="76" cy="49" r="3.8" fill="#4a2b3f"/>
+  <circle cx="57.2" cy="49.8" r="1.2" fill="#fff"/>
+  <circle cx="77.2" cy="47.8" r="1.2" fill="#fff"/>
+  <path d="M60 58 q6 7 12 -1" fill="none" stroke="#4a2b3f" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M106 94 l2.5 6 6 2.5 -6 2.5 -2.5 6 -2.5 -6 -6 -2.5 6 -2.5 Z" fill="#f5a9b8" stroke="#4a2b3f" stroke-width="1.5" stroke-linejoin="round"/>
 </svg>

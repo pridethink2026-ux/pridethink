@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <g fill="none" stroke-width="7">
+    <path d="M12 88 A48 48 0 0 1 108 88" stroke="#ff4d4d"/>
+    <path d="M19 88 A41 41 0 0 1 101 88" stroke="#ff9f1c"/>
+    <path d="M26 88 A34 34 0 0 1 94 88" stroke="#ffd23f"/>
+    <path d="M33 88 A27 27 0 0 1 87 88" stroke="#4cc76a"/>
+    <path d="M40 88 A20 20 0 0 1 80 88" stroke="#3aa0ff"/>
+    <path d="M47 88 A13 13 0 0 1 73 88" stroke="#9b5de5"/>
+  </g>
+  <path d="M8.5 88 A51.5 51.5 0 0 1 111.5 88" fill="none" stroke="#4a2b3f" stroke-width="2.5"/>
+  <circle cx="40" cy="60" r="7" fill="#fff" stroke="#4a2b3f" stroke-width="2"/>
+  <circle cx="80" cy="60" r="7" fill="#fff" stroke="#4a2b3f" stroke-width="2"/>
+  <circle cx="41" cy="61" r="3.5" fill="#4a2b3f"/>
+  <circle cx="81" cy="61" r="3.5" fill="#4a2b3f"/>
+  <path d="M50 46 q10 11 20 0" fill="#7a2340" stroke="#4a2b3f" stroke-width="2.5" stroke-linejoin="round"/>
+  <g fill="#fff" stroke="#4a2b3f" stroke-width="2.5">
+    <path d="M2 100 a9 9 0 0 1 8 -14 a11 11 0 0 1 20 2 a8 8 0 0 1 2 12 Z" stroke-linejoin="round"/>
+    <path d="M88 100 a8 8 0 0 1 2 -12 a11 11 0 0 1 20 -2 a9 9 0 0 1 8 14 Z" stroke-linejoin="round"/>
+  </g>
+</svg>

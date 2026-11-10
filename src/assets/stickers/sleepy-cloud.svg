@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <g fill="#4a2b3f">
+    <circle cx="34" cy="74" r="23"/>
+    <circle cx="60" cy="58" r="29"/>
+    <circle cx="87" cy="72" r="25"/>
+    <rect x="34" y="70" width="53" height="27"/>
+  </g>
+  <g fill="#eaf2ff">
+    <circle cx="34" cy="74" r="20"/>
+    <circle cx="60" cy="58" r="26"/>
+    <circle cx="87" cy="72" r="22"/>
+    <rect x="34" y="70" width="53" height="24"/>
+  </g>
+  <ellipse cx="50" cy="44" rx="9" ry="5" fill="#fff" transform="rotate(-20 50 44)"/>
+  <ellipse cx="42" cy="76" rx="6" ry="3.8" fill="#ffb3c8"/>
+  <ellipse cx="82" cy="76" rx="6" ry="3.8" fill="#ffb3c8"/>
+  <path d="M46 67 q5 5 10 0 M66 67 q5 5 10 0" fill="none" stroke="#4a2b3f" stroke-width="3" stroke-linecap="round"/>
+  <ellipse cx="61" cy="80" rx="3.5" ry="3" fill="#4a2b3f"/>
+  <g fill="#7a6cff" font-family="'Trebuchet MS','Arial Rounded MT Bold',sans-serif" font-weight="800">
+    <text x="88" y="36" font-size="18">z</text>
+    <text x="101" y="22" font-size="13">z</text>
+  </g>
+</svg>

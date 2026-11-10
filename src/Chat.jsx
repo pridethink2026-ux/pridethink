@@ -28,7 +28,7 @@ import { useLanguage } from "./LanguageContext";
 import { getDistinctReactionEmojis, useReactionPicker, ReactionPicker } from "./Reactions";
 import { isEffectivelyOnline, formatLastSeen, usePresences, canSeeOnlineStatus } from "./presence";
 import { useMyFollows } from "./FollowsContext";
-import { StickerImage, StickerPicker } from "./Stickers";
+import { StickerImage, StickerPicker, AnimatedEmojiText } from "./Stickers";
 import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
 import { useAllUsers } from "./Mentions";
 import { playReactionSound } from "./sound";
@@ -131,7 +131,8 @@ import ImageEditor from "./ImageEditor";
 
   STICKERS (ver Stickers.jsx para el set de imágenes y la lógica
   compartida): botón nuevo junto al de grabar audio que abre un panel con
-  una grilla de 10 stickers propios (SVG empaquetados en
+  dos pestañas, "Stickers" (15 caricaturas propias, punto 88) y "Emojis"
+  (animados, se insertan en el cuadro de texto) (SVG empaquetados en
   src/assets/stickers/, NO subidos por usuarios — no requieren Firebase
   Storage ni el plan Blaze). Mensaje tipo
   { senderId, type: "sticker", stickerId, createdAt }: solo guarda el id
@@ -597,6 +598,9 @@ const styles = {
     lineHeight: 0,
   },
   inputRow: {
+    // relative: ancla el panel de stickers/emojis (Stickers.jsx) al ancho
+    // de la fila de escritura, para que nunca se salga de la caja del chat.
+    position: "relative",
     display: "flex",
     gap: "10px",
     padding: "14px 16px",
@@ -639,7 +643,8 @@ const styles = {
     justifyContent: "center",
     flexShrink: 0,
   },
-  stickerBtnWrapper: { position: "relative", flexShrink: 0 },
+  // Sin position propio: el panel se posiciona respecto de inputRow.
+  stickerBtnWrapper: { flexShrink: 0 },
   stickerBtn: (active) => ({
     width: "40px",
     height: "40px",
@@ -1012,7 +1017,11 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
               style={styles.imageBubbleImg}
               onClick={() => setImageViewerOpen(true)}
             />
-            {message.text && <div style={styles.bubble(mine)}>{message.text}</div>}
+            {message.text && (
+              <div style={styles.bubble(mine)}>
+                <AnimatedEmojiText text={message.text} />
+              </div>
+            )}
           </div>
         ) : message.type === "sticker" ? (
           <div style={styles.stickerBubble}>
@@ -1042,7 +1051,7 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
             ) : message.type === "moment_reply" ? (
               <MomentReplyPreview message={message} mine={mine} />
             ) : (
-              message.text
+              <AnimatedEmojiText text={message.text} />
             )}
           </div>
         )}
@@ -1143,6 +1152,7 @@ export default function Chat({
   const [editingImageFile, setEditingImageFile] = useState(null); // File abierto en ImageEditor (punto 65)
   const [sendingImage, setSendingImage] = useState(false);
   const imageInputRef = useRef(null);
+  const textInputRef = useRef(null);
 
   // Escucha si hay sesión activa (viene del mismo login de AuthProfile)
   useEffect(() => {
@@ -1598,6 +1608,29 @@ export default function Chat({
     setText("");
   };
 
+  // Inserta un emoji del panel en el cuadro de texto, en la posición del
+  // cursor (o al final). No envía nada: se manda junto con el texto, como
+  // un mensaje de texto normal. En PC devuelve el foco al cuadro; en
+  // pantallas táctiles no, para que el teclado no tape el panel.
+  const handlePickEmoji = (emoji) => {
+    const input = textInputRef.current;
+    const start = input && input.selectionStart != null ? input.selectionStart : text.length;
+    const end = input && input.selectionEnd != null ? input.selectionEnd : text.length;
+    const next = text.slice(0, start) + emoji + text.slice(end);
+    setText(next);
+    const caret = start + emoji.length;
+    requestAnimationFrame(() => {
+      if (!input) return;
+      const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      if (!touch) input.focus();
+      try {
+        input.setSelectionRange(caret, caret);
+      } catch (_) {
+        // algunos navegadores no permiten mover el cursor sin foco
+      }
+    });
+  };
+
   const handleSendSticker = async (stickerId) => {
     setStickerPanelOpen(false);
     if (!activeContact || !currentUid) return;
@@ -1870,6 +1903,7 @@ export default function Chat({
                 ) : recordingState === "idle" ? (
                   <form style={styles.inputRow} onSubmit={handleSend}>
                     <input
+                      ref={textInputRef}
                       style={styles.input}
                       type="text"
                       placeholder={t("chat.messagePlaceholder")}
@@ -1885,7 +1919,9 @@ export default function Chat({
                       >
                         <StickerIcon />
                       </button>
-                      {stickerPanelOpen && <StickerPicker onSelect={handleSendSticker} />}
+                      {stickerPanelOpen && (
+                        <StickerPicker onSelect={handleSendSticker} onPickEmoji={handlePickEmoji} />
+                      )}
                     </div>
                     <input
                       ref={imageInputRef}
