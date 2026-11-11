@@ -20,7 +20,8 @@ import { useLanguage } from "./LanguageContext";
   Notifications
   -------------
   Campanita con contador de notificaciones no leídas (likes, comentarios,
-  mensajes nuevos, seguidores nuevos). Al abrir el panel se muestran las
+  seguidores nuevos). Los mensajes del chat se avisan en el botón Chat
+  (punto 92, useChatUnread en chatMessages.js). Al abrir el panel se muestran las
   más recientes; al abrirlo se marcan todas como leídas, salvo las
   estrellas de Momentos, que se marcan al tocarlas (punto 86, abajo).
 
@@ -39,9 +40,8 @@ import { useLanguage } from "./LanguageContext";
          primera estrella que alguien le da a uno de tus momentos) — al
          tocarla se abre ese momento (App.js -> MomentViewer con
          startMomentId), o el aviso de que ya no está disponible si venció.
-      -> "message" no trae ningún campo extra: al tocarla se abre la
-         conversación con "fromUid" (App.js -> openChat -> Chat.jsx
-         initialContactUid).
+      -> "message" ya no se crea (punto 92). Las que quedan no se muestran
+         y vencen solas con su "expireAt".
 
   Este archivo exporta tres cosas:
   - useNotifications(uid): hook con la lógica de datos (items, contador de
@@ -72,7 +72,6 @@ const celebratedIds = new Set();
 const LABELS = {
   like: (n, t) => t("notifications.like", { name: n.fromName }),
   comment: (n, t) => t("notifications.comment", { name: n.fromName }),
-  message: (n, t) => t("notifications.message", { name: n.fromName }),
   follow: (n, t) => t("notifications.follow", { name: n.fromName }),
   mention: (n, t) => t("notifications.mention", { name: n.fromName }),
   // Punto 60: se crea para cada seguidor del vendedor cuando uno de sus
@@ -191,6 +190,12 @@ const styles = {
   }),
 };
 
+// Cuántas se muestran, y cuántas se traen para que las "message" viejas
+// (punto 92, se ocultan) no dejen la lista sin las demás. Cuando venzan
+// todas, FETCHED puede volver a ser igual que SHOWN.
+const NOTIFICATIONS_SHOWN = 30;
+const NOTIFICATIONS_FETCHED = 100;
+
 // Lógica de datos compartida: notificaciones en tiempo real, contador de
 // no leídas, y marcar todo como leído.
 export function useNotifications(uid) {
@@ -204,10 +209,15 @@ export function useNotifications(uid) {
     const q = query(
       collection(db, "notifications", uid, "items"),
       orderBy("createdAt", "desc"),
-      limit(30)
+      limit(NOTIFICATIONS_FETCHED)
     );
     const unsub = onSnapshot(q, (snap) => {
-      setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setItems(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((n) => n.type !== "message")
+          .slice(0, NOTIFICATIONS_SHOWN)
+      );
     });
     return unsub;
   }, [uid]);
@@ -256,17 +266,9 @@ function usePhotoByUid() {
   }, [allUsers]);
 }
 
-function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduct, onOpenChat, onOpenMoment, dropdown }) {
+function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduct, onOpenMoment, dropdown }) {
   const { t } = useLanguage();
   const handleClick = () => {
-    // Mensaje nuevo (texto, audio, imagen, sticker, post compartido o
-    // regalo): abre directo la conversación con quien lo mandó. No hace
-    // falta guardar un chatId en la notificación — Chat.jsx lo arma con
-    // getChatId(miUid, fromUid), así que sirve también para las viejas.
-    if (n.type === "message" && n.fromUid && onOpenChat) {
-      onOpenChat(n.fromUid);
-      return;
-    }
     if (n.type === "mention" && n.postId && onOpenPost) {
       onOpenPost(n.postId);
       return;
@@ -306,7 +308,7 @@ function NotificationItem({ n, photoURL, onOpenProfile, onOpenPost, onOpenProduc
   );
 }
 
-export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct, onOpenChat, onOpenMoment }) {
+export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct, onOpenMoment }) {
   const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -371,7 +373,6 @@ export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct
               onOpenProfile={onOpenProfile}
               onOpenPost={onOpenPost}
               onOpenProduct={onOpenProduct}
-              onOpenChat={onOpenChat}
               onOpenMoment={onOpenMoment}
               dropdown
             />
@@ -383,7 +384,7 @@ export default function Notifications({ onOpenProfile, onOpenPost, onOpenProduct
 }
 
 // Misma lista, como pantalla completa para la barra de navegación inferior en móvil.
-export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct, onOpenChat, onOpenMoment }) {
+export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct, onOpenMoment }) {
   const photoByUid = usePhotoByUid();
   const { t } = useLanguage();
   const [currentUid, setCurrentUid] = useState(null);
@@ -424,7 +425,6 @@ export function NotificationsScreen({ onOpenProfile, onOpenPost, onOpenProduct, 
             onOpenProfile={onOpenProfile}
             onOpenPost={onOpenPost}
             onOpenProduct={onOpenProduct}
-            onOpenChat={onOpenChat}
             onOpenMoment={onOpenMoment}
             dropdown={false}
           />

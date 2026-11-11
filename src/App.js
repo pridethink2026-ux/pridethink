@@ -12,7 +12,7 @@ import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
 import { useOnlinePresence } from "./presence";
 import { useFollowsMigration } from "./follows";
-import { useChatsMigration } from "./chatMessages";
+import { useChatsMigration, useChatUnread } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
 import { THEMES, ROTATIVO_KEY, resolveThemeKey } from "./themes";
 import { useTheme } from "./ThemeContext";
@@ -402,6 +402,84 @@ const bottomNavStyles = {
   label: { fontSize: "10px", fontWeight: 600 },
 };
 
+// Punto 92: globito y destello del botón Chat.
+const chatAlertStyles = {
+  // El globito y el destello van en este envoltorio, no dentro del botón:
+  // .pt-relief le pone overflow: hidden y los recortaría.
+  desktopWrap: { position: "relative", display: "inline-flex", borderRadius: "999px" },
+  // Alrededor del ícono, sin tapar el texto de abajo.
+  mobileEnergy: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    width: "24px",
+    height: "24px",
+    margin: "-13px 0 0 -12px",
+  },
+  badge: {
+    position: "absolute",
+    boxSizing: "border-box",
+    background: "var(--accent2)",
+    color: "var(--bg)",
+    fontSize: "10px",
+    fontWeight: 700,
+    lineHeight: 1,
+    borderRadius: "999px",
+    minWidth: "16px",
+    height: "16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0 3px",
+    pointerEvents: "none",
+  },
+  desktopBadge: { top: "-6px", right: "-6px" },
+  // Crece hacia la derecha: "99+" no tapa el ícono.
+  mobileBadge: { top: "-6px", left: "calc(100% - 6px)" },
+};
+
+const formatChatUnread = (count) => (count > 99 ? "99+" : String(count));
+
+function ChatUnreadBadge({ count, style }) {
+  return (
+    <span style={{ ...chatAlertStyles.badge, ...style }} aria-hidden="true">
+      {formatChatUnread(count)}
+    </span>
+  );
+}
+
+// El destello de Momentos sin ver (Avatar.jsx) en un botón: las mismas
+// variables del tema y la misma clase .pt-moment-glow. El aro de Ángel se
+// recorta por dentro, porque acá no hay una foto que lo tape. Con "reducir
+// movimiento" la capa que pulsa queda apagada y se ven solo las fijas.
+function ChatEnergy({ radius }) {
+  const layer = { position: "absolute", borderRadius: radius, pointerEvents: "none" };
+  const mask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)";
+  return (
+    <>
+      <span
+        style={{
+          ...layer,
+          inset: "-4px",
+          padding: "4px",
+          background: "var(--moment-ring-image)",
+          WebkitMask: mask,
+          WebkitMaskComposite: "xor",
+          maskComposite: "exclude",
+        }}
+        aria-hidden="true"
+      />
+      <span style={{ ...layer, inset: "-4px", boxShadow: "var(--moment-ring-halo)" }} aria-hidden="true" />
+      <span style={{ ...layer, inset: 0, boxShadow: "var(--moment-unseen-shadow)" }} aria-hidden="true" />
+      <span
+        className="pt-moment-glow"
+        style={{ ...layer, inset: 0, boxShadow: "var(--moment-glow-shadow)", opacity: 0 }}
+        aria-hidden="true"
+      />
+    </>
+  );
+}
+
 // Ícono del botón que abre el selector de temas: gota de acuarela con
 // degradado arcoíris (punta roja → violeta abajo) y brillo blanco curvo,
 // sobre una mancha de pintura de la que salen chorros que se afinan en
@@ -687,7 +765,7 @@ function ThemeMenu() {
   );
 }
 
-function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
+function BottomNav({ active, unreadCount, chatUnread, chatEnergy, onNavigate, myIdentity }) {
   const { t } = useLanguage();
   const { themeKey } = useTheme();
   const lineIcons = !!THEMES[resolveThemeKey(themeKey)].lineIcons;
@@ -696,15 +774,28 @@ function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
       {getBottomTabs(t).map((tab) => {
         const isActive = active === tab.key;
         const hasUnread = tab.key === "notificaciones" && unreadCount > 0;
+        const isChat = tab.key === "chat";
+        const hasChatUnread = isChat && chatUnread > 0;
         return (
           <button
             key={tab.key}
             style={bottomNavStyles.btn(isActive)}
             aria-current={isActive ? "page" : undefined}
-            aria-label={hasUnread ? t("nav.alertsUnread", { n: unreadCount }) : undefined}
+            aria-label={
+              hasUnread
+                ? t("nav.alertsUnread", { n: unreadCount })
+                : hasChatUnread
+                ? t("nav.chatUnread", { n: formatChatUnread(chatUnread) })
+                : undefined
+            }
             onClick={() => onNavigate(tab.key)}
           >
             <span style={bottomNavStyles.iconWrap} aria-hidden="true">
+              {isChat && chatEnergy && (
+                <span style={chatAlertStyles.mobileEnergy}>
+                  <ChatEnergy radius="50%" />
+                </span>
+              )}
               {tab.key === "feed" ? (
                 <HomeIcon identityText={myIdentity} active={isActive} size={19} />
               ) : tab.key === "tienda" ? (
@@ -715,6 +806,7 @@ function BottomNav({ active, unreadCount, onNavigate, myIdentity }) {
                 tab.icon
               )}
               {hasUnread && <span style={bottomNavStyles.dot} />}
+              {hasChatUnread && <ChatUnreadBadge count={chatUnread} style={chatAlertStyles.mobileBadge} />}
             </span>
             <span style={bottomNavStyles.label}>{tab.label}</span>
             {isActive && <span style={bottomNavStyles.activeMark} aria-hidden="true" />}
@@ -771,11 +863,6 @@ function App() {
   // que lo consume una vez (onConsumeStoreProduct) para no reabrir el
   // mismo producto si el usuario vuelve a la lista y sale de nuevo.
   const [storeProductId, setStoreProductId] = useState(null);
-  // Mismo puente que storeProductId, para la pestaña Chat: uid de la
-  // persona cuya conversación hay que abrir al llegar desde una
-  // notificación de mensaje (Notifications.jsx -> onOpenChat). Chat.jsx lo
-  // consume una vez (onConsumeInitialContactUid).
-  const [chatContactUid, setChatContactUid] = useState(null);
   // Momento propio a abrir al tocar una notificación "momentLike" (punto
   // 66, commit 6). El visor se abre encima de cualquier pantalla, sin
   // cambiar de pestaña. { id, starRain, openedAt }: starRain (punto 86) es
@@ -887,7 +974,6 @@ function App() {
     setViewingGroupId(null);
     setViewingEventId(null);
     setStoreProductId(null);
-    setChatContactUid(null);
   };
 
   // Para el resaltado de pestaña activa: ninguna pestaña se ve "activa"
@@ -896,6 +982,12 @@ function App() {
   // handleNavClick para saber si ya estás viendo el Muro.
   const anyOverlayOpen =
     !!viewingProfileUid || viewingSaved || !!viewingPostId || !!viewingGroupId || !!viewingEventId;
+
+  // Punto 92: un perfil o un post abierto desde el Chat ya es otra sección.
+  const { unreadCount: chatUnread, showEnergy: chatEnergy } = useChatUnread(
+    currentUid,
+    view === "chat" && !anyOverlayOpen
+  );
 
   // Punto 87: botón Muro como en Facebook (barra superior de escritorio y
   // barra inferior de celular). Si ya estás en el Muro, sin ninguna vista
@@ -930,19 +1022,6 @@ function App() {
     setStoreProductId(productId);
   };
 
-  // Desde una notificación de mensaje: cambia a la pestaña Chat y le pide
-  // que abra la conversación con esa persona (mismo patrón que
-  // openStoreProduct de arriba).
-  const openChat = (uid) => {
-    setView("chat");
-    closeProfile();
-    setViewingSaved(false);
-    setViewingPostId(null);
-    setViewingGroupId(null);
-    setViewingEventId(null);
-    setChatContactUid(uid);
-  };
-
   let content;
   if (viewingPostId) {
     content = <PostView postId={viewingPostId} onBack={closePost} onOpenProfile={openProfile} />;
@@ -974,8 +1053,6 @@ function App() {
         onOpenProfile={openProfile}
         onOpenPost={openPost}
         onOpenProduct={openStoreProduct}
-        initialContactUid={chatContactUid}
-        onConsumeInitialContactUid={() => setChatContactUid(null)}
       />
     );
   } else if (view === "buscar") {
@@ -995,7 +1072,6 @@ function App() {
         onOpenProfile={openProfile}
         onOpenPost={openPost}
         onOpenProduct={openStoreProduct}
-        onOpenChat={openChat}
         onOpenMoment={openMoment}
       />
     );
@@ -1015,12 +1091,15 @@ function App() {
           <nav style={navStyles.buttonsGroup} aria-label={t("nav.main")}>
             {getDesktopTabs(t).map((tab) => {
               const active = !anyOverlayOpen && view === tab.key;
-              return (
+              const isChat = tab.key === "chat";
+              const hasChatUnread = isChat && chatUnread > 0;
+              const button = (
                 <button
                   key={tab.key}
                   className="pt-relief"
                   style={navStyles.button(active)}
                   aria-current={active ? "page" : undefined}
+                  aria-label={hasChatUnread ? t("nav.chatUnread", { n: formatChatUnread(chatUnread) }) : undefined}
                   onClick={() => handleNavClick(tab.key)}
                 >
                   {tab.key === "feed" && (
@@ -1029,6 +1108,14 @@ function App() {
                   {tab.key === "tienda" && <StoreIcon size={17} />}
                   {tab.label}
                 </button>
+              );
+              if (!isChat) return button;
+              return (
+                <span key={tab.key} style={chatAlertStyles.desktopWrap}>
+                  {chatEnergy && <ChatEnergy radius="999px" />}
+                  {button}
+                  {hasChatUnread && <ChatUnreadBadge count={chatUnread} style={chatAlertStyles.desktopBadge} />}
+                </span>
               );
             })}
           </nav>
@@ -1040,7 +1127,6 @@ function App() {
               onOpenProfile={openProfile}
               onOpenPost={openPost}
               onOpenProduct={openStoreProduct}
-              onOpenChat={openChat}
               onOpenMoment={openMoment}
             />
           )}
@@ -1088,6 +1174,8 @@ function App() {
         <BottomNav
           active={anyOverlayOpen ? null : view}
           unreadCount={unreadCount}
+          chatUnread={chatUnread}
+          chatEnergy={chatEnergy}
           onNavigate={handleNavClick}
           myIdentity={myIdentity}
         />

@@ -63,6 +63,7 @@ export const translations = {
     "nav.main": "Navegación principal",
     "nav.theme": "Cambiar tema",
     "nav.alertsUnread": "Avisos: {n} sin leer",
+    "nav.chatUnread": "Chat: {n} sin leer",
 
     // Nombres de temas visuales (themes.js -> THEMES.<key>.labelKey)
     "theme.noche": "Noche Violeta",
@@ -448,7 +449,6 @@ export const translations = {
     "chat.searchPlaceholder": "Buscar por nombre o identidad...",
     "chat.noSearchResults": "Nadie coincide con tu búsqueda.",
     "chat.noContacts": "Todavía no hay más personas registradas.",
-    "chat.conversationUnavailable": "Esta conversación no está disponible.",
     // Aviso sobre el campo de texto (punto 84, commit 4)
     "chat.sendError": "No se pudo enviar el mensaje. Intenta de nuevo.",
     "chat.cannotWrite": "Ya no puedes enviar mensajes en esta conversación.",
@@ -491,7 +491,6 @@ export const translations = {
     "notifications.loginNotice": "Inicia sesión primero para ver tus notificaciones.",
     "notifications.like": "{name} le dio like a tu publicación",
     "notifications.comment": "{name} comentó tu publicación",
-    "notifications.message": "{name} te envió un mensaje",
     "notifications.follow": "{name} empezó a seguirte",
     "notifications.mention": "{name} te mencionó",
     "notifications.newProduct": "{name} publicó un nuevo producto: {title}",
@@ -793,6 +792,7 @@ export const translations = {
     "nav.main": "Main navigation",
     "nav.theme": "Change theme",
     "nav.alertsUnread": "Alerts: {n} unread",
+    "nav.chatUnread": "Chat: {n} unread",
 
     // Visual theme names (themes.js -> THEMES.<key>.labelKey)
     "theme.noche": "Violet Night",
@@ -1170,7 +1170,6 @@ export const translations = {
     "chat.searchPlaceholder": "Search by name or identity...",
     "chat.noSearchResults": "No one matches your search.",
     "chat.noContacts": "No other people registered yet.",
-    "chat.conversationUnavailable": "This conversation is not available.",
     // Notice above the message field (point 84, commit 4)
     "chat.sendError": "Couldn't send the message. Try again.",
     "chat.cannotWrite": "You can no longer send messages in this conversation.",
@@ -1211,7 +1210,6 @@ export const translations = {
     "notifications.loginNotice": "Sign in first to see your notifications.",
     "notifications.like": "{name} liked your post",
     "notifications.comment": "{name} commented on your post",
-    "notifications.message": "{name} sent you a message",
     "notifications.follow": "{name} started following you",
     "notifications.mention": "{name} mentioned you",
     "notifications.newProduct": "{name} listed a new product: {title}",

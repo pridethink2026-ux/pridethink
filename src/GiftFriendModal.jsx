@@ -2,7 +2,6 @@ import React, { useMemo, useState } from "react";
 import { db } from "./firebase";
 import { addDoc, collection, doc, increment, serverTimestamp, updateDoc } from "firebase/firestore";
 import Avatar from "./Avatar";
-import { notify } from "./utils";
 import { sendChatMessage } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
@@ -216,12 +215,6 @@ export default function GiftFriendModal({ product, currentUid, myProfile, onClos
       message: trimmedMessage,
     });
     await updateDoc(doc(db, "products", product.id), { giftCount: increment(1) });
-    await notify(contact.uid, {
-      type: "message",
-      fromUid: currentUid,
-      fromName: myProfile?.displayName || "Alguien",
-      fromIdentity: myProfile?.identity || "",
-    });
     setSentTo(contact.uid);
     setTimeout(onClose, 900);
   };

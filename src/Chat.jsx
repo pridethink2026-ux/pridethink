@@ -16,13 +16,14 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Avatar from "./Avatar";
-import { notify, useIsMobile, getChatId, timeAgo } from "./utils";
+import { useIsMobile, getChatId, timeAgo } from "./utils";
 import {
   newMessageId,
   sendChatMessage,
   useRecentChats,
   useChatSummary,
   isChatUnread,
+  canChatWithUser,
   markChatRead,
   deleteChatForMe,
   RECENT_CHATS_PAGE,
@@ -38,7 +39,7 @@ import {
   DEFAULT_PICKER_TAB,
   DEFAULT_EMOJI_CATEGORY,
 } from "./Stickers";
-import { blockUser, unblockUser, useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { blockUser, unblockUser, useMyBlocks } from "./Blocks";
 import { useAllUsers } from "./Mentions";
 import { playReactionSound } from "./sound";
 import GiftNotification from "./GiftNotification";
@@ -72,8 +73,7 @@ import ImageEditor from "./ImageEditor";
   mensaje). Nombre y foto salen de AllUsersContext (sin lecturas extra).
   "Nueva conversación" cambia la columna a un buscador de personas; la
   conversación aparece en la lista recién con el primer mensaje.
-  Quién aparece (en la lista, en el buscador y al llegar desde una
-  notificación), canChatWith: sin bloqueo en ninguna dirección y, si es
+  Quién aparece (en la lista y en el buscador), canChatWith: sin bloqueo en ninguna dirección y, si es
   privado, con seguimiento mutuo o si ya te escribió en ese chat
   (`writers`, commit 4; en el buscador solo el seguimiento mutuo). Quien
   ya no existe no se muestra. Si con la conversación abierta deja de
@@ -1333,8 +1333,6 @@ export default function Chat({
   onOpenProfile,
   onOpenPost,
   onOpenProduct,
-  initialContactUid,
-  onConsumeInitialContactUid,
 }) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -1343,10 +1341,6 @@ export default function Chat({
   // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
   const myProfile = useUserProfile(currentUid);
   const [activeContact, setActiveContact] = useState(null);
-  // Se llegó desde una notificación de mensaje (initialContactUid) pero esa
-  // persona no aparece entre los contactos visibles — ver el efecto que
-  // consume initialContactUid más abajo.
-  const [chatUnavailable, setChatUnavailable] = useState(false);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [search, setSearch] = useState("");
@@ -1421,13 +1415,8 @@ export default function Chat({
   // `writers`: ahí solo cuenta el seguimiento mutuo.
   const { blockedByMe, blockedMe } = useMyBlocks(currentUid);
   const { following, followers, ready: followsReady } = useMyFollows();
-  const canChatWith = (user, writers) => {
-    if (!user || user.uid === currentUid) return false;
-    if (isBlockedEitherWay(blockedByMe, blockedMe, user.uid)) return false;
-    if (!user.isPrivate) return true;
-    if (writers?.[user.uid] === true) return true;
-    return following.includes(user.uid) && followers.includes(user.uid);
-  };
+  const canChatWith = (user, writers) =>
+    canChatWithUser(user, currentUid, writers, { blockedByMe, blockedMe, following, followers });
 
   // "recent": tus conversaciones; "new": buscador de "Nueva conversación".
   const [listMode, setListMode] = useState("recent");
@@ -1523,7 +1512,6 @@ export default function Chat({
     setActiveContact(user);
     setSendError(false);
     setStickerPanelOpen(false);
-    setChatUnavailable(false);
     setListMode("recent");
     setSearch("");
   };
@@ -1547,40 +1535,6 @@ export default function Chat({
       setDeleteError(true);
     }
   };
-
-  // Abrir una conversación puntual al llegar desde una notificación de
-  // mensaje (App.js -> openChat, mismo patrón que initialProductId en
-  // StoreScreen.jsx). Espera a que lleguen la lista de usuarios y tus
-  // seguimientos para no marcar "no disponible" mientras todavía cargan.
-  // Mismo criterio que la lista (canChatWith): si es privado sin
-  // seguimiento mutuo, hay bloqueo en cualquier dirección o ya no existe,
-  // no se abre nada y se muestra un aviso genérico — el mismo texto en
-  // los tres casos, para no revelar quién bloqueó a quién.
-  // Además espera el resumen de ese chat: un privado que ya te escribió
-  // (writers) también se abre.
-  const pendingChatId =
-    initialContactUid && currentUid && initialContactUid !== currentUid
-      ? getChatId(currentUid, initialContactUid)
-      : null;
-  const pendingSummary = useChatSummary(pendingChatId);
-  useEffect(() => {
-    if (!initialContactUid || !currentUid || allUsersRaw.length === 0 || !followsReady) return;
-    if (pendingChatId && pendingSummary === undefined) return;
-    const target = allUsersRaw.find((u) => u.uid === initialContactUid);
-    const available = canChatWith(target, pendingSummary?.writers);
-    if (available) {
-      setSendError(false);
-      setActiveContact(target);
-      setStickerPanelOpen(false);
-      setChatUnavailable(false);
-    } else {
-      setActiveContact(null);
-      setChatUnavailable(true);
-    }
-    onConsumeInitialContactUid?.();
-    // canChatWith depende de lo mismo que ya está en la lista.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialContactUid, currentUid, allUsersRaw, blockedByMe, blockedMe, followsReady, following, followers, pendingChatId, pendingSummary, onConsumeInitialContactUid]);
 
   const handleToggleBlock = async () => {
     if (!activeContact || !currentUid) return;
@@ -1778,13 +1732,6 @@ export default function Chat({
         audioData: dataUrl,
         audioDuration: duration,
       });
-
-      await notify(activeContact.uid, {
-        type: "message",
-        fromUid: currentUid,
-        fromName: myProfile?.displayName || "Alguien",
-        fromIdentity: myProfile?.identity || "",
-      });
     } catch (err) {
       alert(t("chat.audioSendError"));
     } finally {
@@ -1856,13 +1803,6 @@ export default function Chat({
 
       await sendChatMessage(currentUid, activeContact.uid, { type: "image", imageUrl }, messageId);
 
-      await notify(activeContact.uid, {
-        type: "message",
-        fromUid: currentUid,
-        fromName: myProfile?.displayName || "Alguien",
-        fromIdentity: myProfile?.identity || "",
-      });
-
       URL.revokeObjectURL(pendingImage.previewUrl);
       setPendingImage(null);
     } catch (err) {
@@ -1896,14 +1836,6 @@ export default function Chat({
       return;
     }
     setSendError(false);
-
-    // Notifica al destinatario que le llegó un mensaje nuevo
-    await notify(activeContact.uid, {
-      type: "message",
-      fromUid: currentUid,
-      fromName: myProfile?.displayName || "Alguien",
-      fromIdentity: myProfile?.identity || "",
-    });
   };
 
   // Punto 91: en PC, Enter envía y Shift+Enter hace línea nueva; en táctil,
@@ -1949,13 +1881,6 @@ export default function Chat({
       return;
     }
     setSendError(false);
-
-    await notify(activeContact.uid, {
-      type: "message",
-      fromUid: currentUid,
-      fromName: myProfile?.displayName || "Alguien",
-      fromIdentity: myProfile?.identity || "",
-    });
   };
 
   if (!currentUid) {
@@ -2035,11 +1960,6 @@ export default function Chat({
                   {t("chat.newConversation")}
                 </p>
               </div>
-            )}
-            {chatUnavailable && (
-              <p style={{ padding: "8px 16px 0", fontSize: "13px", color: "var(--text-muted)", margin: 0 }}>
-                {t("chat.conversationUnavailable")}
-              </p>
             )}
             <div style={styles.searchBox}>
               <input

@@ -948,7 +948,6 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
         <SharePostModal
           post={post}
           currentUid={currentUid}
-          myProfile={myProfile}
           onClose={() => setShareOpen(false)}
         />
       )}

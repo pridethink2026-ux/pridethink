@@ -61,7 +61,7 @@ import { triggerStarRain } from "./StarRain";
     una lluvia de estrellas (punto 86, StarRain.jsx).
   - Responder (commit 7): en los momentos ajenos, el campo de abajo manda
     la respuesta como mensaje al chat con el autor (moments.js →
-    sendMomentReply, notificación "message"). Mientras el campo tiene el
+    sendMomentReply). Mientras el campo tiene el
     foco o se está enviando, el tiempo se pausa. Aunque tu perfil sea
     privado, el autor puede contestarte: al responder quedás en `writers`
     del chat (punto 84, commit 4), así que la conversación le aparece en
@@ -772,12 +772,6 @@ export default function MomentViewer({
     setReplyStatus(null);
     try {
       await sendMomentReply(currentUid, moment, text);
-      notify(moment.authorId, {
-        type: "message",
-        fromUid: currentUid,
-        fromName: me?.displayName || "Alguien",
-        fromIdentity: me?.identity || "",
-      }).catch(() => {});
       setReplyText("");
       setReplyStatus("sent");
       replyInputRef.current?.blur();

@@ -135,7 +135,7 @@ code {
 }
 
 /* Destello de Momentos sin ver (Avatar.jsx, prop momentRing="unseen",
-   punto 66). El estilo inline del avatar ya trae el destello fijo
+   punto 66; también el botón Chat con mensajes nuevos, punto 92). El estilo inline del avatar ya trae el destello fijo
    (accent2); encima, una capa propia con el destello en accent "respira"
    cambiando solo su opacidad (punto 68: antes se animaba box-shadow, que
    el navegador no puede delegar a la GPU). Con "reducir movimiento" queda

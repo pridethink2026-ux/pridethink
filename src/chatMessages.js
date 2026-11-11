@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   doc,
@@ -16,6 +16,9 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { getChatId } from "./utils";
+import { useAllUsersContext } from "./AllUsersContext";
+import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
+import { useMyFollows } from "./FollowsContext";
 
 /*
   chatMessages.js
@@ -311,6 +314,152 @@ export function isChatUnread(chat, myUid) {
 // updateDoc falla si no, en vez de crearlo.
 export function markChatRead(myUid, chatId) {
   return updateDoc(doc(db, "chats", chatId), { [`lastReadAt.${myUid}`]: serverTimestamp() });
+}
+
+// ¿Se puede chatear con esta persona? Decide quién sale en la lista del
+// Chat y, por lo tanto, qué conversaciones cuentan para el globito (si una
+// oculta contara, el número no se podría borrar nunca).
+export function canChatWithUser(user, myUid, writers, { blockedByMe, blockedMe, following, followers }) {
+  if (!user || user.uid === myUid) return false;
+  if (isBlockedEitherWay(blockedByMe, blockedMe, user.uid)) return false;
+  if (!user.isPrivate) return true;
+  if (writers?.[user.uid] === true) return true;
+  return following.includes(user.uid) && followers.includes(user.uid);
+}
+
+// ---------------------------------------------------------------------
+// Punto 92: globito de mensajes sin leer y destello del botón Chat.
+// ---------------------------------------------------------------------
+
+// Hasta cuántos mensajes se cuentan por conversación: alcanza para "99+" y
+// acota las lecturas de una conversación con muchos mensajes sin abrir.
+const UNREAD_MESSAGES_MAX = 100;
+
+// Desde cuándo cuenta un mensaje como no leído: lo posterior a tu última
+// lectura y a la última vez que eliminaste la conversación.
+function unreadCutoff(chat, myUid) {
+  const read = chat.lastReadAt?.[myUid];
+  const hidden = chat.hiddenAt?.[myUid];
+  return (millis(hidden) > millis(read) ? hidden : read) || null;
+}
+
+// { [chatId]: mensajes sin leer }, en vivo. Un listener por conversación no
+// leída, que se abre al quedar sin leer y se cierra al leerla. La consulta
+// no filtra por remitente porque eso exigiría un índice compuesto (ver el
+// punto 90): tus propios mensajes se descartan acá.
+function useUnreadMessageCounts(myUid, unreadChats) {
+  const [counts, setCounts] = useState({});
+  const listenersRef = useRef(new Map());
+  const signature = unreadChats
+    .map((chat) => chat.id + ":" + millis(unreadCutoff(chat, myUid)))
+    .sort()
+    .join(",");
+
+  useEffect(() => {
+    const listeners = listenersRef.current;
+    const wanted = new Map(unreadChats.map((chat) => [chat.id, chat]));
+
+    listeners.forEach((listener, chatId) => {
+      const chat = wanted.get(chatId);
+      if (chat && listener.cutoff === millis(unreadCutoff(chat, myUid))) return;
+      listener.stop();
+      listeners.delete(chatId);
+      setCounts(({ [chatId]: _closed, ...rest }) => rest);
+    });
+
+    wanted.forEach((chat, chatId) => {
+      if (listeners.has(chatId)) return;
+      const cutoff = unreadCutoff(chat, myUid);
+      const q = query(
+        collection(db, "chats", chatId, "messages"),
+        ...(cutoff ? [where("createdAt", ">", cutoff)] : []),
+        orderBy("createdAt", "desc"),
+        limit(UNREAD_MESSAGES_MAX)
+      );
+      const stop = onSnapshot(
+        q,
+        (snap) => {
+          const n = snap.docs.filter((message) => message.data().senderId !== myUid).length;
+          setCounts((current) => ({ ...current, [chatId]: n }));
+        },
+        (err) => console.error("chats: no se pudieron contar los no leídos", err.code)
+      );
+      listeners.set(chatId, { cutoff: millis(cutoff), stop });
+    });
+    // "signature" resume unreadChats: cada mensaje nuevo cambia el arreglo,
+    // pero el listener de esa conversación ya lo recibe solo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature, myUid]);
+
+  useEffect(() => {
+    const listeners = listenersRef.current;
+    return () => {
+      listeners.forEach((listener) => listener.stop());
+      listeners.clear();
+      setCounts({});
+    };
+  }, [myUid]);
+
+  return counts;
+}
+
+// El navegador recuerda hasta qué mensaje ya viste el aviso, para que
+// recargar la página no vuelva a encender el destello. Si localStorage
+// falla (modo privado), se recuerda solo durante la sesión.
+const chatAlertKey = (uid) => "pt-chat-alert-seen-" + uid;
+
+function readChatAlertSeen(uid) {
+  try {
+    return Number(localStorage.getItem(chatAlertKey(uid))) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveChatAlertSeen(uid, at) {
+  try {
+    localStorage.setItem(chatAlertKey(uid), String(at));
+  } catch {
+    // Sin localStorage: queda en memoria (useChatUnread).
+  }
+}
+
+// Para el botón Chat (App.js). unreadCount: mensajes sin leer de las
+// conversaciones que se ven en la lista. showEnergy: hay un mensaje sin
+// leer que llegó después de la última vez que estuviste en la sección Chat.
+export function useChatUnread(myUid, inChatSection) {
+  const { chats } = useRecentChats(myUid, Infinity);
+  const allUsers = useAllUsersContext();
+  const { blockedByMe, blockedMe } = useMyBlocks();
+  const { following, followers } = useMyFollows();
+  const usersByUid = useMemo(() => {
+    const map = {};
+    allUsers.forEach((u) => (map[u.uid] = u));
+    return map;
+  }, [allUsers]);
+
+  const unreadChats = chats.filter((chat) => {
+    if (!isChatUnread(chat, myUid)) return false;
+    const otherUid = (chat.participants || []).find((uid) => uid !== myUid);
+    return canChatWithUser(usersByUid[otherUid], myUid, chat.writers, { blockedByMe, blockedMe, following, followers });
+  });
+
+  // Mientras llega el conteo, una conversación no leída vale 1.
+  const counts = useUnreadMessageCounts(myUid, unreadChats);
+  const unreadCount = unreadChats.reduce((sum, chat) => sum + (counts[chat.id] || 1), 0);
+
+  const latestUnread = unreadChats.reduce((latest, chat) => Math.max(latest, millis(chat.lastMessageAt)), 0);
+  const storedSeen = useMemo(() => (myUid ? readChatAlertSeen(myUid) : 0), [myUid]);
+  const [marked, setMarked] = useState({ uid: null, at: 0 });
+  const seenUpTo = Math.max(storedSeen, marked.uid === myUid ? marked.at : 0);
+
+  useEffect(() => {
+    if (!myUid || !inChatSection || latestUnread <= seenUpTo) return;
+    setMarked({ uid: myUid, at: latestUnread });
+    saveChatAlertSeen(myUid, latestUnread);
+  }, [myUid, inChatSection, latestUnread, seenUpTo]);
+
+  return { unreadCount, showEnergy: !inChatSection && latestUnread > seenUpTo };
 }
 
 // Una vez por sesión, al iniciar (App.js, mismo patrón que

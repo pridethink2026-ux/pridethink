@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import Avatar from "./Avatar";
-import { notify } from "./utils";
 import { sendChatMessage } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
 import { useMyBlocks, isBlockedEitherWay } from "./Blocks";
@@ -18,8 +17,7 @@ import { useAllUsers } from "./Mentions";
 
   Al elegir un contacto, crea un mensaje { senderId, type: "shared_post",
   sharedPostId, createdAt } en chats/{chatId}/messages con
-  sendChatMessage (chatMessages.js, punto 84) y notifica como un
-  mensaje normal. NO copia el contenido del post en el mensaje — la vista
+  sendChatMessage (chatMessages.js, punto 84). NO copia el contenido del post en el mensaje — la vista
   previa se resuelve en vivo del lado de Chat.jsx (ver SharedPostPreview).
 */
 
@@ -116,7 +114,7 @@ const styles = {
   },
 };
 
-export default function SharePostModal({ post, currentUid, myProfile, onClose }) {
+export default function SharePostModal({ post, currentUid, onClose }) {
   const { t } = useLanguage();
   // Del listener único de AllUsersContext (ver Mentions.jsx/AllUsersContext.jsx)
   // en vez de un onSnapshot propio sobre toda la colección "users".
@@ -147,12 +145,6 @@ export default function SharePostModal({ post, currentUid, myProfile, onClose })
   const handleShare = async (contact) => {
     // Mensaje y resumen del chat juntos (chatMessages.js, punto 84).
     await sendChatMessage(currentUid, contact.uid, { type: "shared_post", sharedPostId: post.id });
-    await notify(contact.uid, {
-      type: "message",
-      fromUid: currentUid,
-      fromName: myProfile?.displayName || "Alguien",
-      fromIdentity: myProfile?.identity || "",
-    });
     setSentTo(contact.uid);
     setTimeout(onClose, 900);
   };
