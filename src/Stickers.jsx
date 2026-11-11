@@ -254,9 +254,11 @@ const styles = {
     left: "8px",
     right: "8px",
     maxWidth: "420px",
-    // Cabe dentro de la caja del chat (80vh menos cabecera y fila de
-    // escritura) y nunca más de 360px; el contenido se desplaza por dentro.
-    maxHeight: "min(360px, calc(80vh - 170px))",
+    // Cabe dentro de la caja del chat (su alto visible, punto 91, menos
+    // cabecera y fila de escritura) y nunca más de 360px; el contenido se
+    // desplaza por dentro. Con muy poco alto se recorta antes que desaparecer.
+    maxHeight:
+      "max(120px, min(360px, calc(var(--pt-chat-height, 80vh) - 170px - var(--pt-composer-extra, 0px))))",
     marginBottom: "6px",
     display: "flex",
     flexDirection: "column",

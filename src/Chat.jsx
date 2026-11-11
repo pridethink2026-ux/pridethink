@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useLayoutEffect, useState, useRef, useMemo } from "react";
 import { auth, db } from "./firebase";
 import { useUserProfile } from "./AllUsersContext";
 import { storage } from "./firebaseStorage";
@@ -338,6 +338,16 @@ function AudioWaveform({ seed, playing, mine }) {
   );
 }
 
+// Medidas del cuadro de escribir. En táctil, 16px: con menos, iPhone hace
+// zoom al enfocar. oneLine y fiveLines son el alto del <textarea> (padding
+// 10+10; el borde lo lleva composerField, por eso roundBtn suma 2).
+function composerMetrics(touch) {
+  const fontSize = touch ? 16 : 14;
+  const lineHeight = touch ? 22 : 20;
+  const oneLine = lineHeight + 20;
+  return { fontSize, lineHeight, oneLine, fiveLines: lineHeight * 5 + 20, roundBtn: oneLine + 2 };
+}
+
 const styles = {
   wrapper: {
     minHeight: "100vh",
@@ -348,6 +358,32 @@ const styles = {
     fontFamily: "var(--font-body)",
     color: "var(--text)",
     boxSizing: "border-box",
+  },
+  // Punto 91: en PC la caja ocupa justo lo que queda bajo la barra superior
+  // (useChatViewport pone el alto), así la página no tiene scroll.
+  wrapperPage: { minHeight: 0 },
+  // Punto 91: conversación abierta en celular, a pantalla completa. top y
+  // height los pone useChatViewport según el área visible. z-index 46: tapa
+  // la barra inferior (30) y queda debajo de los modales (50). Fondo --bg
+  // porque --page-bg es transparente en algunos temas.
+  wrapperFull: {
+    position: "fixed",
+    left: 0,
+    right: 0,
+    zIndex: 46,
+    minHeight: 0,
+    padding: 0,
+    background: "var(--bg)",
+    overflow: "hidden",
+    overscrollBehavior: "none",
+  },
+  shellPage: { height: "100%" },
+  shellFull: {
+    maxWidth: "none",
+    height: "100%",
+    borderRadius: 0,
+    border: "none",
+    boxShadow: "none",
   },
   shell: {
     width: "100%",
@@ -582,6 +618,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "10px",
+    overscrollBehavior: "contain",
   },
   bubbleRow: (mine) => ({
     display: "flex",
@@ -617,6 +654,8 @@ const styles = {
     // (en Pinky el degradado es blanco y --bg rosa claro no se lee).
     color: mine ? "var(--on-primary)" : "var(--text)",
   }),
+  // Respeta los saltos de línea del cuadro de escribir (punto 91).
+  bubbleText: { whiteSpace: "pre-wrap" },
   // Sin fondo de burbuja a propósito (pedido explícito: "como en
   // WhatsApp") — solo un poco de padding para que la reacción no quede
   // pegada al borde de la imagen.
@@ -629,40 +668,74 @@ const styles = {
     // de la fila de escritura, para que nunca se salga de la caja del chat.
     position: "relative",
     display: "flex",
-    gap: "10px",
-    padding: "14px 16px",
+    // Los botones se quedan abajo cuando el cuadro crece.
+    alignItems: "flex-end",
+    gap: "8px",
+    padding: "8px 10px",
     borderTop: "1px solid var(--border)",
   },
-  input: {
+  // Punto 91: el "cuadro" que se ve, con los iconos de stickers e imagen
+  // dentro. Sin position propio, para que el panel de stickers se siga
+  // anclando a inputRow.
+  composerField: {
     flex: 1,
     minWidth: 0,
+    display: "flex",
+    alignItems: "flex-end",
     background: "var(--surface-alt)",
     border: "1px solid var(--border)",
     boxShadow: "var(--field-shine)",
-    borderRadius: "12px",
-    padding: "10px 14px",
-    fontSize: "14px",
-    color: "var(--text)",
-    outline: "none",
+    borderRadius: "22px",
+    padding: "0 4px",
   },
-  sendBtn: {
-    padding: "10px 18px",
-    borderRadius: "12px",
+  // Punto 91: crece hasta 5 líneas (ComposerTextarea pone el alto). El tope
+  // también respeta el alto visible, para no tapar el nombre con el teclado.
+  input: (touch) => {
+    const { fontSize, lineHeight, oneLine, fiveLines } = composerMetrics(touch);
+    return {
+      flex: 1,
+      minWidth: 0,
+      display: "block",
+      boxSizing: "border-box",
+      resize: "none",
+      maxHeight: `max(${oneLine}px, min(${fiveLines}px, calc(var(--pt-chat-height, 80vh) - 130px)))`,
+      background: "transparent",
+      border: "none",
+      padding: "10px 4px",
+      fontFamily: "inherit",
+      fontSize: `${fontSize}px`,
+      lineHeight: `${lineHeight}px`,
+      wordBreak: "break-word",
+      color: "var(--text)",
+      outline: "none",
+    };
+  },
+  // Punto 91: un solo botón redondo, micrófono o flecha de enviar.
+  composerRoundBtn: (size) => ({
+    width: `${size}px`,
+    height: `${size}px`,
+    borderRadius: "50%",
     border: "none",
+    padding: 0,
     background: "var(--gradient-primary)",
     boxShadow: "var(--button-shine)",
     color: "var(--on-primary)",
-    fontWeight: 600,
+    fontSize: "16px",
     cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
-  },
-  micBtn: {
-    width: "40px",
-    height: "40px",
+  }),
+  // Iconos dentro del cuadro de escribir.
+  composerIconBtn: {
+    width: "34px",
+    height: "34px",
     borderRadius: "50%",
-    border: "1px solid var(--border)",
+    border: "none",
+    padding: 0,
     background: "transparent",
-    color: "var(--text)",
+    color: "var(--text-muted)",
     fontSize: "16px",
     cursor: "pointer",
     display: "flex",
@@ -672,20 +745,7 @@ const styles = {
   },
   // Sin position propio: el panel se posiciona respecto de inputRow.
   stickerBtnWrapper: { flexShrink: 0 },
-  stickerBtn: (active) => ({
-    width: "40px",
-    height: "40px",
-    borderRadius: "50%",
-    border: `1px solid ${active ? "var(--accent2)" : "var(--border)"}`,
-    background: active ? "var(--accent2-soft)" : "transparent",
-    color: active ? "var(--accent2)" : "var(--text)",
-    fontSize: "16px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  }),
+  stickerBtnActive: { background: "var(--accent2-soft)", color: "var(--accent2)" },
   recordingRow: {
     display: "flex",
     alignItems: "center",
@@ -1046,7 +1106,7 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
             />
             {message.text && (
               <div style={styles.bubble(mine)}>
-                <AnimatedEmojiText text={message.text} />
+                <span style={styles.bubbleText}><AnimatedEmojiText text={message.text} /></span>
               </div>
             )}
           </div>
@@ -1078,7 +1138,7 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
             ) : message.type === "moment_reply" ? (
               <MomentReplyPreview message={message} mine={mine} />
             ) : (
-              <AnimatedEmojiText text={message.text} />
+              <span style={styles.bubbleText}><AnimatedEmojiText text={message.text} /></span>
             )}
           </div>
         )}
@@ -1134,6 +1194,141 @@ function chatPreview(chat, myUid, t) {
   return mine ? t("chat.previewMine", { text: body }) : body;
 }
 
+// Punto 91: pantalla táctil como puntero principal (celular o tablet). Una
+// ventana angosta de PC o una laptop con pantalla táctil no cuentan.
+function isTouchScreen() {
+  return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+}
+
+// Punto 91: mantiene la ventana del chat dentro del área visible.
+// - "full" (conversación abierta en celular): capa fija del alto visible
+//   real, que sigue al teclado, con el scroll de la página bloqueado. En
+//   iPhone el teclado desplaza el área visible (offsetTop), por eso se
+//   ajusta también top y no solo el alto.
+// - "page" (PC): el chat ocupa lo que queda bajo la barra superior y el
+//   banner, así la página no tiene scroll que el navegador pueda mover.
+// - "flow" (lista de conversaciones en celular): no hace nada.
+// --pt-chat-height es el alto de la caja; lo usan el cuadro de escribir y
+// el panel de stickers para no salirse.
+const DESKTOP_MIN_CHAT_HEIGHT = 420;
+const WRAPPER_VERTICAL_PADDING = 48;
+
+function useChatViewport(wrapperRef, mode) {
+  useLayoutEffect(() => {
+    const el = wrapperRef.current;
+    if (!el || mode === "flow") return undefined;
+    const vv = window.visualViewport;
+
+    const sync = () => {
+      // Con zoom de dedos el área visible se achica, pero la caja no debe.
+      if (vv && vv.scale > 1.01) return;
+      const visibleHeight = vv ? vv.height : window.innerHeight;
+      if (mode === "full") {
+        el.style.top = `${vv ? vv.offsetTop : 0}px`;
+        el.style.height = `${visibleHeight}px`;
+        el.style.setProperty("--pt-chat-height", `${visibleHeight}px`);
+      } else {
+        const top = el.getBoundingClientRect().top + window.scrollY;
+        const height = Math.max(visibleHeight - top, DESKTOP_MIN_CHAT_HEIGHT);
+        el.style.height = `${height}px`;
+        el.style.setProperty("--pt-chat-height", `${height - WRAPPER_VERTICAL_PADDING}px`);
+      }
+    };
+
+    const { body, documentElement: html } = document;
+    const scrollY = window.scrollY;
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      bodyOverflow: body.style.overflow,
+      htmlOverflow: html.style.overflow,
+    };
+    if (mode === "full") {
+      body.style.position = "fixed";
+      body.style.top = `-${scrollY}px`;
+      body.style.left = "0";
+      body.style.right = "0";
+      body.style.overflow = "hidden";
+      html.style.overflow = "hidden";
+    }
+
+    sync();
+    window.addEventListener("resize", sync);
+    if (vv) {
+      vv.addEventListener("resize", sync);
+      vv.addEventListener("scroll", sync);
+    }
+    // En PC, el alto disponible cambia si se cierra el banner.
+    const observer =
+      mode === "page" && typeof ResizeObserver !== "undefined" ? new ResizeObserver(sync) : null;
+    if (observer) observer.observe(body);
+
+    return () => {
+      window.removeEventListener("resize", sync);
+      if (vv) {
+        vv.removeEventListener("resize", sync);
+        vv.removeEventListener("scroll", sync);
+      }
+      if (observer) observer.disconnect();
+      el.style.removeProperty("top");
+      el.style.removeProperty("height");
+      el.style.removeProperty("--pt-chat-height");
+      if (mode === "full") {
+        body.style.position = previous.position;
+        body.style.top = previous.top;
+        body.style.left = previous.left;
+        body.style.right = previous.right;
+        body.style.overflow = previous.bodyOverflow;
+        html.style.overflow = previous.htmlOverflow;
+        window.scrollTo(0, scrollY);
+      }
+    };
+  }, [wrapperRef, mode]);
+}
+
+// Punto 91: cuadro de escribir que crece con el texto hasta el tope de
+// styles.input (5 líneas); después tiene scroll por dentro.
+function fitComposer(el, oneLine) {
+  if (!el) return;
+  el.style.height = "auto";
+  const borders = el.offsetHeight - el.clientHeight;
+  el.style.height = `${el.scrollHeight + borders}px`;
+  el.style.overflowY = el.scrollHeight > el.clientHeight + 1 ? "auto" : "hidden";
+  // Lo que creció: el panel de stickers lo descuenta de su alto máximo.
+  if (el.form) el.form.style.setProperty("--pt-composer-extra", `${el.offsetHeight - oneLine}px`);
+}
+
+function ComposerTextarea({ inputRef, touch, value, onChange, onKeyDown, placeholder }) {
+  const { oneLine } = composerMetrics(touch);
+
+  useLayoutEffect(() => {
+    fitComposer(inputRef.current, oneLine);
+  }, [inputRef, value, oneLine]);
+
+  // Al cambiar el ancho (girar el celular) el texto ocupa otras líneas.
+  useEffect(() => {
+    const onResize = () => fitComposer(inputRef.current, oneLine);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [inputRef, oneLine]);
+
+  return (
+    <textarea
+      ref={inputRef}
+      style={styles.input(touch)}
+      rows={1}
+      enterKeyHint="enter"
+      placeholder={placeholder}
+      aria-label={placeholder}
+      value={value}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+    />
+  );
+}
+
 export default function Chat({
   onOpenProfile,
   onOpenPost,
@@ -1143,6 +1338,7 @@ export default function Chat({
 }) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const [touch] = useState(isTouchScreen);
   const [currentUid, setCurrentUid] = useState(null);
   // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
   const myProfile = useUserProfile(currentUid);
@@ -1168,7 +1364,12 @@ export default function Chat({
     setStickerPickerTab(DEFAULT_PICKER_TAB);
     setStickerPickerCategory(DEFAULT_EMOJI_CATEGORY);
   }, [activeContactUid]);
-  const messagesEndRef = useRef(null);
+  const messagesAreaRef = useRef(null);
+  // ¿La lista estaba al final? Si sí, sigue al final cuando se achica.
+  const stuckToEndRef = useRef(true);
+  const wrapperRef = useRef(null);
+  const viewportMode = !currentUid ? "flow" : !isMobile ? "page" : activeContact ? "full" : "flow";
+  useChatViewport(wrapperRef, viewportMode);
 
   // Estado del grabador de notas de voz: "idle" | "recording" | "ready"
   // ("ready" = ya se detuvo por el límite de 60s, esperando que se envíe o cancele)
@@ -1181,6 +1382,8 @@ export default function Chat({
   const chunksRef = useRef([]);
   const secondsRef = useRef(0);
   const pendingActionRef = useRef(null); // "cancel" | "send" | "auto"
+  // Hora del último envío de texto: ver el botón redondo (punto 91).
+  const lastTextSendAtRef = useRef(0);
 
   // Punto 61: enviar una imagen sigue el mismo esqueleto que una nota de
   // voz — elegir/grabar deja algo "listo" (pendingImage/pendingAudio) que
@@ -1414,10 +1617,30 @@ export default function Chat({
     return unsub;
   }, [currentUid, activeContact, activeSummaryLoaded, activeHiddenMs]);
 
-  // Auto-scroll al último mensaje
+  // Auto-scroll al último mensaje. Solo mueve la lista: scrollIntoView
+  // desplazaría también la página (punto 91).
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const area = messagesAreaRef.current;
+    if (area) area.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // Si estabas al final, sigues viendo el último mensaje cuando la lista se
+  // achica (sale el teclado o crece el cuadro de escribir).
+  useEffect(() => {
+    const area = messagesAreaRef.current;
+    if (!area || typeof ResizeObserver === "undefined") return undefined;
+    stuckToEndRef.current = true;
+    const observer = new ResizeObserver(() => {
+      if (stuckToEndRef.current) area.scrollTop = area.scrollHeight;
+    });
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, [activeContactUid, currentUid, isMobile]);
+
+  const handleMessagesScroll = (e) => {
+    const area = e.currentTarget;
+    stuckToEndRef.current = area.scrollHeight - area.scrollTop - area.clientHeight < 40;
+  };
 
   // Cierra el panel de stickers al tocar/clickear afuera, mismo patrón que
   // el resto de los paneles desplegables de la app (menú de temas, notificaciones).
@@ -1653,14 +1876,23 @@ export default function Chat({
     e.preventDefault();
     if (!text.trim() || !activeContact || !currentUid) return;
 
+    // Punto 91: el cuadro se vacía ya y conserva el foco (el teclado sigue
+    // abierto), para poder seguir escribiendo mientras esto se envía y sin
+    // que un doble toque mande el mensaje dos veces.
+    const sentText = text;
+    lastTextSendAtRef.current = Date.now();
+    setText("");
+    if (textInputRef.current) textInputRef.current.focus();
+
     // Mensaje y resumen de la conversación juntos (chatMessages.js, punto 84).
     // Si las reglas lo rechazan (bloqueo o privacidad, commit 5), se avisa
-    // y el texto queda en el campo.
+    // y el texto vuelve al campo, salvo que ya estés escribiendo otra cosa.
     try {
-      await sendChatMessage(currentUid, activeContact.uid, { text: text.trim() });
+      await sendChatMessage(currentUid, activeContact.uid, { text: sentText.trim() });
     } catch (err) {
       console.error("chat: no se pudo enviar el mensaje", err.code);
       setSendError(true);
+      setText((current) => (current.trim() ? current : sentText));
       return;
     }
     setSendError(false);
@@ -1672,8 +1904,15 @@ export default function Chat({
       fromName: myProfile?.displayName || "Alguien",
       fromIdentity: myProfile?.identity || "",
     });
+  };
 
-    setText("");
+  // Punto 91: en PC, Enter envía y Shift+Enter hace línea nueva; en táctil,
+  // Enter hace línea nueva y se envía con el botón. No envía mientras se
+  // compone texto (acentos, teclados de otros idiomas).
+  const handleComposerKeyDown = (e) => {
+    if (e.key !== "Enter" || e.shiftKey || touch) return;
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    handleSend(e);
   };
 
   // Inserta un emoji del panel en el cuadro de texto, en la posición del
@@ -1689,7 +1928,6 @@ export default function Chat({
     const caret = start + emoji.length;
     requestAnimationFrame(() => {
       if (!input) return;
-      const touch = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
       if (!touch) input.focus();
       try {
         input.setSelectionRange(caret, caret);
@@ -1737,9 +1975,32 @@ export default function Chat({
   const showContactsList = !isMobile || !activeContact;
   const showChatPane = !isMobile || !!activeContact;
 
+  const wrapperStyle =
+    viewportMode === "full"
+      ? { ...styles.wrapper, ...styles.wrapperFull }
+      : viewportMode === "page"
+      ? { ...styles.wrapper, ...styles.wrapperPage }
+      : styles.wrapper;
+  const shellStyle =
+    viewportMode === "full"
+      ? { ...styles.shell, ...styles.shellFull }
+      : viewportMode === "page"
+      ? { ...styles.shell, ...styles.shellPage }
+      : styles.shell;
+  const composerSizes = composerMetrics(touch);
+  // Centra los iconos de 34px con la última línea del cuadro.
+  const composerIconOffset = { marginBottom: `${(composerSizes.oneLine - 34) / 2}px` };
+  const hasText = !!text.trim();
+  // Tras enviar, el botón pasa a micrófono al instante: un doble toque en
+  // la flecha no debe empezar a grabar.
+  const handleMicClick = () => {
+    if (Date.now() - lastTextSendAtRef.current < 600) return;
+    startRecording();
+  };
+
   return (
-    <div style={styles.wrapper}>
-      <div style={styles.shell}>
+    <div ref={wrapperRef} style={wrapperStyle}>
+      <div style={shellStyle}>
         {showContactsList && (
           <div style={styles.contactsCol(isMobile)}>
             {listMode === "recent" ? (
@@ -1782,7 +2043,7 @@ export default function Chat({
             )}
             <div style={styles.searchBox}>
               <input
-                style={styles.searchInput}
+                style={touch ? { ...styles.searchInput, fontSize: "16px" } : styles.searchInput}
                 type="text"
                 placeholder={t(listMode === "recent" ? "chat.searchConversations" : "chat.searchPlaceholder")}
                 aria-label={t(listMode === "recent" ? "chat.searchConversations" : "chat.searchPlaceholder")}
@@ -1929,7 +2190,7 @@ export default function Chat({
                     {isBlocked ? t("chat.unblock") : t("chat.block")}
                   </button>
                 </div>
-                <div style={styles.messagesArea}>
+                <div ref={messagesAreaRef} style={styles.messagesArea} onScroll={handleMessagesScroll}>
                   {messages.map((m) => (
                     <MessageBubble
                       key={m.id}
@@ -1944,7 +2205,6 @@ export default function Chat({
                       }
                     />
                   ))}
-                  <div ref={messagesEndRef} />
                 </div>
                 {sendError && activeWriteState === "ok" && (
                   <p style={styles.composerNote} role="alert">
@@ -1983,60 +2243,85 @@ export default function Chat({
                   </div>
                 ) : recordingState === "idle" ? (
                   <form style={styles.inputRow} onSubmit={handleSend}>
-                    <input
-                      ref={textInputRef}
-                      style={styles.input}
-                      type="text"
-                      placeholder={t("chat.messagePlaceholder")}
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                    />
-                    <div style={styles.stickerBtnWrapper} ref={stickerPanelRef}>
+                    <div style={styles.composerField}>
+                      <div style={{ ...styles.stickerBtnWrapper, ...composerIconOffset }} ref={stickerPanelRef}>
+                        <button
+                          type="button"
+                          style={
+                            stickerPanelOpen
+                              ? { ...styles.composerIconBtn, ...styles.stickerBtnActive }
+                              : styles.composerIconBtn
+                          }
+                          onClick={() => setStickerPanelOpen((v) => !v)}
+                          title={t("chat.openStickers")}
+                          aria-label={t("chat.openStickers")}
+                        >
+                          <StickerIcon />
+                        </button>
+                        {stickerPanelOpen && (
+                          <StickerPicker
+                            onSelect={handleSendSticker}
+                            onPickEmoji={handlePickEmoji}
+                            tab={stickerPickerTab}
+                            onTabChange={setStickerPickerTab}
+                            emojiCategory={stickerPickerCategory}
+                            onEmojiCategoryChange={setStickerPickerCategory}
+                          />
+                        )}
+                      </div>
+                      <ComposerTextarea
+                        inputRef={textInputRef}
+                        touch={touch}
+                        placeholder={t("chat.messagePlaceholder")}
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        onKeyDown={handleComposerKeyDown}
+                      />
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePickImage}
+                        style={{ display: "none" }}
+                      />
                       <button
                         type="button"
-                        style={styles.stickerBtn(stickerPanelOpen)}
-                        onClick={() => setStickerPanelOpen((v) => !v)}
-                        title={t("chat.openStickers")}
+                        style={{ ...styles.composerIconBtn, ...composerIconOffset }}
+                        onClick={() => imageInputRef.current && imageInputRef.current.click()}
+                        title={t("chat.sendImage")}
+                        aria-label={t("chat.sendImage")}
                       >
-                        <StickerIcon />
+                        <ImageIcon />
                       </button>
-                      {stickerPanelOpen && (
-                        <StickerPicker
-                          onSelect={handleSendSticker}
-                          onPickEmoji={handlePickEmoji}
-                          tab={stickerPickerTab}
-                          onTabChange={setStickerPickerTab}
-                          emojiCategory={stickerPickerCategory}
-                          onEmojiCategoryChange={setStickerPickerCategory}
-                        />
-                      )}
                     </div>
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePickImage}
-                      style={{ display: "none" }}
-                    />
-                    <button
-                      type="button"
-                      style={styles.micBtn}
-                      onClick={() => imageInputRef.current && imageInputRef.current.click()}
-                      title={t("chat.sendImage")}
-                    >
-                      <ImageIcon />
-                    </button>
-                    <button
-                      type="button"
-                      style={styles.micBtn}
-                      onClick={startRecording}
-                      title={t("chat.recordVoice")}
-                    >
-                      <MicIcon />
-                    </button>
-                    <button type="submit" className="pt-relief" style={styles.sendBtn}>
-                      {t("chat.send")}
-                    </button>
+                    {/* key distinta: son dos botones, no uno que cambia de
+                        tipo mientras se lo está tocando. */}
+                    {hasText ? (
+                      <button
+                        key="send"
+                        type="submit"
+                        className="pt-relief"
+                        style={styles.composerRoundBtn(composerSizes.roundBtn)}
+                        // Que tocar el botón no le quite el foco al cuadro.
+                        onMouseDown={(e) => e.preventDefault()}
+                        title={t("chat.send")}
+                        aria-label={t("chat.send")}
+                      >
+                        ➤
+                      </button>
+                    ) : (
+                      <button
+                        key="mic"
+                        type="button"
+                        className="pt-relief"
+                        style={styles.composerRoundBtn(composerSizes.roundBtn)}
+                        onClick={handleMicClick}
+                        title={t("chat.recordVoice")}
+                        aria-label={t("chat.recordVoice")}
+                      >
+                        <MicIcon />
+                      </button>
+                    )}
                   </form>
                 ) : (
                   <div style={styles.recordingRow}>
