@@ -73,7 +73,7 @@ service cloud.firestore {
       let par = chatId.split('_');
       let yo = request.auth.uid;
       let tocaUltimo = d.diff(antes).affectedKeys().hasAny(['lastMessageAt', 'lastSenderId', 'lastType', 'lastText']);
-      return d.keys().hasOnly(['participants', 'lastMessageAt', 'lastSenderId', 'lastType', 'lastText', 'writers', 'lastReadAt'])
+      return d.keys().hasOnly(['participants', 'lastMessageAt', 'lastSenderId', 'lastType', 'lastText', 'writers', 'lastReadAt', 'hiddenAt'])
         && d.participants is list
         && d.participants.size() == 2
         && d.participants.hasAll(par)
@@ -89,7 +89,26 @@ service cloud.firestore {
         && soloMiEntrada(antes.get('lastReadAt', {}), d.get('lastReadAt', {}))
         // Si cambia mi lastReadAt, es la hora del servidor (no se borra).
         && (!d.get('lastReadAt', {}).diff(antes.get('lastReadAt', {})).affectedKeys().hasAny([yo])
-          || d.get('lastReadAt', {}).get(yo, null) == request.time);
+          || d.get('lastReadAt', {}).get(yo, null) == request.time)
+        // Punto 90: eliminar la conversación de mi lista. Mismo criterio
+        // que lastReadAt: solo mi entrada y con la hora del servidor, así
+        // nadie puede adelantar ni atrasar el momento en que la eliminó.
+        && soloMiEntrada(antes.get('hiddenAt', {}), d.get('hiddenAt', {}))
+        && (!d.get('hiddenAt', {}).diff(antes.get('hiddenAt', {})).affectedKeys().hasAny([yo])
+          || d.get('hiddenAt', {}).get(yo, null) == request.time);
+    }
+
+    // Punto 90: ¿ya nadie puede ver lo ocurrido a esta hora? Solo cuando
+    // los DOS eliminaron la conversación después de esa hora. Como cada
+    // quien solo escribe su propia entrada de hiddenAt, nadie puede forzar
+    // el borrado de mensajes que la otra persona todavía ve.
+    function ocultoParaLosDos(chatId, hiddenAt, hora) {
+      let par = chatId.split('_');
+      return hora is timestamp
+        && par[0] in hiddenAt
+        && par[1] in hiddenAt
+        && hora <= hiddenAt[par[0]]
+        && hora <= hiddenAt[par[1]];
     }
 
     // Punto 84, commit 5: quién puede escribirle al otro participante del
@@ -631,6 +650,13 @@ service cloud.firestore {
             .hasAny(['lastMessageAt', 'lastSenderId', 'lastType', 'lastText'])
           || !('lastMessageAt' in resource.data)
           || puedeEscribirEnChat(chatId, resource.data.get('writers', {}))
+          // Punto 90: vaciar la vista previa de un último mensaje que ya
+          // nadie puede ver (aunque hoy haya un bloqueo entre los dos).
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastText'])
+            && request.resource.data.lastText == ''
+            && ocultoParaLosDos(chatId, resource.data.get('hiddenAt', {}), resource.data.lastMessageAt)
+          )
         );
 
       // Nadie borra una conversación (la app no lo ofrece).
@@ -675,8 +701,15 @@ service cloud.firestore {
                request.resource.data.get('reactions', {})
              );
 
-        // Hoy la app no permite borrar mensajes ya enviados.
-        allow delete: if false;
+        // Punto 90: un mensaje solo se borra cuando las dos personas
+        // eliminaron la conversación después de que se envió (ya nadie lo
+        // puede ver). Nunca para borrar un mensaje que el otro todavía ve.
+        allow delete: if esParticipanteDelChat(chatId)
+          && ocultoParaLosDos(
+               chatId,
+               get(/databases/$(database)/documents/chats/$(chatId)).data.get('hiddenAt', {}),
+               resource.data.createdAt
+             );
       }
     }
 

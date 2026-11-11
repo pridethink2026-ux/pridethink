@@ -9,6 +9,8 @@ import {
   onSnapshot,
   query,
   orderBy,
+  startAfter,
+  Timestamp,
   updateDoc,
   deleteField,
 } from "firebase/firestore";
@@ -22,6 +24,7 @@ import {
   useChatSummary,
   isChatUnread,
   markChatRead,
+  deleteChatForMe,
   RECENT_CHATS_PAGE,
 } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
@@ -417,6 +420,24 @@ const styles = {
     textAlign: "left",
     boxSizing: "border-box",
   }),
+  // Punto 90: la fila de una conversación es este contenedor con dos
+  // botones hermanos (un <button> no puede ir dentro de otro).
+  contactRow: (active) => ({
+    display: "flex",
+    alignItems: "stretch",
+    background: active ? "var(--surface-alt)" : "transparent",
+  }),
+  contactRowOpen: { flex: 1, width: "auto", minWidth: 0, background: "transparent" },
+  contactDeleteBtn: {
+    flexShrink: 0,
+    width: "44px",
+    border: "none",
+    background: "transparent",
+    color: "var(--text-muted)",
+    cursor: "pointer",
+    fontSize: "15px",
+    fontFamily: "inherit",
+  },
   contactText: { flex: 1, minWidth: 0 },
   contactTopLine: { display: "flex", alignItems: "baseline", gap: "8px" },
   contactName: (unread) => ({
@@ -1304,6 +1325,26 @@ export default function Chat({
     setSearch("");
   };
 
+  // Punto 90: eliminar una conversación de TU lista, con confirmación. Si
+  // es la que está abierta, se cierra.
+  const [deleteError, setDeleteError] = useState(false);
+  const handleDeleteConversation = async (chat, user) => {
+    const name = user.displayName || t("chat.defaultName");
+    if (!window.confirm(t("chat.deleteConversationConfirm", { name }))) return;
+    try {
+      await deleteChatForMe(currentUid, chat.id);
+      setDeleteError(false);
+      if (activeContact?.uid === user.uid) {
+        setActiveContact(null);
+        setSendError(false);
+        setStickerPanelOpen(false);
+      }
+    } catch (err) {
+      console.error("chats: no se pudo eliminar la conversación", err.code);
+      setDeleteError(true);
+    }
+  };
+
   // Abrir una conversación puntual al llegar desde una notificación de
   // mensaje (App.js -> openChat, mismo patrón que initialProductId en
   // StoreScreen.jsx). Espera a que lleguen la lista de usuarios y tus
@@ -1347,22 +1388,31 @@ export default function Chat({
     }
   };
 
+  // Punto 90: si eliminaste esta conversación, para vos empieza desde cero.
+  // Se espera al resumen antes de pedir mensajes para que los viejos no
+  // lleguen a descargarse ni a verse un instante.
+  const activeSummaryLoaded = activeSummary !== undefined;
+  const activeHiddenMs = activeSummary?.hiddenAt?.[currentUid]?.toMillis() || 0;
+
   // Mensajes en tiempo real de la conversación activa
   useEffect(() => {
-    if (!currentUid || !activeContact) {
+    if (!currentUid || !activeContact || !activeSummaryLoaded) {
       setMessages([]);
       return;
     }
     const chatId = getChatId(currentUid, activeContact.uid);
+    // startAfter y no where(">"): un where no incluye un mensaje recién
+    // enviado hasta que el servidor le pone la hora, y tardaría en verse.
     const q = query(
       collection(db, "chats", chatId, "messages"),
-      orderBy("createdAt", "asc")
+      orderBy("createdAt", "asc"),
+      ...(activeHiddenMs ? [startAfter(Timestamp.fromMillis(activeHiddenMs))] : [])
     );
     const unsub = onSnapshot(q, (snap) => {
       setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return unsub;
-  }, [currentUid, activeContact]);
+  }, [currentUid, activeContact, activeSummaryLoaded, activeHiddenMs]);
 
   // Auto-scroll al último mensaje
   useEffect(() => {
@@ -1745,6 +1795,7 @@ export default function Chat({
                 <>
                   {recent.loading && <p style={styles.listNote}>{t("chat.loadingConversations")}</p>}
                   {recent.error && <p style={styles.listNote}>{t("chat.conversationsError")}</p>}
+                  {deleteError && <p style={styles.listNote}>{t("chat.deleteConversationError")}</p>}
                   {!recent.loading && !recent.error && recentRows.length === 0 && (
                     <p style={styles.listNote}>
                       {search ? t("chat.noSearchResults") : t("chat.noConversations")}
@@ -1752,39 +1803,51 @@ export default function Chat({
                   )}
                   {recentRows.map(({ chat, user: c }) => {
                     const unread = isChatUnread(chat, currentUid);
+                    const isActive = activeContact?.uid === c.uid;
                     return (
-                      <button
-                        type="button"
-                        key={chat.id}
-                        style={styles.contactItem(activeContact?.uid === c.uid)}
-                        onClick={() => openConversation(c)}
-                      >
-                        <Avatar
-                          uid={c.uid}
-                          name={c.displayName || c.identity}
-                          identity={c.identity}
-                          photoURL={c.photoURL}
-                          size="md"
-                          online={isEffectivelyOnline(presenceByUid[c.uid])}
-                        />
-                        <span style={styles.contactText}>
-                          <span style={styles.contactTopLine}>
-                            <span style={styles.contactName(unread)}>{c.displayName || t("chat.defaultName")}</span>
-                            <span style={styles.contactTime}>{timeAgo(chat.lastMessageAt, t)}</span>
+                      <div key={chat.id} style={styles.contactRow(isActive)}>
+                        <button
+                          type="button"
+                          style={{ ...styles.contactItem(isActive), ...styles.contactRowOpen }}
+                          onClick={() => openConversation(c)}
+                        >
+                          <Avatar
+                            uid={c.uid}
+                            name={c.displayName || c.identity}
+                            identity={c.identity}
+                            photoURL={c.photoURL}
+                            size="md"
+                            online={isEffectivelyOnline(presenceByUid[c.uid])}
+                          />
+                          <span style={styles.contactText}>
+                            <span style={styles.contactTopLine}>
+                              <span style={styles.contactName(unread)}>{c.displayName || t("chat.defaultName")}</span>
+                              <span style={styles.contactTime}>{timeAgo(chat.lastMessageAt, t)}</span>
+                            </span>
+                            <span style={styles.contactBottomLine}>
+                              <span style={styles.contactPreview(unread)}>{chatPreview(chat, currentUid, t)}</span>
+                              {unread && (
+                                <span
+                                  style={styles.unreadDot}
+                                  role="img"
+                                  aria-label={t("chat.unread")}
+                                  title={t("chat.unread")}
+                                />
+                              )}
+                            </span>
                           </span>
-                          <span style={styles.contactBottomLine}>
-                            <span style={styles.contactPreview(unread)}>{chatPreview(chat, currentUid, t)}</span>
-                            {unread && (
-                              <span
-                                style={styles.unreadDot}
-                                role="img"
-                                aria-label={t("chat.unread")}
-                                title={t("chat.unread")}
-                              />
-                            )}
-                          </span>
-                        </span>
-                      </button>
+                        </button>
+                        <button
+                          type="button"
+                          style={styles.contactDeleteBtn}
+                          disabled={recordingState !== "idle"}
+                          onClick={() => handleDeleteConversation(chat, c)}
+                          aria-label={t("chat.deleteConversation")}
+                          title={t("chat.deleteConversation")}
+                        >
+                          🗑
+                        </button>
+                      </div>
                     );
                   })}
                   {recent.hasMore && (

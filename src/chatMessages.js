@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   limit,
   onSnapshot,
@@ -36,6 +37,8 @@ import { getChatId } from "./utils";
     writers: { [uid]: true }       quién escribió alguna vez en el chat
     lastReadAt: { [uid]: Timestamp }  hasta cuándo leyó cada uno (commit 3:
                                    punto de no leído, ver isChatUnread)
+    hiddenAt: { [uid]: Timestamp } cuándo la eliminó cada uno de su lista
+                                   (punto 90, ver deleteChatForMe)
 
   La lista de conversaciones recientes (commit 3) lee solo estos
   documentos, sin abrir los mensajes. Las reglas no pueden comprobar que
@@ -123,6 +126,15 @@ export async function repairMyChats(myUid) {
     if (Object.keys(update).length > 0) {
       await setDoc(chatDoc.ref, update, { merge: true });
     }
+
+    // Punto 90: termina una limpieza que quedó a medias (se cerró la
+    // pestaña o se cortó la conexión). Cuesta 1 lectura por cada chat que
+    // eliminaron los dos.
+    if (purgeCutoff(data)) {
+      await purgeUnseenMessages(chatDoc.id, data).catch((err) =>
+        console.error("chats: no se pudo completar la limpieza", err.code)
+      );
+    }
   }
 }
 
@@ -137,50 +149,132 @@ export const RECENT_CHATS_PAGE = 30;
 // Hora de un campo Timestamp en milisegundos (0 si falta).
 const millis = (ts) => (ts && ts.toMillis ? ts.toMillis() : 0);
 
-// Tus conversaciones, la más reciente primero, en vivo. Una sola consulta
-// (participants array-contains vos + lastMessageAt desc), con el índice
-// compuesto creado en la consola (commit 2). Los chats sin lastMessageAt
-// (de antes del commit 1 y todavía sin migrar) no salen. Mientras se
-// pide una tanda más, se sigue mostrando la anterior.
+// ¿Sale en mi lista? Tiene que tener al menos un mensaje (las abiertas sin
+// escribir nunca llegan a tener lastMessageAt) y, si la eliminé, un mensaje
+// posterior a ese momento.
+function isChatInMyList(chat, myUid) {
+  const last = millis(chat.lastMessageAt);
+  return last > 0 && last > millis(chat.hiddenAt?.[myUid]);
+}
+
+// Tus conversaciones con mensajes, la más reciente primero, en vivo. Punto
+// 90: la consulta es solo participants array-contains vos y el orden se
+// hace acá, porque con orderBy dependía de un índice compuesto creado a
+// mano en la consola (si faltaba, la lista entera daba error) y porque las
+// conversaciones eliminadas no podrían ocupar lugar en un limit() del
+// servidor. Costo: 1 lectura por cada conversación tuya al abrir el Chat.
 //   → { chats: [{ id, participants, lastMessageAt, ... }], loading, hasMore, error }
 export function useRecentChats(myUid, max) {
-  const key = myUid ? `${myUid}:${max}` : null;
-  const [state, setState] = useState({ key: null, uid: null, chats: [], error: null });
+  const [state, setState] = useState({ uid: null, chats: [], error: null });
 
   useEffect(() => {
     if (!myUid) return;
-    const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", myUid),
-      orderBy("lastMessageAt", "desc"),
-      limit(max)
-    );
+    const q = query(collection(db, "chats"), where("participants", "array-contains", myUid));
     return onSnapshot(
       q,
       (snap) =>
         setState({
-          key: `${myUid}:${max}`,
           uid: myUid,
           // "estimate": un mensaje recién enviado (hora del servidor todavía
           // pendiente) ya sale con la hora local en vez de null.
-          chats: snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })),
+          chats: snap.docs
+            .map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }))
+            .filter((chat) => isChatInMyList(chat, myUid))
+            .sort((a, b) => millis(b.lastMessageAt) - millis(a.lastMessageAt)),
           error: null,
         }),
       (err) => {
         console.error("chats: no se pudo cargar la lista de conversaciones", err.code);
-        setState({ key: `${myUid}:${max}`, uid: myUid, chats: [], error: err.code || "error" });
+        setState({ uid: myUid, chats: [], error: err.code || "error" });
       }
     );
-  }, [myUid, max]);
+  }, [myUid]);
 
-  const chats = state.uid === myUid ? state.chats : [];
-  const ready = state.key === key;
+  const ready = state.uid === myUid;
+  const allChats = ready ? state.chats : [];
   return {
-    chats,
-    loading: !ready && chats.length === 0,
-    hasMore: ready && chats.length >= max,
+    chats: allChats.slice(0, max),
+    loading: !ready,
+    hasMore: allChats.length > max,
     error: ready ? state.error : null,
   };
+}
+
+// ---------------------------------------------------------------------
+// Punto 90: eliminar una conversación de tu lista.
+// ---------------------------------------------------------------------
+
+// De a cuántos mensajes se borra: cada borrado hace una lectura en las
+// reglas, y un batch admite hasta 20.
+const PURGE_BATCH = 15;
+
+// Quita la conversación solo de tu lista: guarda la hora en hiddenAt[vos].
+// La otra persona no nota nada. Si vuelven a escribirte reaparece, y vos
+// solo ves lo posterior a esta hora. Si la otra persona también la había
+// eliminado, se limpia lo que ya nadie puede ver (en segundo plano: si
+// falla, se reintenta al iniciar sesión, ver repairMyChats).
+export async function deleteChatForMe(myUid, chatId) {
+  const chatRef = doc(db, "chats", chatId);
+  await updateDoc(chatRef, { [`hiddenAt.${myUid}`]: serverTimestamp() });
+  getDoc(chatRef)
+    .then((snap) => (snap.exists() && purgeCutoff(snap.data()) ? purgeUnseenMessages(chatId, snap.data()) : null))
+    .catch((err) => console.error("chats: no se pudo completar la limpieza", err.code));
+}
+
+// Hasta qué hora nadie puede ver los mensajes: la más vieja de las dos
+// eliminaciones. null si alguno de los dos todavía no la eliminó.
+function purgeCutoff(chat) {
+  const [a, b] = chat.participants || [];
+  const hiddenA = chat.hiddenAt?.[a];
+  const hiddenB = chat.hiddenAt?.[b];
+  if (!hiddenA || !hiddenB) return null;
+  return millis(hiddenA) <= millis(hiddenB) ? hiddenA : hiddenB;
+}
+
+// Borra para siempre los mensajes que ya nadie puede ver (hasta
+// purgeCutoff), con sus fotos. Un mensaje enviado después de que uno de
+// los dos eliminó la conversación sigue visible para esa persona y no se
+// toca. Las reglas exigen lo mismo (ocultoParaLosDos). Si no quedó ningún
+// mensaje posterior, también vacía la vista previa guardada en el resumen.
+async function purgeUnseenMessages(chatId, chat) {
+  const cutoff = purgeCutoff(chat);
+  if (!cutoff) return;
+  const chatRef = doc(db, "chats", chatId);
+  const pageQuery = query(
+    collection(chatRef, "messages"),
+    where("createdAt", "<=", cutoff),
+    limit(PURGE_BATCH)
+  );
+
+  for (let page = await getDocs(pageQuery); !page.empty; page = await getDocs(pageQuery)) {
+    await deleteMessagePhotos(chatId, page.docs);
+    const batch = writeBatch(db);
+    page.docs.forEach((message) => batch.delete(message.ref));
+    await batch.commit();
+  }
+
+  if (chat.lastText && millis(chat.lastMessageAt) <= millis(cutoff)) {
+    await updateDoc(chatRef, { lastText: "" });
+  }
+}
+
+// Las fotos se borran antes que el mensaje: su ruta sale del id del
+// mensaje, y si esto falla el mensaje sigue ahí para reintentar. Storage se
+// importa acá adentro para no sumarlo a la pantalla de entrada (punto 68).
+async function deleteMessagePhotos(chatId, messages) {
+  const photos = messages.filter((message) => message.data().type === "image");
+  if (photos.length === 0) return;
+  const [{ deleteObject, ref }, { storage }] = await Promise.all([
+    import("firebase/storage"),
+    import("./firebaseStorage"),
+  ]);
+  await Promise.all(
+    photos.map((message) =>
+      deleteObject(ref(storage, `chatImages/${chatId}/${message.id}/img.jpg`)).catch((err) => {
+        if (err.code !== "storage/object-not-found") throw err;
+      })
+    )
+  );
 }
 
 // El resumen de UNA conversación, en vivo: null si todavía no existe (o no
