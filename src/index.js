@@ -6,6 +6,7 @@ import { LanguageProvider } from './LanguageContext';
 import { ThemeProvider } from './ThemeContext';
 import { initTheme } from './themes';
 import reportWebVitals from './reportWebVitals';
+import { registerServiceWorker } from './serviceWorkerRegistration';
 
 // El tema (colores y fuentes) se aplica antes del primer render, así la
 // primera pantalla ya sale con él — ver ThemeContext.jsx.
@@ -23,6 +24,10 @@ root.render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+// App instalable en el teléfono (PWA, punto 93): solo en la versión
+// publicada; ver serviceWorkerRegistration.js.
+registerServiceWorker();
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

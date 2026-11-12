@@ -10,11 +10,16 @@
       content="Pridethink: la red social de la comunidad LGBTQ+ para compartir, conversar y encontrarte."
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
+    <!-- App instalable (PWA, punto 93). manifest.json: nombre, íconos y
+         modo standalone (sin barras del navegador) en Android/Chrome.
+         El iPhone ("Agregar a pantalla de inicio" en Safari) no lo lee
+         del todo: necesita las etiquetas apple-* de abajo. -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Pridethink" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="application-name" content="Pridethink" />
     <!-- Tipografía de marca: Sora (títulos/logo) + Inter (texto). Ver src/themes.js (--font-display, --font-body).
          Se carga sin bloquear el primer pintado (preload + onload): mientras
          llega, el texto usa la fuente de reserva de themes.js (display=swap).
