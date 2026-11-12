@@ -62,33 +62,73 @@ export function lazyWithReload(factory) {
   );
 }
 
-// Atrapa lo que falle al cargar o dibujar lo que tiene adentro (un archivo
-// que no bajó, o un error de la pantalla) y muestra un aviso con
-// "Recargar" en vez de dejar la página en blanco.
-export class LoadErrorBoundary extends React.Component {
-  state = { failed: false };
+// "Volver al inicio" sin una app que lo resuelva (la protección de Root):
+// borra la marca de recarga y abre la app de cero en "/", que siempre
+// empieza en el Muro (App.js). Así nunca se queda atrapada en el error.
+export function goHomeHard() {
+  try {
+    sessionStorage.removeItem(RELOAD_FLAG);
+  } catch {
+    // sin sessionStorage: nada que borrar
+  }
+  window.location.replace("/");
+}
 
-  static getDerivedStateFromError() {
-    return { failed: true };
+/*
+  Atrapa lo que falle al cargar o dibujar lo que tiene adentro (un archivo
+  que no bajó, o un error de la pantalla) y muestra un aviso con
+  "Recargar" y "Volver al inicio" en vez de dejar la página en blanco.
+
+  Props opcionales:
+  - onHome(): qué hace "Volver al inicio" (App.js: ir al Muro sin
+    recargar). Sin onHome, recarga la app de cero en el Muro (goHomeHard).
+  - onError(err): en vez del aviso no dibuja nada y avisa a quien la usa
+    (App.js la usa en el visor de Momentos: lo cierra y muestra un aviso).
+*/
+export class LoadErrorBoundary extends React.Component {
+  state = { error: null };
+
+  static getDerivedStateFromError(error) {
+    return { error: error || new Error("unknown") };
   }
 
   componentDidCatch(err) {
     console.error("LoadErrorBoundary:", err);
+    this.props.onError?.(err);
   }
 
+  goHome = () => {
+    if (this.props.onHome) {
+      this.setState({ error: null });
+      this.props.onHome();
+    } else {
+      goHomeHard();
+    }
+  };
+
   render() {
-    return this.state.failed ? <LoadErrorMessage /> : this.props.children;
+    if (!this.state.error) return this.props.children;
+    if (this.props.onError) return null;
+    return <LoadErrorMessage error={this.state.error} onHome={this.goHome} />;
   }
 }
 
-function LoadErrorMessage() {
+function LoadErrorMessage({ error, onHome }) {
   const { t } = useLanguage();
+  const detail = String(error?.message || error || "").slice(0, 200);
   return (
     <div role="alert" style={styles.box}>
       <p style={styles.text}>{t("common.loadFailed")}</p>
-      <button type="button" className="pt-relief" style={styles.button} onClick={() => window.location.reload()}>
-        {t("common.reload")}
-      </button>
+      <div style={styles.row}>
+        <button type="button" className="pt-relief" style={styles.button} onClick={onHome}>
+          {t("common.goHome")}
+        </button>
+        <button type="button" style={styles.secondary} onClick={() => window.location.reload()}>
+          {t("common.reload")}
+        </button>
+      </div>
+      {/* El detalle técnico, chico: sirve para saber qué falló. */}
+      {detail && <p style={styles.detail}>{detail}</p>}
     </div>
   );
 }
@@ -131,6 +171,31 @@ const styles = {
     fontSize: "15px",
     fontWeight: 600,
     cursor: "pointer",
+  },
+  row: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "10px",
+  },
+  secondary: {
+    padding: "11px 24px",
+    borderRadius: "12px",
+    border: "1px solid var(--border)",
+    background: "transparent",
+    color: "var(--text)",
+    fontFamily: "inherit",
+    fontSize: "15px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  detail: {
+    margin: 0,
+    maxWidth: "100%",
+    fontSize: "11px",
+    color: "var(--text-muted)",
+    opacity: 0.7,
+    overflowWrap: "anywhere",
   },
   loading: {
     margin: 0,

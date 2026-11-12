@@ -87,7 +87,9 @@ import { triggerStarRain } from "./StarRain";
     siempre por el primer momento sin ver de cada autor.
   - `startMomentId` (opcional): abrir en ese momento del primer autor (lo
     usa App.js al tocar una notificación "momentLike"). Si ya no está
-    activo, se muestra "Este momento ya no está disponible".
+    activo, se muestra "Este momento ya no está disponible" (o, con
+    `onUnavailable`, se llama a esa función: App.js cierra el visor y
+    muestra el aviso sobre la pantalla de Avisos).
   - `starRainOnOpen` (opcional, punto 86): con `startMomentId`, cae una
     lluvia de estrellas (StarRain.jsx) una vez, cuando ese momento ya se
     muestra. App.js lo pone la primera vez que tocás una notificación
@@ -362,6 +364,7 @@ export default function MomentViewer({
   startMomentId,
   starRainOnOpen = false,
   onClose,
+  onUnavailable,
 }) {
   const { t, language } = useLanguage();
   const {
@@ -521,8 +524,12 @@ export default function MomentViewer({
       if (wanted) {
         // Desde una notificación: ese momento puntual, o el aviso si venció.
         const pos = readable.findIndex((m) => m.id === wanted);
-        if (pos === -1) setUnavailable(true);
-        else {
+        if (pos === -1) {
+          // Con onUnavailable (App.js) el visor se cierra y el aviso queda
+          // abajo, sobre Avisos; sin él, el aviso se ve acá adentro.
+          if (onUnavailable) onUnavailable();
+          else setUnavailable(true);
+        } else {
           setMomentPos(pos);
           setMoments(readable);
         }

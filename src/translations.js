@@ -36,6 +36,7 @@ export const translations = {
     "common.retry": "Reintentar",
     "common.loadFailed": "No se pudo cargar esta pantalla.",
     "common.reload": "Recargar",
+    "common.goHome": "Volver al inicio",
     "verified.badge": "Cuenta verificada",
 
     // Tiempo relativo (timeAgo()/formatLastSeen() en utils.js/presence.js),
@@ -765,6 +766,7 @@ export const translations = {
     "common.retry": "Try again",
     "common.loadFailed": "This screen couldn't be loaded.",
     "common.reload": "Reload",
+    "common.goHome": "Back to home",
     "verified.badge": "Verified account",
 
     // Relative time (timeAgo()/formatLastSeen() in utils.js/presence.js),

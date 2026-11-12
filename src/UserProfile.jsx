@@ -208,9 +208,11 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
       setMyPrivateData(null);
       return;
     }
-    const unsub = onSnapshot(doc(db, "users", uid, "private", "data"), (snap) => {
-      setMyPrivateData(snap.exists() ? snap.data() : null);
-    });
+    const unsub = onSnapshot(
+      doc(db, "users", uid, "private", "data"),
+      (snap) => setMyPrivateData(snap.exists() ? snap.data() : null),
+      () => setMyPrivateData(null)
+    );
     return unsub;
   }, [uid, currentUid]);
 
@@ -258,11 +260,15 @@ export default function UserProfile({ uid, onBack, onOpenProfile }) {
           where("authorId", "==", uid),
           where("authorIsPrivate", "==", false)
         );
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-      setPosts(list);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        setPosts(list);
+      },
+      () => setPosts([])
+    );
     return unsub;
   }, [uid, isBlocked, isWallHidden, isMe]);
 

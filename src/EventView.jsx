@@ -152,17 +152,22 @@ export default function EventView({ eventId, onBack, onOpenProfile }) {
   useEffect(() => {
     if (!eventId) return;
     setEvent(undefined);
-    const unsub = onSnapshot(doc(db, "events", eventId), (snap) => {
-      setEvent(snap.exists() ? { id: snap.id, ...snap.data() } : null);
-    });
+    // Si la lectura falla (borrado, sin permiso): "no encontrado".
+    const unsub = onSnapshot(
+      doc(db, "events", eventId),
+      (snap) => setEvent(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      () => setEvent(null)
+    );
     return unsub;
   }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
-    const unsub = onSnapshot(collection(db, "events", eventId, "attendees"), (snap) => {
-      setAttendeeUids(snap.docs.map((d) => d.id));
-    });
+    const unsub = onSnapshot(
+      collection(db, "events", eventId, "attendees"),
+      (snap) => setAttendeeUids(snap.docs.map((d) => d.id)),
+      () => setAttendeeUids([])
+    );
     return unsub;
   }, [eventId]);
 

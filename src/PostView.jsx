@@ -87,9 +87,13 @@ export default function PostView({ postId, onBack, onOpenProfile }) {
   useEffect(() => {
     if (!postId) return;
     setPost(undefined);
-    const unsub = onSnapshot(doc(db, "posts", postId), (snap) => {
-      setPost(snap.exists() ? { id: snap.id, ...snap.data() } : null);
-    });
+    // Si la lectura falla (borrado y las reglas ya no dejan leerlo, sin
+    // permiso), se muestra "no encontrado" en vez de quedar cargando.
+    const unsub = onSnapshot(
+      doc(db, "posts", postId),
+      (snap) => setPost(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      () => setPost(null)
+    );
     return unsub;
   }, [postId]);
 

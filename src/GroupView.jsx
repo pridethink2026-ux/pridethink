@@ -225,17 +225,22 @@ export default function GroupView({ groupId, onBack, onOpenProfile }) {
   useEffect(() => {
     if (!groupId) return;
     setGroup(undefined);
-    const unsub = onSnapshot(doc(db, "groups", groupId), (snap) => {
-      setGroup(snap.exists() ? { id: snap.id, ...snap.data() } : null);
-    });
+    // Si la lectura falla (borrado, sin permiso): "no encontrado".
+    const unsub = onSnapshot(
+      doc(db, "groups", groupId),
+      (snap) => setGroup(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      () => setGroup(null)
+    );
     return unsub;
   }, [groupId]);
 
   useEffect(() => {
     if (!groupId) return;
-    const unsub = onSnapshot(collection(db, "groups", groupId, "members"), (snap) => {
-      setMemberUids(snap.docs.map((d) => d.id));
-    });
+    const unsub = onSnapshot(
+      collection(db, "groups", groupId, "members"),
+      (snap) => setMemberUids(snap.docs.map((d) => d.id)),
+      () => setMemberUids([])
+    );
     return unsub;
   }, [groupId]);
 

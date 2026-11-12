@@ -44,8 +44,8 @@ import AngelWingsIcon from "./AngelWingsIcon";
 */
 
 // Pantallas que bajan aparte, recién al abrirlas (punto 68, commit 8).
-// Perfil y Muro quedan en el archivo de la app: son la primera pantalla
-// (Perfil) y la que más se usa, y el perfil ya trae el muro (PostCard).
+// Perfil y Muro quedan en el archivo de la app: el Muro es la primera
+// pantalla y la que más se usa, y el perfil ya trae el muro (PostCard).
 // MomentViewer también, porque lo usa la tira de Momentos del muro.
 const Chat = lazyWithReload(() => import(/* webpackChunkName: "chat" */ "./Chat"));
 const Search = lazyWithReload(() => import(/* webpackChunkName: "search" */ "./Search"));
@@ -351,6 +351,28 @@ const bannerStyles = {
     justifyContent: "center",
   },
 };
+
+// Aviso "Este momento ya no está disponible" (cuando el visor falla):
+// flota abajo, por encima de la barra inferior en el celular.
+const MOMENT_NOTICE_MS = 2500;
+const momentNoticeStyle = (isMobile) => ({
+  position: "fixed",
+  left: "50%",
+  bottom: isMobile ? "calc(84px + env(safe-area-inset-bottom, 0px))" : "32px",
+  transform: "translateX(-50%)",
+  maxWidth: "calc(100vw - 32px)",
+  boxSizing: "border-box",
+  padding: "12px 18px",
+  borderRadius: "14px",
+  background: "var(--surface-sheen)",
+  border: "1px solid var(--border)",
+  boxShadow: "0 10px 30px rgba(var(--shadow-rgb), 0.4), var(--shine)",
+  color: "var(--text)",
+  fontFamily: "var(--font-body)",
+  fontSize: "14px",
+  textAlign: "center",
+  zIndex: 60,
+});
 
 const bottomNavStyles = {
   bar: {
@@ -849,7 +871,9 @@ function MotivationalBanner({ onClose, t }) {
 function App() {
   const isMobile = useIsMobile();
   const { t } = useLanguage();
-  const [view, setView] = useState("perfil"); // "perfil" | "feed" | "chat" | "buscar" | "notificaciones"
+  // Siempre empieza en el Muro (no se guarda la última pantalla): si una
+  // pantalla falló, al volver a abrir la app no se vuelve a ella.
+  const [view, setView] = useState("feed"); // "perfil" | "feed" | "chat" | "buscar" | "notificaciones"
   const [currentUid, setCurrentUid] = useState(null);
   const [viewingProfileUid, setViewingProfileUid] = useState(null);
   const [viewingSaved, setViewingSaved] = useState(false);
@@ -874,6 +898,19 @@ function App() {
   const [momentToOpen, setMomentToOpen] = useState(null);
   const openMoment = (id, { starRain = false } = {}) =>
     setMomentToOpen({ id, starRain, openedAt: Date.now() });
+  // Aviso corto "Este momento ya no está disponible" cuando el visor falla
+  // (ver su LoadErrorBoundary abajo): se cierra el visor y se queda donde
+  // estabas (Avisos), sin tumbar la app.
+  const [momentNotice, setMomentNotice] = useState(false);
+  useEffect(() => {
+    if (!momentNotice) return undefined;
+    const timer = setTimeout(() => setMomentNotice(false), MOMENT_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [momentNotice]);
+  const handleMomentError = () => {
+    setMomentToOpen(null);
+    setMomentNotice(true);
+  };
   const [bannerDismissed, setBannerDismissed] = useState(false);
   // Punto 87: filtro del muro ("todos" | "siguiendo" | "explorar" |
   // "grupos" | "eventos") y hashtag elegido. Viven acá y no en Feed.jsx
@@ -1157,19 +1194,34 @@ function App() {
       >
         {/* Dentro de <main> con su key: al cambiar de pantalla se vuelven a
             montar, así un error en una no deja trabadas las demás. */}
-        <LoadErrorBoundary>
+        <LoadErrorBoundary
+          onHome={() => {
+            navigate("feed");
+            window.scrollTo(0, 0);
+          }}
+        >
           <Suspense fallback={<ScreenLoading />}>{content}</Suspense>
         </LoadErrorBoundary>
       </main>
 
+      {/* El visor va fuera de <main>: con su propia protección, un error
+          adentro lo cierra con un aviso en vez de tumbar toda la app. */}
       {currentUid && momentToOpen && (
-        <MomentViewer
-          key={momentToOpen.openedAt}
-          authorUids={[currentUid]}
-          startMomentId={momentToOpen.id}
-          starRainOnOpen={momentToOpen.starRain}
-          onClose={() => setMomentToOpen(null)}
-        />
+        <LoadErrorBoundary key={momentToOpen.openedAt} onError={handleMomentError}>
+          <MomentViewer
+            authorUids={[currentUid]}
+            startMomentId={momentToOpen.id}
+            starRainOnOpen={momentToOpen.starRain}
+            onClose={() => setMomentToOpen(null)}
+            onUnavailable={handleMomentError}
+          />
+        </LoadErrorBoundary>
+      )}
+
+      {momentNotice && (
+        <div role="status" style={momentNoticeStyle(isMobile)}>
+          {t("moments.unavailable")}
+        </div>
       )}
 
       {isMobile && (

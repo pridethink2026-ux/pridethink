@@ -315,9 +315,12 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
   useEffect(() => {
     setProduct(undefined);
     viewCounted.current = false;
-    const unsub = onSnapshot(doc(db, "products", productId), (snap) => {
-      setProduct(snap.exists() ? { id: snap.id, ...snap.data() } : null);
-    });
+    // Si la lectura falla (borrado, sin permiso): "no encontrado".
+    const unsub = onSnapshot(
+      doc(db, "products", productId),
+      (snap) => setProduct(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      () => setProduct(null)
+    );
     return unsub;
   }, [productId]);
 
@@ -333,9 +336,11 @@ export default function ProductDetailScreen({ productId, currentUid, myProfile, 
   // en Feed.jsx -> PostCard).
   useEffect(() => {
     if (!currentUid || !productId) return;
-    const unsub = onSnapshot(doc(db, "savedProducts", currentUid, "items", productId), (snap) => {
-      setSaved(snap.exists());
-    });
+    const unsub = onSnapshot(
+      doc(db, "savedProducts", currentUid, "items", productId),
+      (snap) => setSaved(snap.exists()),
+      () => setSaved(false)
+    );
     return unsub;
   }, [currentUid, productId]);
 
