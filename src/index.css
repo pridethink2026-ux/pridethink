@@ -8,6 +8,42 @@ body {
   /* Fondo del tema también detrás de toda la página (sin destello blanco
      al cargar ni al hacer scroll de más). */
   background: var(--bg);
+  /* Punto 94: una palabra o un enlace largo baja de línea en vez de
+     ensanchar la tarjeta (y la página). */
+  overflow-wrap: break-word;
+}
+
+/* Punto 94: la página nunca se mueve de lado a lado. "clip" recorta sin
+   crear un contenedor de scroll (no rompe la barra sticky ni
+   window.scrollY); "hidden" en <html> es el respaldo para iOS viejos (en
+   <html> pasa a la ventana, no convierte a body en contenedor).
+   text-size-adjust: iPhone no agranda el texto al girar la pantalla. */
+html {
+  overflow-x: hidden;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: clip;
+}
+
+img,
+video {
+  max-width: 100%;
+}
+
+/* Punto 94: en pantallas táctiles todos los cuadros de escribir van a
+   16 px; con menos, iPhone hace zoom al tocarlos. !important porque los
+   tamaños están en estilos inline. No se toca el <meta viewport>: el zoom
+   con los dedos sigue funcionando. En PC (mouse) no cambia nada. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 
 /* Reflejos fijos del fondo (--page-glare, themes.js; hoy Clásico y Noche

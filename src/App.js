@@ -296,7 +296,9 @@ const bannerStyles = {
     position: "relative",
     overflow: "hidden",
     display: "grid",
-    gridTemplateColumns: "26px 1fr 26px",
+    // minmax(0, …): el texto del centro se achica con la pantalla en vez
+    // de ensanchar el banner (punto 94).
+    gridTemplateColumns: "26px minmax(0, 1fr) 26px",
     alignItems: "center",
     gap: "12px",
     maxWidth: "900px",

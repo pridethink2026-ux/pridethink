@@ -282,7 +282,8 @@ const styles = {
   },
   postImageGrid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    // minmax(0, …): las fotos no ensanchan la tarjeta (punto 94).
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "4px",
     borderRadius: "14px",
     overflow: "hidden",

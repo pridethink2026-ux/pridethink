@@ -7,10 +7,14 @@ import { ThemeProvider } from './ThemeContext';
 import { initTheme } from './themes';
 import reportWebVitals from './reportWebVitals';
 import { registerServiceWorker } from './serviceWorkerRegistration';
+import { initViewportFit } from './viewportFit';
 
 // El tema (colores y fuentes) se aplica antes del primer render, así la
 // primera pantalla ya sale con él — ver ThemeContext.jsx.
 initTheme();
+
+// Pantalla bien ajustada en el celular al cerrar el teclado (punto 94).
+initViewportFit();
 
 // Los proveedores que solo sirven con sesión (usuarios, bloqueos,
 // momentos, sonidos) los monta Root.jsx junto con la app.
