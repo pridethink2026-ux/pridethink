@@ -352,13 +352,20 @@ const bannerStyles = {
   },
 };
 
+// Punto 96: barra inferior del celular con íconos al estilo Facebook (27px,
+// texto 11px, botón de 56px). Suma abajo el espacio de la línea de inicio
+// del iPhone, con su fondo hasta el borde; en Android y PC env() vale 0.
+const NAV_ICON_SIZE = 27;
+const BOTTOM_NAV_HEIGHT = 57; // 56 del botón + 1 del borde de arriba
+const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
+
 // Aviso "Este momento ya no está disponible" (cuando el visor falla):
 // flota abajo, por encima de la barra inferior en el celular.
 const MOMENT_NOTICE_MS = 2500;
 const momentNoticeStyle = (isMobile) => ({
   position: "fixed",
   left: "50%",
-  bottom: isMobile ? "calc(84px + env(safe-area-inset-bottom, 0px))" : "32px",
+  bottom: isMobile ? `calc(${BOTTOM_NAV_HEIGHT + 22}px + ${SAFE_BOTTOM})` : "32px",
   transform: "translateX(-50%)",
   maxWidth: "calc(100vw - 32px)",
   boxSizing: "border-box",
@@ -381,6 +388,9 @@ const bottomNavStyles = {
     left: 0,
     right: 0,
     display: "flex",
+    paddingBottom: SAFE_BOTTOM,
+    paddingLeft: "env(safe-area-inset-left, 0px)",
+    paddingRight: "env(safe-area-inset-right, 0px)",
     background: "var(--bottom-bar-bg)",
     borderTop: "1px solid var(--border)",
     boxShadow: "var(--bottom-bar-shine)",
@@ -391,11 +401,13 @@ const bottomNavStyles = {
     flex: 1,
     background: "none",
     border: "none",
-    padding: "8px 0 10px",
+    minHeight: "56px",
+    padding: "6px 0 8px",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "2px",
+    justifyContent: "flex-start",
+    gap: "3px",
     cursor: "pointer",
     color: active ? "var(--nav-active-color)" : "var(--text-muted)",
   }),
@@ -412,18 +424,28 @@ const bottomNavStyles = {
     background: "var(--nav-active-mark)",
     pointerEvents: "none",
   },
-  iconWrap: { position: "relative", fontSize: "19px", lineHeight: 1 },
+  // Caja fija y centrada: emojis y SVG quedan todos a la misma altura.
+  iconWrap: {
+    position: "relative",
+    width: `${NAV_ICON_SIZE}px`,
+    height: `${NAV_ICON_SIZE}px`,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "24px",
+    lineHeight: 1,
+  },
   dot: {
     position: "absolute",
-    top: "-3px",
-    right: "-6px",
-    width: "9px",
-    height: "9px",
+    top: "-2px",
+    right: "-4px",
+    width: "10px",
+    height: "10px",
     borderRadius: "50%",
     background: "var(--accent2)",
     border: "2px solid var(--surface)",
   },
-  label: { fontSize: "10px", fontWeight: 600 },
+  label: { fontSize: "11px", fontWeight: 600, lineHeight: "14px" },
 };
 
 // Punto 92: globito y destello del botón Chat.
@@ -436,9 +458,9 @@ const chatAlertStyles = {
     position: "absolute",
     top: "50%",
     left: "50%",
-    width: "24px",
-    height: "24px",
-    margin: "-13px 0 0 -12px",
+    width: "32px",
+    height: "32px",
+    margin: "-16px 0 0 -16px",
   },
   badge: {
     position: "absolute",
@@ -821,11 +843,11 @@ function BottomNav({ active, unreadCount, chatUnread, chatEnergy, onNavigate, my
                 </span>
               )}
               {tab.key === "feed" ? (
-                <HomeIcon identityText={myIdentity} active={isActive} size={19} />
+                <HomeIcon identityText={myIdentity} active={isActive} size={NAV_ICON_SIZE} />
               ) : tab.key === "tienda" ? (
-                <StoreIcon size={19} />
+                <StoreIcon size={NAV_ICON_SIZE} />
               ) : lineIcons && LINE_ICON_PATHS[tab.key] ? (
-                <LineNavIcon name={tab.key} size={19} />
+                <LineNavIcon name={tab.key} size={NAV_ICON_SIZE} />
               ) : (
                 tab.icon
               )}
@@ -1119,7 +1141,7 @@ function App() {
   }
 
   return (
-    <div style={{ paddingBottom: isMobile ? "62px" : 0 }}>
+    <div style={{ paddingBottom: isMobile ? `calc(${BOTTOM_NAV_HEIGHT + 8}px + ${SAFE_BOTTOM})` : 0 }}>
       <header style={isMobile ? navStyles.bar : { ...navStyles.bar, ...navStyles.stickyBar(scrolled) }}>
         <div style={navStyles.logoSlot}>
           {/* alt vacío: el nombre ya está escrito al lado */}

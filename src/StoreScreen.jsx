@@ -259,7 +259,8 @@ const styles = {
   fab: (isMobile) => ({
     position: "fixed",
     right: "24px",
-    bottom: isMobile ? "78px" : "28px",
+    // Punto 96: encima de la barra inferior y de la línea de inicio del iPhone.
+    bottom: isMobile ? "calc(78px + env(safe-area-inset-bottom, 0px))" : "28px",
     width: "56px",
     height: "56px",
     borderRadius: "50%",

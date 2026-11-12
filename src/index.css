@@ -27,6 +27,10 @@ html {
 
 body {
   overflow-x: clip;
+  /* Punto 96: con viewport-fit=cover, en iPhone horizontal el contenido no
+     se mete detrás de la muesca. En vertical, Android y PC valen 0. */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 img,

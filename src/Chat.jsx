@@ -378,9 +378,14 @@ const styles = {
     overscrollBehavior: "none",
   },
   shellPage: { height: "100%" },
+  // Punto 96: el padding de abajo deja la fila de escribir arriba de la
+  // línea de inicio del iPhone; useChatViewport lo pone en 0 con el teclado
+  // abierto. Va en la caja (no en la fila) para que el fondo llegue al borde.
   shellFull: {
     maxWidth: "none",
     height: "100%",
+    boxSizing: "border-box",
+    paddingBottom: "var(--pt-safe-bottom, 0px)",
     borderRadius: 0,
     border: "none",
     boxShadow: "none",
@@ -1212,6 +1217,9 @@ function isTouchScreen() {
 // el panel de stickers para no salirse.
 const DESKTOP_MIN_CHAT_HEIGHT = 420;
 const WRAPPER_VERTICAL_PADDING = 48;
+// Diferencia mínima entre la ventana y el área visible para dar el teclado
+// por abierto (la barra de Safari que aparece o se esconde mide menos).
+const KEYBOARD_MIN_HEIGHT = 150;
 
 function useChatViewport(wrapperRef, mode) {
   useLayoutEffect(() => {
@@ -1227,6 +1235,14 @@ function useChatViewport(wrapperRef, mode) {
         el.style.top = `${vv ? vv.offsetTop : 0}px`;
         el.style.height = `${visibleHeight}px`;
         el.style.setProperty("--pt-chat-height", `${visibleHeight}px`);
+        // Punto 96: con el teclado abierto (el área visible se achica) la
+        // línea de inicio queda tapada: sin espacio extra, la fila de
+        // escribir va pegada al teclado. En Android y PC env() vale 0.
+        const keyboardOpen = !!vv && window.innerHeight - vv.height > KEYBOARD_MIN_HEIGHT;
+        el.style.setProperty(
+          "--pt-safe-bottom",
+          keyboardOpen ? "0px" : "env(safe-area-inset-bottom, 0px)"
+        );
       } else {
         const top = el.getBoundingClientRect().top + window.scrollY;
         const height = Math.max(visibleHeight - top, DESKTOP_MIN_CHAT_HEIGHT);
@@ -1275,6 +1291,7 @@ function useChatViewport(wrapperRef, mode) {
       el.style.removeProperty("top");
       el.style.removeProperty("height");
       el.style.removeProperty("--pt-chat-height");
+      el.style.removeProperty("--pt-safe-bottom");
       if (mode === "full") {
         body.style.position = previous.position;
         body.style.top = previous.top;
