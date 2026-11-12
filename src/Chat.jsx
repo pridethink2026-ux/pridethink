@@ -1217,15 +1217,40 @@ function isTouchScreen() {
 // el panel de stickers para no salirse.
 const DESKTOP_MIN_CHAT_HEIGHT = 420;
 const WRAPPER_VERTICAL_PADDING = 48;
-// Diferencia mínima entre la ventana y el área visible para dar el teclado
-// por abierto (la barra de Safari que aparece o se esconde mide menos).
+// Cuánto se tiene que achicar el área visible (respecto de la más alta vista
+// con el chat abierto) para dar el teclado por abierto. La barra de Safari
+// que aparece o se esconde mide menos.
 const KEYBOARD_MIN_HEIGHT = 150;
+const FIELD_TAGS = new Set(["INPUT", "TEXTAREA"]);
 
 function useChatViewport(wrapperRef, mode) {
   useLayoutEffect(() => {
     const el = wrapperRef.current;
     if (!el || mode === "flow") return undefined;
     const vv = window.visualViewport;
+    // Punto 96b: alto visible más grande visto desde que se abrió el chat,
+    // por ancho de pantalla (al girar el celular cambia). No se compara con
+    // innerHeight: en la app instalada de iOS también se achica con el
+    // teclado y la diferencia no llegaba al umbral.
+    const tallestByWidth = new Map();
+
+    // Teclado abierto: un cuadro del chat con foco en pantalla táctil, o el
+    // área visible bastante más baja que la más alta vista.
+    const isKeyboardOpen = (visibleHeight) => {
+      const focused = document.activeElement;
+      if (
+        isTouchScreen() &&
+        focused &&
+        FIELD_TAGS.has(focused.tagName) &&
+        el.contains(focused)
+      ) {
+        return true;
+      }
+      const width = window.innerWidth;
+      const tallest = Math.max(tallestByWidth.get(width) || 0, visibleHeight);
+      tallestByWidth.set(width, tallest);
+      return tallest - visibleHeight > KEYBOARD_MIN_HEIGHT;
+    };
 
     const sync = () => {
       // Con zoom de dedos el área visible se achica, pero la caja no debe.
@@ -1238,10 +1263,9 @@ function useChatViewport(wrapperRef, mode) {
         // Punto 96: con el teclado abierto (el área visible se achica) la
         // línea de inicio queda tapada: sin espacio extra, la fila de
         // escribir va pegada al teclado. En Android y PC env() vale 0.
-        const keyboardOpen = !!vv && window.innerHeight - vv.height > KEYBOARD_MIN_HEIGHT;
         el.style.setProperty(
           "--pt-safe-bottom",
-          keyboardOpen ? "0px" : "env(safe-area-inset-bottom, 0px)"
+          isKeyboardOpen(visibleHeight) ? "0px" : "env(safe-area-inset-bottom, 0px)"
         );
       } else {
         const top = el.getBoundingClientRect().top + window.scrollY;
@@ -1276,12 +1300,27 @@ function useChatViewport(wrapperRef, mode) {
       vv.addEventListener("resize", sync);
       vv.addEventListener("scroll", sync);
     }
+    // Punto 96b: al tocar el cuadro de escribir (o salir de él) se recalcula
+    // en el momento, sin esperar a que el área visible cambie de alto. El
+    // setTimeout deja que document.activeElement ya sea el nuevo.
+    let focusTimer = null;
+    const syncAfterFocus = () => {
+      window.clearTimeout(focusTimer);
+      focusTimer = window.setTimeout(sync, 0);
+    };
+    if (mode === "full") {
+      document.addEventListener("focusin", syncAfterFocus);
+      document.addEventListener("focusout", syncAfterFocus);
+    }
     // En PC, el alto disponible cambia si se cierra el banner.
     const observer =
       mode === "page" && typeof ResizeObserver !== "undefined" ? new ResizeObserver(sync) : null;
     if (observer) observer.observe(body);
 
     return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener("focusin", syncAfterFocus);
+      document.removeEventListener("focusout", syncAfterFocus);
       window.removeEventListener("resize", sync);
       if (vv) {
         vv.removeEventListener("resize", sync);
