@@ -29,6 +29,7 @@ import { unblockUser, useMyBlocks } from "./Blocks";
 import { formatMonthYear, formatLongDate } from "./utils";
 import { authStyles as styles, IdentityForm } from "./AuthForms";
 import { lazyWithReload } from "./lazyLoad";
+import { usePushStatus, disablePushOnLogout } from "./push";
 
 const MusicCredits = lazyWithReload(() => import(/* webpackChunkName: "music-credits" */ "./MusicCredits"));
 
@@ -93,6 +94,67 @@ function BlockedUserRow({ uid, onUnblock }) {
   );
 }
 
+// Punto 97: notificaciones push en ESTE dispositivo + "Mostrar el texto del
+// mensaje" (de la persona, en private/data). Ver push.js.
+function PushSettings({ uid, showText, onToggleShowText }) {
+  const { t } = useLanguage();
+  const push = usePushStatus(uid);
+  const canToggle = push.support === "supported" && (push.enabled || push.permission !== "denied");
+  const hint = push.error
+    ? t(push.error === "no-sw" ? "push.errorNoSw" : "push.errorFailed")
+    : push.support === "ios-install"
+    ? t("push.hintIosInstall")
+    : push.support === "ios-update"
+    ? t("push.hintIosUpdate")
+    : push.support === "unsupported"
+    ? t("push.hintUnsupported")
+    : push.enabled
+    ? t("push.hintOn")
+    : push.permission === "denied"
+    ? t("push.hintDenied")
+    : t("push.hintOff");
+  const disabledLook = { opacity: 0.5, cursor: "default" };
+
+  return (
+    <>
+      <div style={styles.privacyRow}>
+        <div>
+          <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>{t("push.toggle")}</p>
+          <p style={styles.privacyHint}>{hint}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={push.enabled}
+          aria-label={t("push.toggle")}
+          disabled={!canToggle || push.busy}
+          style={!canToggle || push.busy ? { ...styles.toggle(push.enabled), ...disabledLook } : styles.toggle(push.enabled)}
+          onClick={() => (push.enabled ? push.disable() : push.enable())}
+        >
+          <span style={styles.toggleDot(push.enabled)} />
+        </button>
+      </div>
+
+      <div style={styles.privacyRow}>
+        <div>
+          <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>{t("push.showText")}</p>
+          <p style={styles.privacyHint}>{showText ? t("push.showTextOn") : t("push.showTextOff")}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showText}
+          aria-label={t("push.showText")}
+          style={styles.toggle(showText)}
+          onClick={() => onToggleShowText(!showText)}
+        >
+          <span style={styles.toggleDot(showText)} />
+        </button>
+      </div>
+    </>
+  );
+}
+
 function ProfileView({
   user,
   uid,
@@ -101,6 +163,7 @@ function ProfileView({
   onTogglePrivacy,
   onToggleWallPrivacy,
   onToggleSoundMuted,
+  onTogglePushShowText,
   onUnblock,
   onOpenProfile,
   onOpenSaved,
@@ -276,6 +339,8 @@ function ProfileView({
                 <span style={styles.toggleDot(!!user.soundMuted)} />
               </button>
             </div>
+
+            <PushSettings uid={uid} showText={user.pushShowText !== false} onToggleShowText={onTogglePushShowText} />
 
             <div style={styles.privacyRow}>
               <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
@@ -515,6 +580,20 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
     }
   };
 
+  // Punto 97: "Mostrar el texto del mensaje" es de la persona (vale para
+  // todos sus dispositivos), así que va en private/data; la Cloud Function
+  // lo lee al armar cada aviso.
+  const handleTogglePushShowText = async (newValue) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    setUser({ ...user, pushShowText: newValue });
+    try {
+      await setDoc(doc(db, "users", uid, "private", "data"), { pushShowText: newValue }, { merge: true });
+    } catch (err) {
+      setUser(user); // revierte si falla
+    }
+  };
+
   const handleUnblock = async (targetUid) => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -525,6 +604,9 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
   };
 
   const handleLogout = async () => {
+    // Punto 97: apaga las notificaciones de este dispositivo, para que otra
+    // cuenta que entre acá no reciba tus avisos (necesita la sesión).
+    await disablePushOnLogout(auth.currentUser?.uid);
     // Marca "offline" ANTES de cerrar sesión: una vez cerrada, la
     // escritura ya no pasaría las reglas de Firestore (exigen estar
     // autenticado) — ver presence.js.
@@ -583,6 +665,7 @@ export default function AuthProfile({ onOpenProfile, onOpenSaved }) {
             onTogglePrivacy={handleTogglePrivacy}
             onToggleWallPrivacy={handleToggleWallPrivacy}
             onToggleSoundMuted={handleToggleSoundMuted}
+            onTogglePushShowText={handleTogglePushShowText}
             onUnblock={handleUnblock}
             onOpenProfile={onOpenProfile}
             onOpenSaved={onOpenSaved}

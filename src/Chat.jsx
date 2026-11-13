@@ -42,6 +42,7 @@ import {
 import { blockUser, unblockUser, useMyBlocks } from "./Blocks";
 import { useAllUsers } from "./Mentions";
 import { playReactionSound } from "./sound";
+import { usePushStatus } from "./push";
 import GiftNotification from "./GiftNotification";
 import ImageViewer from "./ImageViewer";
 import ImageEditor from "./ImageEditor";
@@ -543,6 +544,42 @@ const styles = {
     padding: "14px 0 10px 12px",
   },
   listNote: { padding: "16px", fontSize: "13px", color: "var(--text-muted)", margin: 0 },
+  // Punto 97: aviso para activar las notificaciones push.
+  pushBanner: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    margin: "10px 12px 0",
+    padding: "8px 6px 8px 12px",
+    borderRadius: "14px",
+    border: "1px solid var(--border)",
+    background: "var(--accent2-soft)",
+  },
+  pushBannerText: { flex: 1, minWidth: 0, margin: 0, fontSize: "12px", lineHeight: 1.4, color: "var(--text)" },
+  pushBannerBtn: {
+    flexShrink: 0,
+    padding: "6px 12px",
+    borderRadius: "999px",
+    border: "1px solid var(--border)",
+    background: "var(--surface-alt)",
+    boxShadow: "var(--chip-shine)",
+    color: "var(--text)",
+    fontFamily: "inherit",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  pushBannerClose: {
+    flexShrink: 0,
+    width: "28px",
+    height: "28px",
+    border: "none",
+    background: "transparent",
+    color: "var(--text-muted)",
+    fontSize: "13px",
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
   // Aviso sobre el campo de texto (commit 4): no se pudo enviar, o ya no
   // se puede escribir en esta conversación (en lugar del campo).
   composerNote: {
@@ -1476,6 +1513,19 @@ export default function Chat({
 
   // "recent": tus conversaciones; "new": buscador de "Nueva conversación".
   const [listMode, setListMode] = useState("recent");
+
+  // Punto 97: aviso para activar las notificaciones (nunca se piden solas
+  // al abrir la app). En iPhone sin instalar, explica cómo instalarla.
+  // Se cierra con ✕ y no vuelve en este navegador.
+  const push = usePushStatus(currentUid);
+  const pushBanner =
+    push.enabled || push.bannerHidden
+      ? null
+      : push.support === "supported" && push.permission !== "denied"
+      ? "enable"
+      : push.support === "ios-install"
+      ? "install"
+      : null;
   const [maxChats, setMaxChats] = useState(RECENT_CHATS_PAGE);
   const recent = useRecentChats(currentUid, maxChats);
   const usersByUid = useMemo(() => {
@@ -1997,6 +2047,38 @@ export default function Chat({
                 >
                   ✏️ {t("chat.newConversation")}
                 </button>
+                {pushBanner && (
+                  <div style={styles.pushBanner}>
+                    <p style={styles.pushBannerText}>
+                      {pushBanner === "install" ? t("push.hintIosInstall") : t("push.bannerText")}
+                      {push.error && (
+                        <>
+                          {" "}
+                          {t(push.error === "no-sw" ? "push.errorNoSw" : "push.errorFailed")}
+                        </>
+                      )}
+                    </p>
+                    {pushBanner === "enable" && (
+                      <button
+                        type="button"
+                        style={styles.pushBannerBtn}
+                        disabled={push.busy}
+                        onClick={push.enable}
+                      >
+                        {t("push.bannerEnable")}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      style={styles.pushBannerClose}
+                      onClick={push.hideBanner}
+                      aria-label={t("push.bannerClose")}
+                      title={t("push.bannerClose")}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <div style={styles.listHeaderRow}>

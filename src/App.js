@@ -11,6 +11,7 @@ import HomeIcon from "./HomeNavIcon";
 import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
 import { useOnlinePresence } from "./presence";
+import { usePushRefresh } from "./push";
 import { useFollowsMigration } from "./follows";
 import { useChatsMigration, useChatUnread } from "./chatMessages";
 import { useLanguage } from "./LanguageContext";
@@ -964,6 +965,10 @@ function App() {
   // signOut(auth) (una vez cerrada la sesión, la escritura ya no pasaría
   // las reglas de Firestore).
   useOnlinePresence(currentUid);
+
+  // Punto 97: si las notificaciones están activas en este dispositivo,
+  // confirma el token una vez por día (ver push.js).
+  usePushRefresh(currentUid);
 
   // En vivo, para que el icono de Inicio cambie al instante si el usuario
   // edita su identidad (AuthProfile.jsx). Sale de AllUsersContext, sin un

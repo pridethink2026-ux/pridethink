@@ -198,8 +198,22 @@ service cloud.firestore {
         && (!('genderOther' in datos) || textoValido(datos.genderOther, 50))
         && (!('language' in datos) || textoValido(datos.language, 10))
         && (!('soundMuted' in datos) || datos.soundMuted is bool)
+        && (!('pushShowText' in datos) || datos.pushShowText is bool)
         && (!('theme' in datos) || datos.theme in
           ['noche', 'arcoiris', 'oceano', 'atardecer', 'elegante', 'pinky', 'angel', 'rotativo']);
+    }
+
+    // Punto 97: users/{uid}/devices/{deviceId}. Solo estos campos; el token
+    // es obligatorio. viewingChatId/viewingUntil: chat que se está viendo
+    // en este dispositivo (null si ninguno).
+    function dispositivoValido(d) {
+      return d.keys().hasOnly(['token', 'platform', 'createdAt', 'lastSeenAt', 'viewingChatId', 'viewingUntil'])
+        && d.token is string && d.token.size() > 0 && d.token.size() <= 4096
+        && (!('platform' in d) || textoValido(d.platform, 20))
+        && (!('createdAt' in d) || d.createdAt is timestamp)
+        && (!('lastSeenAt' in d) || d.lastSeenAt is timestamp)
+        && (!('viewingChatId' in d) || d.viewingChatId == null || textoValido(d.viewingChatId, 128))
+        && (!('viewingUntil' in d) || d.viewingUntil == null || d.viewingUntil is timestamp);
     }
 
     // Hallazgo H1, fase B: campos que ya no pueden estar en users/{uid}.
@@ -459,7 +473,7 @@ service cloud.firestore {
       // users/{uid}/private/data (hallazgo H1, 2026-10-24)
       // Datos personales del registro (fullName, birthDate, gender,
       // genderOther, country) y ajustes privados (language, soundMuted,
-      // theme).
+      // theme, pushShowText del punto 97).
       // Antes vivían en users/{uid}, que cualquier autenticado lee entero
       // (y AllUsersContext.jsx descarga para TODOS los usuarios) — reglas
       // de Firestore no pueden ocultar un campo puntual de un documento
@@ -489,6 +503,19 @@ service cloud.firestore {
           && camposPrivadosValidos(request.resource.data);
 
         allow delete: if false;
+      }
+
+      // ------------------------------------------------------------------
+      // users/{uid}/devices/{deviceId} (punto 97): un documento por
+      // navegador o app instalada con notificaciones activas (ver push.js).
+      // Solo el dueño lo lee y lo escribe. La Cloud Function que manda los
+      // avisos usa firebase-admin, que no pasa por estas reglas.
+      // ------------------------------------------------------------------
+      match /devices/{deviceId} {
+        allow read, delete: if esDueno(uid);
+        allow create, update: if esDueno(uid)
+          && deviceId.size() <= 64
+          && dispositivoValido(request.resource.data);
       }
     }
 
