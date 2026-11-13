@@ -46,7 +46,7 @@ Pridethink es una app social centrada en la libre expresión de identidad para l
 - ~~Auditoría de privacidad: campos públicos del perfil visibles para todos~~ — RESUELTO (punto 67, H1)
 - ~~Validación de campos en reglas de Firestore (tipo y tamaño)~~ — RESUELTO (hallazgo M1, ver "Seguridad de Firestore")
 - ~~Datos sensibles del perfil en subcolección privada~~ — RESUELTO (punto 67, H1)
-- Gradientes mínimos: solo en botón "Post" y título "Pridethink"
+- ~~Gradientes mínimos: solo en botón "Post" y título "Pridethink"~~ (descartada: el punto 85 usa degradados a propósito en los títulos)
 
 ## Equipo
 - **Ernesto** — Fundador, dirección de producto, arquitectura de soluciones
