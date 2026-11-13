@@ -1,0 +1,13 @@
+{
+  "name": "pridethink-functions",
+  "description": "Cloud Functions de Pridethink (punto 97: notificaciones push del chat)",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.1",
+    "firebase-functions": "^7.4.0"
+  }
+}
