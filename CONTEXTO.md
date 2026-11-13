@@ -41,10 +41,11 @@ Pridethink es una app social centrada en la libre expresión de identidad para l
 ## Funcionalidades pendientes
 - Stripe (pagos reales en la tienda) — requiere plan Blaze de Firebase
 - Subida de imágenes de PORTADAS de grupos/eventos (las fotos de PERFIL y de PRODUCTOS ya están, puntos 58 y 59)
-- Sonidos de chat (enviar/recibir) respetando el mute toggle
-- Auditoría de privacidad: campos públicos del perfil visibles para todos
-- Validación de campos en reglas de Firestore (tipo y tamaño)
-- Datos sensibles del perfil en subcolección privada
+- Sonidos de chat (enviar/recibir) respetando el mute toggle (hoy solo suenan las reacciones, punto 50)
+- Notificaciones push con sonido (Android e iPhone) con Firebase Cloud Messaging
+- ~~Auditoría de privacidad: campos públicos del perfil visibles para todos~~ — RESUELTO (punto 67, H1)
+- ~~Validación de campos en reglas de Firestore (tipo y tamaño)~~ — RESUELTO (hallazgo M1, ver "Seguridad de Firestore")
+- ~~Datos sensibles del perfil en subcolección privada~~ — RESUELTO (punto 67, H1)
 - Gradientes mínimos: solo en botón "Post" y título "Pridethink"
 
 ## Equipo
