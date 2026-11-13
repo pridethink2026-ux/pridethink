@@ -1088,6 +1088,37 @@ function App() {
     setStoreProductId(productId);
   };
 
+  // Punto 97: tocar una notificación push abre ese chat. El service worker
+  // manda "pt-open-chat" si la app ya estaba abierta, o la abre en
+  // /?chat=<uid> (se lee una vez al arrancar y se quita de la URL). Chat.jsx
+  // consume el pedido con onOpenRequestDone.
+  const [chatToOpen, setChatToOpen] = useState(null); // { uid, at } | null
+  const openChatFromPushRef = useRef(null);
+  openChatFromPushRef.current = (uid) => {
+    navigate("chat");
+    setMomentToOpen(null);
+    setChatToOpen({ uid, at: Date.now() });
+  };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get("chat");
+    if (uid) {
+      params.delete("chat");
+      const rest = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
+      openChatFromPushRef.current(uid);
+    }
+    if (!("serviceWorker" in navigator)) return undefined;
+    const onMessage = (event) => {
+      const data = event.data || {};
+      if (data.type === "pt-open-chat" && typeof data.uid === "string" && data.uid) {
+        openChatFromPushRef.current(data.uid);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
+
   let content;
   if (viewingPostId) {
     content = <PostView postId={viewingPostId} onBack={closePost} onOpenProfile={openProfile} />;
@@ -1119,6 +1150,8 @@ function App() {
         onOpenProfile={openProfile}
         onOpenPost={openPost}
         onOpenProduct={openStoreProduct}
+        openRequest={chatToOpen}
+        onOpenRequestDone={() => setChatToOpen(null)}
       />
     );
   } else if (view === "buscar") {

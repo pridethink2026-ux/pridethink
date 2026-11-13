@@ -42,7 +42,7 @@ import {
 import { blockUser, unblockUser, useMyBlocks } from "./Blocks";
 import { useAllUsers } from "./Mentions";
 import { playReactionSound } from "./sound";
-import { usePushStatus } from "./push";
+import { usePushStatus, useViewingChatBeacon } from "./push";
 import GiftNotification from "./GiftNotification";
 import ImageViewer from "./ImageViewer";
 import ImageEditor from "./ImageEditor";
@@ -1426,6 +1426,8 @@ export default function Chat({
   onOpenProfile,
   onOpenPost,
   onOpenProduct,
+  openRequest = null,
+  onOpenRequestDone = () => {},
 }) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -1595,6 +1597,10 @@ export default function Chat({
     );
   }, [activeChatId, activeSummary, currentUid, pageVisible]);
 
+  // Punto 97: mientras ves esta conversación, no te llegan notificaciones
+  // push de ella en este dispositivo (ver push.js).
+  useViewingChatBeacon(currentUid, pageVisible ? activeChatId : null);
+
   // ¿Todavía se puede escribir en la conversación abierta? (commit 4) Si
   // mientras está abierta hay un bloqueo, o un privado deja de seguirte y
   // nunca te escribió, el campo de texto se cambia por un aviso: las
@@ -1621,6 +1627,18 @@ export default function Chat({
     setListMode("recent");
     setSearch("");
   };
+
+  // Punto 97: al tocar una notificación push, App.js pide abrir el chat con
+  // esa persona ({ uid, at }). Se espera a que su perfil esté cargado; un
+  // uid que no existe simplemente no abre nada.
+  useEffect(() => {
+    if (!openRequest || !currentUid) return;
+    const user = usersByUid[openRequest.uid];
+    if (!user) return;
+    onOpenRequestDone();
+    openConversation(user);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest, currentUid, usersByUid]);
 
   // Punto 90: eliminar una conversación de TU lista, con confirmación. Si
   // es la que está abierta, se cierra.

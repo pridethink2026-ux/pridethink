@@ -10,6 +10,11 @@
   - Todo lo demás (Firebase, fotos, otros sitios, /music/, manifest,
     íconos) no se toca: va directo a internet como siempre.
 
+  - Notificaciones push del chat (punto 97): ver los listeners "push" y
+    "notificationclick" al final. Este es el único service worker de la
+    app: push.js le pasa su registro a Firebase al pedir el token, así que
+    no existe un firebase-messaging-sw.js aparte.
+
   Actualizaciones: scripts/stamp-sw.js reemplaza __PT_SW_VERSION__ con un
   número distinto en cada `npm run build`. Al cambiar este archivo, el
   navegador instala el nuevo, que toma el control enseguida (skipWaiting
@@ -94,4 +99,87 @@ self.addEventListener("fetch", (event) => {
       })()
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// Punto 97: notificaciones push (Firebase Cloud Messaging)
+//
+// La Cloud Function manda solo datos (sin "notification"), con el texto ya
+// armado y traducido: { title, body, chatId, senderUid }. FCM los entrega
+// como { data: {...}, from, fcmMessageId, ... }.
+//
+// Cada push SIEMPRE muestra una notificación, aunque los datos no se
+// puedan leer (texto genérico): iPhone quita el permiso si llegan avisos
+// que no se muestran. Por eso decidir "no avisar" (chat abierto, bloqueo)
+// es trabajo de la función, nunca de este archivo.
+// ---------------------------------------------------------------------------
+
+function genericNotification() {
+  const english = /^en\b/i.test(self.navigator.language || "");
+  return {
+    title: "Pridethink",
+    body: english ? "You have a new message" : "Tienes un mensaje nuevo",
+  };
+}
+
+function readPushData(event) {
+  try {
+    const json = event.data ? event.data.json() : null;
+    const data = (json && (json.data || json)) || {};
+    return typeof data === "object" ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    (async () => {
+      const data = readPushData(event);
+      const fallback = genericNotification();
+      const title = typeof data.title === "string" && data.title ? data.title : fallback.title;
+      const body = typeof data.body === "string" && data.body ? data.body : fallback.body;
+      const senderUid = typeof data.senderUid === "string" ? data.senderUid : "";
+      try {
+        await self.registration.showNotification(title, {
+          body,
+          icon: "/logo192.png",
+          // Varios mensajes del mismo chat se reemplazan en vez de
+          // acumularse; renotify hace que cada uno vuelva a sonar.
+          tag: typeof data.chatId === "string" && data.chatId ? `chat-${data.chatId}` : "pt-message",
+          renotify: true,
+          vibrate: [120, 60, 120],
+          data: { senderUid },
+        });
+      } catch {
+        // Opciones que este navegador no acepta: la versión mínima.
+        await self.registration.showNotification(fallback.title, { body: fallback.body });
+      }
+    })()
+  );
+});
+
+// Al tocarla: si la app ya está abierta, se trae al frente y se le pide que
+// abra ese chat (App.js escucha el mensaje "pt-open-chat"); si no, se abre
+// en /?chat=<uid>, que App.js lee al arrancar.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const senderUid = (event.notification.data && event.notification.data.senderUid) || "";
+  const url = senderUid ? `/?chat=${encodeURIComponent(senderUid)}` : "/";
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const client = windows.find((c) => new URL(c.url).origin === self.location.origin);
+      if (client) {
+        if (senderUid) client.postMessage({ type: "pt-open-chat", uid: senderUid });
+        try {
+          await client.focus();
+          return;
+        } catch {
+          // algunos navegadores no dejan enfocar: se abre una ventana
+        }
+      }
+      await self.clients.openWindow(url);
+    })()
+  );
 });

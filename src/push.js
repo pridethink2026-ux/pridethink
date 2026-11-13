@@ -12,7 +12,7 @@
                    por día, ver usePushRefresh); la función borra los que
                    llevan más de 60 días sin confirmarse
     viewingChatId  chat abierto y visible en este dispositivo (commit 2),
-    viewingUntil   hasta cuándo vale (se renueva cada minuto): con eso la
+    viewingUntil   hasta cuándo vale (ver useViewingChatBeacon): con eso la
                    función no avisa de un chat que ya estás viendo
 
   deviceId es un id al azar guardado en localStorage, uno por navegador:
@@ -27,7 +27,7 @@
 */
 
 import { useEffect, useState } from "react";
-import { doc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { app, db } from "./firebase";
 
 // Clave pública de "Certificados de push web" (Firebase Console → Cloud
@@ -216,6 +216,33 @@ export function usePushRefresh(uid) {
       cancelled = true;
     };
   }, [uid]);
+}
+
+// Commit 2: mientras un chat está abierto y la app visible, este
+// dispositivo avisa que lo está viendo (viewingChatId + viewingUntil), y la
+// función no le manda notificaciones de ESE chat. Se renueva cada 45 s y
+// vale 90 s: si el teléfono cierra la app de golpe (sin llegar a borrarlo),
+// en menos de un minuto y medio vuelven los avisos. Solo si las
+// notificaciones están activas en este dispositivo.
+const VIEWING_MS = 90 * 1000;
+const VIEWING_RENEW_MS = 45 * 1000;
+
+export function useViewingChatBeacon(uid, chatId) {
+  useEffect(() => {
+    if (!uid || !chatId || !isPushEnabledHere(uid)) return undefined;
+    const ref = deviceRef(uid);
+    const write = () =>
+      updateDoc(ref, {
+        viewingChatId: chatId,
+        viewingUntil: Timestamp.fromMillis(Date.now() + VIEWING_MS),
+      }).catch(() => {});
+    write();
+    const timer = setInterval(write, VIEWING_RENEW_MS);
+    return () => {
+      clearInterval(timer);
+      updateDoc(ref, { viewingChatId: null, viewingUntil: null }).catch(() => {});
+    };
+  }, [uid, chatId]);
 }
 
 // Estado para el interruptor del Perfil y el aviso del Chat.
