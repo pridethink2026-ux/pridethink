@@ -14,6 +14,7 @@ import { useOnlinePresence } from "./presence";
 import { usePushRefresh } from "./push";
 import { useFollowsMigration } from "./follows";
 import { useChatsMigration, useChatUnread } from "./chatMessages";
+import { setAppBadge } from "./appBadge";
 import { useLanguage } from "./LanguageContext";
 import { THEMES, ROTATIVO_KEY, resolveThemeKey } from "./themes";
 import { useTheme } from "./ThemeContext";
@@ -1054,6 +1055,18 @@ function App() {
     currentUid,
     view === "chat" && !anyOverlayOpen
   );
+
+  // Punto 98: el mismo número sobre el ícono de la app instalada. Se vuelve
+  // a poner al volver a primer plano, por si un push dejó otro número. Sin
+  // sesión el conteo es 0 y se borra.
+  useEffect(() => {
+    setAppBadge(chatUnread);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") setAppBadge(chatUnread);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [chatUnread]);
 
   // Punto 87: botón Muro como en Facebook (barra superior de escritorio y
   // barra inferior de celular). Si ya estás en el Muro, sin ninguna vista

@@ -105,7 +105,7 @@ self.addEventListener("fetch", (event) => {
 // Punto 97: notificaciones push (Firebase Cloud Messaging)
 //
 // La Cloud Function manda solo datos (sin "notification"), con el texto ya
-// armado y traducido: { title, body, chatId, senderUid }. FCM los entrega
+// armado y traducido: { title, body, chatId, senderUid, unread }. FCM los entrega
 // como { data: {...}, from, fcmMessageId, ... }.
 //
 // Cada push SIEMPRE muestra una notificación, aunque los datos no se
@@ -132,10 +132,29 @@ function readPushData(event) {
   }
 }
 
+// Punto 98: número sobre el ícono (Badging API) con los mensajes sin leer
+// de quien recibe. La función lo manda como texto en data.unread; si no
+// viene, el número queda como está. Sin soporte (Android), no hace nada.
+async function updateBadgeFromPush(data) {
+  const unread = Number.parseInt(data.unread, 10);
+  if (!Number.isFinite(unread) || unread < 0) return;
+  try {
+    const nav = self.navigator;
+    if (unread > 0) {
+      if (typeof nav.setAppBadge === "function") await nav.setAppBadge(unread);
+    } else if (typeof nav.clearAppBadge === "function") {
+      await nav.clearAppBadge();
+    }
+  } catch {
+    // el número es solo una comodidad: la notificación sale igual
+  }
+}
+
 self.addEventListener("push", (event) => {
   event.waitUntil(
     (async () => {
       const data = readPushData(event);
+      await updateBadgeFromPush(data);
       const fallback = genericNotification();
       const title = typeof data.title === "string" && data.title ? data.title : fallback.title;
       const body = typeof data.body === "string" && data.body ? data.body : fallback.body;
