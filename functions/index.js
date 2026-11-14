@@ -22,6 +22,10 @@
   Usa firebase-admin, que no pasa por firestore.rules. Nunca escribe el
   contenido de un mensaje en los registros.
 
+  Punto 98: cada aviso lleva también data.unread, el total de mensajes sin
+  leer de quien recibe (el mismo número del globito del Chat), para el
+  número sobre el ícono de la app. Ver countUnreadMessages.
+
   Subir: npx firebase deploy --only functions (o npm run deploy:functions
   desde la raíz del proyecto).
 */
@@ -94,6 +98,73 @@ function millis(timestamp) {
   return timestamp && typeof timestamp.toMillis === "function" ? timestamp.toMillis() : null;
 }
 
+// ---------------------------------------------------------------------
+// Punto 98: total de mensajes sin leer de quien recibe, para el número
+// sobre el ícono de la app (service worker → setAppBadge). Es la misma
+// cuenta que el globito del botón Chat: useChatUnread, isChatInMyList,
+// isChatUnread, canChatWithUser y unreadCutoff en src/chatMessages.js. Si
+// cambia allá, hay que cambiarla acá.
+// ---------------------------------------------------------------------
+
+// Mismo tope por conversación que UNREAD_MESSAGES_MAX en chatMessages.js.
+const UNREAD_MESSAGES_MAX = 100;
+
+async function countUnreadMessages(db, uid) {
+  const chatsSnap = await db.collection("chats").where("participants", "array-contains", uid).get();
+
+  const unreadChats = [];
+  chatsSnap.forEach((chatDoc) => {
+    const chat = chatDoc.data();
+    const last = millis(chat.lastMessageAt) || 0;
+    const hidden = millis(chat.hiddenAt && chat.hiddenAt[uid]) || 0;
+    const read = millis(chat.lastReadAt && chat.lastReadAt[uid]) || 0;
+    // En tu lista (isChatInMyList) y sin leer (isChatUnread).
+    if (!(last > 0 && last > hidden)) return;
+    if (!chat.lastSenderId || chat.lastSenderId === uid || !(last > read)) return;
+    const otherUid = (chat.participants || []).find((p) => p !== uid);
+    if (!otherUid) return;
+    // Corte: lo posterior a tu lectura y a cuando la eliminaste (unreadCutoff).
+    const cutoff = hidden > read ? chat.hiddenAt[uid] : (chat.lastReadAt && chat.lastReadAt[uid]) || null;
+    unreadChats.push({ ref: chatDoc.ref, otherUid, writers: chat.writers || {}, cutoff });
+  });
+  if (unreadChats.length === 0) return 0;
+
+  // canChatWithUser: sin bloqueo en ninguna dirección; si el perfil es
+  // privado, solo si ya te escribió o se siguen mutuamente.
+  const allowed = await Promise.all(
+    unreadChats.map(async ({ otherUid, writers }) => {
+      const [userSnap, blockedByMe, blockedMe] = await Promise.all([
+        db.doc(`users/${otherUid}`).get(),
+        db.doc(`blocks/${uid}_${otherUid}`).get(),
+        db.doc(`blocks/${otherUid}_${uid}`).get(),
+      ]);
+      if (!userSnap.exists || blockedByMe.exists || blockedMe.exists) return false;
+      if (!userSnap.data().isPrivate) return true;
+      if (writers[otherUid] === true) return true;
+      const [iFollow, followsMe] = await Promise.all([
+        db.doc(`follows/${uid}_${otherUid}`).get(),
+        db.doc(`follows/${otherUid}_${uid}`).get(),
+      ]);
+      return iFollow.exists && followsMe.exists;
+    })
+  );
+
+  // Mensajes de la otra persona después del corte. select() trae solo el
+  // remitente (no baja las notas de voz enteras).
+  const counts = await Promise.all(
+    unreadChats
+      .filter((_, i) => allowed[i])
+      .map(async ({ ref, cutoff }) => {
+        let q = ref.collection("messages");
+        if (cutoff) q = q.where("createdAt", ">", cutoff);
+        const snap = await q.orderBy("createdAt", "desc").limit(UNREAD_MESSAGES_MAX).select("senderId").get();
+        // Igual que el globito: una conversación sin leer vale al menos 1.
+        return snap.docs.filter((m) => m.get("senderId") !== uid).length || 1;
+      })
+  );
+  return counts.reduce((sum, n) => sum + n, 0);
+}
+
 exports.notifyChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageId}", async (event) => {
   const message = event.data && event.data.data();
   if (!message) return;
@@ -147,10 +218,20 @@ exports.notifyChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageI
   const title = showText ? truncate(senderName, NAME_MAX) || texts.someone : "Pridethink";
   const body = showText ? describeMessage(message, texts) : texts.generic;
 
+  // Punto 98: si la cuenta falla, el aviso sale igual, sin número.
+  let unread = null;
+  try {
+    unread = await countUnreadMessages(db, recipientUid);
+  } catch (err) {
+    logger.warn("push: no se pudieron contar los no leídos", { code: err && err.code });
+  }
+  const data = { title, body, chatId, senderUid };
+  if (unread !== null) data.unread = String(unread);
+
   const response = await getMessaging().sendEach(
     targets.map(({ token }) => ({
       token,
-      data: { title, body, chatId, senderUid },
+      data,
       webpush: { headers: { Urgency: "high", TTL: String(TTL_SECONDS) } },
     }))
   );
