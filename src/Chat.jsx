@@ -313,34 +313,52 @@ function getWaveformHeights(seedText) {
 
 // Barras SVG delgadas. El color sale de una variable de tema distinta según
 // el tipo de burbuja (fondo degradado propio vs. fondo oscuro ajeno) para
-// que siempre haya buen contraste, y solo se animan (efecto ecualizador)
-// mientras el audio se está reproduciendo.
-function AudioWaveform({ seed, playing, mine }) {
+// que siempre haya buen contraste.
+//
+// Punto 99 (como WhatsApp): con `progress` (0 a 1) las barras ya
+// reproducidas van con el color completo, las que faltan más tenues, y un
+// punto marca la posición. Sin `progress` (nota enviándose) todas las
+// barras van llenas y no hay punto. Ya no hay animación de ecualizador.
+// El margen del viewBox deja lugar al punto en los extremos; es el mismo
+// con o sin punto, así la burbuja "Enviando…" mide lo mismo que la real.
+const WAVEFORM_DOT_R = 3.5;
+const WAVEFORM_WIDTH =
+  WAVEFORM_BARS * WAVEFORM_BAR_WIDTH + (WAVEFORM_BARS - 1) * WAVEFORM_BAR_GAP;
+const WAVEFORM_OUTER_WIDTH = WAVEFORM_WIDTH + 2 * WAVEFORM_DOT_R;
+const WAVEFORM_UNPLAYED_OPACITY = 0.45;
+
+function AudioWaveform({ seed, mine, progress = null }) {
   const heights = useMemo(() => getWaveformHeights(seed), [seed]);
-  const totalWidth =
-    WAVEFORM_BARS * WAVEFORM_BAR_WIDTH + (WAVEFORM_BARS - 1) * WAVEFORM_BAR_GAP;
+  const withProgress = progress != null;
+  const dotX = withProgress ? Math.min(Math.max(progress, 0), 1) * WAVEFORM_WIDTH : 0;
 
   return (
     <svg
-      viewBox={`0 0 ${totalWidth} ${WAVEFORM_VIEW_HEIGHT}`}
-      width={totalWidth}
+      viewBox={`${-WAVEFORM_DOT_R} 0 ${WAVEFORM_OUTER_WIDTH} ${WAVEFORM_VIEW_HEIGHT}`}
+      width={WAVEFORM_OUTER_WIDTH}
       height={WAVEFORM_VIEW_HEIGHT}
       style={styles.waveform(mine)}
       aria-hidden="true"
     >
-      {heights.map((h, i) => (
-        <rect
-          key={i}
-          className={playing ? "pt-wave-bar pt-wave-playing" : "pt-wave-bar"}
-          x={i * (WAVEFORM_BAR_WIDTH + WAVEFORM_BAR_GAP)}
-          y={(WAVEFORM_VIEW_HEIGHT - h) / 2}
-          width={WAVEFORM_BAR_WIDTH}
-          height={h}
-          rx={WAVEFORM_BAR_WIDTH / 2}
-          fill="currentColor"
-          style={{ animationDelay: `${i * 0.045}s` }}
-        />
-      ))}
+      {heights.map((h, i) => {
+        const x = i * (WAVEFORM_BAR_WIDTH + WAVEFORM_BAR_GAP);
+        const played = !withProgress || x + WAVEFORM_BAR_WIDTH / 2 <= dotX;
+        return (
+          <rect
+            key={i}
+            x={x}
+            y={(WAVEFORM_VIEW_HEIGHT - h) / 2}
+            width={WAVEFORM_BAR_WIDTH}
+            height={h}
+            rx={WAVEFORM_BAR_WIDTH / 2}
+            fill="currentColor"
+            opacity={played ? 1 : WAVEFORM_UNPLAYED_OPACITY}
+          />
+        );
+      })}
+      {withProgress && (
+        <circle cx={dotX} cy={WAVEFORM_VIEW_HEIGHT / 2} r={WAVEFORM_DOT_R} fill="currentColor" />
+      )}
     </svg>
   );
 }
@@ -915,10 +933,25 @@ const styles = {
     maxWidth: "100%",
     color: mine ? "var(--on-primary)" : "var(--text-muted)",
   }),
+  // Zona tocable de la onda (punto 99): 6px más arriba y abajo para el
+  // dedo, sin cambiar el alto de la burbuja. pan-y deja hacer scroll
+  // vertical del chat empezando sobre la onda.
+  audioScrubber: (enabled) => ({
+    flexShrink: 0,
+    display: "flex",
+    padding: "6px 0",
+    margin: "-6px 0",
+    touchAction: "pan-y",
+    cursor: enabled ? "pointer" : "default",
+    WebkitTapHighlightColor: "transparent",
+    borderRadius: "6px",
+  }),
   audioDuration: (mine) => ({
     fontSize: "12px",
     fontWeight: 600,
     flexShrink: 0,
+    // Cifras del mismo ancho: el contador no "baila" al avanzar.
+    fontVariantNumeric: "tabular-nums",
     color: mine ? "var(--on-primary)" : "var(--text-muted)",
   }),
   emptyState: {
@@ -1001,50 +1034,258 @@ const styles = {
   },
 };
 
+// ---------------------------------------------------------------------
+// Punto 99: reproducir notas de voz como en WhatsApp.
+// - Sin reproducir: duración total. Reproduciendo o en pausa: el tiempo
+//   que va. Al terminar vuelve a 0 y a la duración total.
+// - La onda se llena según el avance (requestAnimationFrame solo mientras
+//   suena) y se puede tocar o arrastrar para adelantar o retroceder. El
+//   arrastre solo mueve el punto; el audio salta al soltar (en webm largo
+//   cada salto puede tardar).
+// - Solo una nota suena a la vez (activeVoiceNoteAudio).
+// - Duración faltante o 0 (notas viejas): esa nota carga sus datos
+//   básicos y toma la duración del audio. El webm de Chrome/Android no la
+//   trae en el archivo (da Infinity): se salta "al final" para que el
+//   navegador la calcule y se vuelve a 0.
+// ---------------------------------------------------------------------
+let activeVoiceNoteAudio = null;
+
+const SEEK_STEP_SECONDS = 5;
+const SCRUB_START_PX = 6;
+// Un salto justo al final puede disparar "ended" y volver a 0.
+const SEEK_END_MARGIN = 0.05;
+
 function AudioMessage({ src, duration, mine, id }) {
   const { t } = useLanguage();
   const audioRef = useRef(null);
+  const scrubberRef = useRef(null);
   const [playing, setPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [realDuration, setRealDuration] = useState(null);
+
+  const savedDuration = Number(duration) > 0 ? Number(duration) : 0;
+  const needsProbe = savedDuration === 0;
+  const total = realDuration || savedDuration;
+  const totalRef = useRef(total);
+  totalRef.current = total;
+
+  const probingRef = useRef(false); // calculando la duración de un webm
+  const pendingSeekRef = useRef(null); // salto pedido antes de que cargue
+  const loadRequestedRef = useRef(false);
+  const scrubbingRef = useRef(false);
+  const pointerRef = useRef(null); // { id, startX, moved }
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
-    const onEnded = () => setPlaying(false);
+    if (!audio) return undefined;
+
+    const readDuration = () => {
+      const d = audio.duration;
+      if (Number.isFinite(d) && d > 0) {
+        setRealDuration(d);
+        return true;
+      }
+      return false;
+    };
+    const applyPendingSeek = (fallback) => {
+      const target = pendingSeekRef.current ?? fallback;
+      pendingSeekRef.current = null;
+      if (target != null) audio.currentTime = target;
+    };
+    const onMetadata = () => {
+      if (readDuration()) {
+        applyPendingSeek(null);
+        return;
+      }
+      if (audio.duration === Infinity && !probingRef.current) {
+        probingRef.current = true;
+        audio.currentTime = 1e101;
+      }
+    };
+    const onDurationChange = () => {
+      if (readDuration() && probingRef.current) {
+        probingRef.current = false;
+        applyPendingSeek(0);
+      }
+    };
+    const onPlay = () => {
+      if (activeVoiceNoteAudio && activeVoiceNoteAudio !== audio) {
+        activeVoiceNoteAudio.pause();
+      }
+      activeVoiceNoteAudio = audio;
+      setPlaying(true);
+    };
+    const onPause = () => {
+      setPlaying(false);
+      if (activeVoiceNoteAudio === audio) activeVoiceNoteAudio = null;
+      if (!scrubbingRef.current && !probingRef.current) setPosition(audio.currentTime);
+    };
+    const onEnded = () => {
+      setPlaying(false);
+      setPosition(0);
+      audio.currentTime = 0;
+      if (activeVoiceNoteAudio === audio) activeVoiceNoteAudio = null;
+    };
+
+    audio.addEventListener("loadedmetadata", onMetadata);
+    audio.addEventListener("durationchange", onDurationChange);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     return () => {
+      audio.removeEventListener("loadedmetadata", onMetadata);
+      audio.removeEventListener("durationchange", onDurationChange);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
+      if (activeVoiceNoteAudio === audio) activeVoiceNoteAudio = null;
+      audio.pause();
     };
   }, []);
+
+  // Avance en tiempo real, solo mientras suena.
+  useEffect(() => {
+    if (!playing) return undefined;
+    const audio = audioRef.current;
+    let frame = 0;
+    const tick = () => {
+      if (!scrubbingRef.current) setPosition(audio.currentTime);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [playing]);
 
   const toggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playing) {
+    if (!audio.paused) {
       audio.pause();
-    } else {
-      audio.play();
+      return;
+    }
+    if (probingRef.current) {
+      // Play mientras se calculaba la duración: arrancar desde donde iba.
+      probingRef.current = false;
+      audio.currentTime = pendingSeekRef.current ?? 0;
+      pendingSeekRef.current = null;
+    }
+    const p = audio.play();
+    if (p && typeof p.catch === "function") p.catch(() => {});
+  };
+
+  const seekTo = (seconds) => {
+    const audio = audioRef.current;
+    const tot = totalRef.current;
+    if (!audio || !tot) return;
+    const target = Math.min(Math.max(seconds, 0), Math.max(0, tot - SEEK_END_MARGIN));
+    setPosition(target);
+    if (audio.readyState >= 1 && !probingRef.current) {
+      audio.currentTime = target;
+      return;
+    }
+    // Todavía no cargó (preload "none"): el salto se aplica al cargar.
+    pendingSeekRef.current = target;
+    if (audio.readyState === 0 && !loadRequestedRef.current) {
+      loadRequestedRef.current = true;
+      audio.preload = "metadata";
+      audio.load();
     }
   };
 
+  const ratioFromEvent = (e) => {
+    const rect = scrubberRef.current.getBoundingClientRect();
+    // El viewBox tiene el margen del punto a cada lado.
+    const pad = (WAVEFORM_DOT_R * rect.width) / WAVEFORM_OUTER_WIDTH;
+    const ratio = (e.clientX - rect.left - pad) / (rect.width - 2 * pad);
+    return Math.min(Math.max(ratio, 0), 1);
+  };
+
+  // Tocar = saltar al soltar. Arrastrar (más de 6px de lado) = el punto
+  // sigue al dedo y el audio salta al soltar. Si el dedo hace scroll
+  // vertical, el navegador cancela y no se salta.
+  const onPointerDown = (e) => {
+    if (!total || (e.pointerType === "mouse" && e.button !== 0)) return;
+    pointerRef.current = { id: e.pointerId, startX: e.clientX, moved: false };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (err) {
+      // sin captura: el arrastre funciona igual mientras el dedo siga encima
+    }
+  };
+  const onPointerMove = (e) => {
+    const p = pointerRef.current;
+    if (!p || p.id !== e.pointerId) return;
+    if (!p.moved && Math.abs(e.clientX - p.startX) < SCRUB_START_PX) return;
+    p.moved = true;
+    scrubbingRef.current = true;
+    setPosition(ratioFromEvent(e) * totalRef.current);
+  };
+  const onPointerUp = (e) => {
+    const p = pointerRef.current;
+    if (!p || p.id !== e.pointerId) return;
+    pointerRef.current = null;
+    scrubbingRef.current = false;
+    seekTo(ratioFromEvent(e) * totalRef.current);
+  };
+  const onPointerCancel = () => {
+    pointerRef.current = null;
+    if (scrubbingRef.current) {
+      scrubbingRef.current = false;
+      const audio = audioRef.current;
+      if (audio && !probingRef.current) setPosition(audio.currentTime);
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (!total) return;
+    let target = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") target = position + SEEK_STEP_SECONDS;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowDown") target = position - SEEK_STEP_SECONDS;
+    else if (e.key === "Home") target = 0;
+    else if (e.key === "End") target = total;
+    if (target == null) return;
+    e.preventDefault();
+    seekTo(target);
+  };
+
+  const started = playing || position > 0;
+  const progress = total ? Math.min(position / total, 1) : 0;
+  // Notas de menos de 1 s: 0:01, como WhatsApp.
+  const totalShown = total > 0 ? Math.max(1, total) : 0;
+  const elapsedShown = Math.floor(position);
+  const label = started ? formatDuration(elapsedShown) : formatDuration(totalShown);
+
   return (
     <div style={styles.audioMessage}>
-      <audio ref={audioRef} src={src} preload="none" />
+      <audio ref={audioRef} src={src} preload={needsProbe ? "metadata" : "none"} />
       <button
         type="button"
         style={styles.audioPlayBtn(mine)}
         onClick={toggle}
         title={playing ? t("chat.pauseAudio") : t("chat.playAudio")}
+        aria-label={playing ? t("chat.pauseAudio") : t("chat.playAudio")}
       >
         {playing ? "⏸" : "▶"}
       </button>
-      <AudioWaveform seed={id || src} playing={playing} mine={mine} />
-      <span style={styles.audioDuration(mine)}>{formatDuration(duration)}</span>
+      <div
+        ref={scrubberRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={t("chat.voiceNotePosition")}
+        aria-valuemin={0}
+        aria-valuemax={Math.round(totalShown)}
+        aria-valuenow={elapsedShown}
+        aria-valuetext={`${formatDuration(elapsedShown)} / ${formatDuration(totalShown)}`}
+        style={styles.audioScrubber(total > 0)}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onKeyDown={onKeyDown}
+      >
+        <AudioWaveform seed={id || src} mine={mine} progress={progress} />
+      </div>
+      <span style={styles.audioDuration(mine)}>{label}</span>
     </div>
   );
 }
@@ -1137,7 +1378,7 @@ function SendingVoiceNote({ id, duration }) {
                 style={{ ...styles.sendingSpinner, borderColor: "var(--border)", borderTopColor: "var(--accent2)" }}
               />
             </span>
-            <AudioWaveform seed={id} playing={false} mine />
+            <AudioWaveform seed={id} mine />
             <span style={styles.audioDuration(true)}>
               {formatDuration(duration)} · {t("chat.sendingVoice")}
             </span>

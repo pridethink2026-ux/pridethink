@@ -525,23 +525,8 @@ code {
   }
 }
 
-.pt-wave-bar {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.pt-wave-bar.pt-wave-playing {
-  animation: pt-wave-eq 0.9s ease-in-out infinite;
-}
-
-@keyframes pt-wave-eq {
-  0%, 100% {
-    transform: scaleY(0.45);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
+/* Punto 99: la onda de las notas de voz ya no se anima (ecualizador);
+   solo se llena de color según el avance (Chat.jsx, AudioWaveform). */
 
 /* Spinner de la subida de foto de perfil (ProfilePhotoUploader.jsx). Los
    colores del círculo se pasan inline desde el componente con las

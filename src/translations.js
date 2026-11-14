@@ -489,6 +489,7 @@ export const translations = {
     "chat.loginNotice": "Inicia sesión primero para usar el chat.",
     "chat.playAudio": "Reproducir",
     "chat.pauseAudio": "Pausar",
+    "chat.voiceNotePosition": "Posición de la nota de voz",
     "chat.noMicSupport": "Tu navegador no soporta grabación de audio.",
     "chat.micPermissionError":
       "No se pudo acceder al micrófono. Revisa los permisos del navegador.",
@@ -1229,6 +1230,7 @@ export const translations = {
     "chat.loginNotice": "Sign in first to use chat.",
     "chat.playAudio": "Play",
     "chat.pauseAudio": "Pause",
+    "chat.voiceNotePosition": "Voice note position",
     "chat.noMicSupport": "Your browser doesn't support audio recording.",
     "chat.micPermissionError": "Couldn't access the microphone. Check your browser permissions.",
     "chat.audioTooLarge": "The voice note is too large to send. Try a shorter one.",
