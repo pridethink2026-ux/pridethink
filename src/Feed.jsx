@@ -690,11 +690,18 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
       collection(db, "posts", post.id, "comments"),
       orderBy("createdAt", "asc")
     );
-    const unsub = onSnapshot(q, (snap) => {
-      setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      // Una respuesta de la caché local (sin red) puede estar incompleta.
-      if (!snap.metadata.fromCache) setCommentCount(post.id, snap.size);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        // Una respuesta de la caché local (sin red) puede estar incompleta.
+        if (!snap.metadata.fromCache) setCommentCount(post.id, snap.size);
+      },
+      // Punto 100: si mientras están abiertos dejas de poder ver el post
+      // (el autor se puso privado, hay un bloqueo o lo borró), las reglas
+      // cortan la lectura. La lista se vacía en silencio.
+      () => setComments([])
+    );
     return unsub;
   }, [post.id, commentsOpen]);
 

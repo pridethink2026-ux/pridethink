@@ -541,6 +541,29 @@ service cloud.firestore {
     // --------------------------------------------------------------------
     // posts/{postId}  y  posts/{postId}/comments/{commentId}
     // --------------------------------------------------------------------
+
+    // Punto 100 (hallazgo H2, parte de comentarios): los comentarios se
+    // ven igual que su post. El autor siempre ve los suyos; los demás,
+    // solo si el post no es de un perfil privado (authorIsPrivate, la
+    // misma condición que allow read de posts/{postId}) y si no hay
+    // bloqueo en ninguna dirección con el autor del post. Los posts de
+    // grupo siempre tienen authorIsPrivate == false (grupos públicos).
+    // Un post borrado hace fallar el get() y deniega.
+    //
+    // Sirve también para las consultas (lista de comentarios y conteo):
+    // depende solo de postId, que va en la ruta, así que Firestore puede
+    // comprobarla sin mirar cada comentario. Costo: 1 lectura del post +
+    // hasta 2 de bloqueos por pedido (1 sola si sos el autor).
+    function puedeVerPost(postId) {
+      let post = get(/databases/$(database)/documents/posts/$(postId)).data;
+      let yo = request.auth.uid;
+      return post.authorId == yo || (
+        post.get('authorIsPrivate', false) == false
+        && !exists(/databases/$(database)/documents/blocks/$(post.authorId + '_' + yo))
+        && !exists(/databases/$(database)/documents/blocks/$(yo + '_' + post.authorId))
+      );
+    }
+
     match /posts/{postId} {
       // Auditoría de seguridad (2026-07-28, hallazgo H2): antes,
       // cualquier autenticado podía leer CUALQUIER post — un perfil
@@ -617,28 +640,35 @@ service cloud.firestore {
         );
 
       match /comments/{commentId} {
-        // Cualquier autenticado ve los comentarios de cualquier post visible.
-        allow read: if estaAutenticado();
+        // Punto 100: antes era solo estaAutenticado(), así que los
+        // comentarios de un post privado los leía cualquiera con el id del
+        // post. Ahora, misma visibilidad que el post (puedeVerPost).
+        allow read: if estaAutenticado() && puedeVerPost(postId);
 
-        // Solo puedes crear un comentario firmado con tu propio uid.
+        // Solo puedes crear un comentario firmado con tu propio uid, en un
+        // post que puedes ver (punto 100).
         allow create: if estaAutenticado()
           && request.resource.data.authorId == request.auth.uid
-          && textoValido(request.resource.data.text, 2000);
+          && textoValido(request.resource.data.text, 2000)
+          && puedeVerPost(postId);
 
-        // Solo el autor del comentario puede borrarlo.
+        // Solo el autor del comentario puede borrarlo (aunque ya no vea el
+        // post: borrar lo propio siempre se permite).
         allow delete: if estaAutenticado()
           && resource.data.authorId == request.auth.uid;
 
         // No se puede editar el texto de un comentario ya publicado, pero
-        // cualquier autenticado puede reaccionar: mismo patrón que
-        // posts/{postId} y chats/{chatId}/messages/{messageId} de arriba,
-        // solo se permite tocar "reactions" y solo la propia entrada del mapa.
+        // cualquier autenticado que vea el post puede reaccionar: mismo
+        // patrón que posts/{postId} y chats/{chatId}/messages/{messageId}
+        // de arriba, solo se permite tocar "reactions" y solo la propia
+        // entrada del mapa.
         allow update: if estaAutenticado()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
           && soloTocaMiReaccion(
                resource.data.get('reactions', {}),
                request.resource.data.get('reactions', {})
-             );
+             )
+          && puedeVerPost(postId);
       }
     }
 
