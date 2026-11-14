@@ -123,11 +123,8 @@ export function playCommentSound() {
 // Punto 98b: en iPhone no suenan (ni el bip ni enviar/cancelar). Pasar de
 // "reproducir" a "reproducir y grabar" con un sonido en curso hacía que
 // el micrófono tardara en abrir y que enviar se trabara. Android y PC
-// siguen igual.
-//
-// Punto 98c: en iPhone vuelve solo el bip de inicio, pero recién con el
-// micrófono ya abierto (iOS ya está en "reproducir y grabar", no hay
-// cambio de sesión con sonido en curso). Ver playRecordStartSoundAfterMic.
+// siguen igual. El 98c (bip con el micrófono ya abierto) se probó y se
+// descartó: también trababa el iPhone.
 // ---------------------------------------------------------------------
 
 const voiceNoteSoundsOff = () => isSoundMuted() || isIOS();
@@ -146,34 +143,6 @@ export function playRecordStartSound() {
     if (!ctx) return 0;
     playTone(ctx, { freq: 880, type: "sine", duration: 0.11, peakGain: 0.06, attack: 0.006, freqRampTo: 1175 });
     return RECORD_START_MS;
-  } catch (err) {
-    return 0;
-  }
-}
-
-// Punto 98c: bip de inicio en iPhone, con el micrófono ya abierto. Se
-// llama después de getUserMedia; si el AudioContext no vuelve a "running"
-// enseguida (iOS lo deja pausado o "interrupted"), no suena y se graba
-// igual: como mucho espera 150 ms. Devuelve cuántos ms esperar antes de
-// grabar (0 si no sonó). El margen es mayor que en Android/PC por la
-// latencia de salida de iOS, para que el bip no quede en la nota.
-const RECORD_START_IOS_MS = 200;
-const RESUME_WAIT_MS = 150;
-
-export async function playRecordStartSoundAfterMic() {
-  if (isSoundMuted() || !isIOS()) return 0;
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return 0;
-    if (ctx.state !== "running") {
-      await Promise.race([
-        ctx.resume().catch(() => {}),
-        new Promise((resolve) => setTimeout(resolve, RESUME_WAIT_MS)),
-      ]);
-    }
-    if (ctx.state !== "running") return 0;
-    playTone(ctx, { freq: 880, type: "sine", duration: 0.11, peakGain: 0.06, attack: 0.006, freqRampTo: 1175 });
-    return RECORD_START_IOS_MS;
   } catch (err) {
     return 0;
   }
