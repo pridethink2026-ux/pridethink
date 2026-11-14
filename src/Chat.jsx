@@ -44,6 +44,7 @@ import { useAllUsers } from "./Mentions";
 import {
   playReactionSound,
   playRecordStartSound,
+  playRecordStartSoundAfterMic,
   playRecordSendSound,
   playRecordCancelSound,
   vibrateShort,
@@ -1818,12 +1819,17 @@ export default function Chat({
     setRecordingState("starting");
     // Punto 98: bip y vibración en el mismo toque (Safari solo deja sonar
     // audio que nace de un gesto), antes de abrir el micrófono. En iPhone
-    // no suena (punto 98b), así que no hay nada que esperar.
-    const beepEndsAt = Date.now() + playRecordStartSound();
+    // no suena acá (punto 98b): suena después, con el micrófono ya abierto.
+    let beepEndsAt = Date.now() + playRecordStartSound();
     vibrateShort();
     let stream = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Punto 98c: bip de iPhone, solo si no se canceló mientras abría.
+      if (attempt === recordAttemptRef.current) {
+        const iosBeepMs = await playRecordStartSoundAfterMic();
+        if (iosBeepMs) beepEndsAt = Date.now() + iosBeepMs;
+      }
       // Se graba recién cuando terminó el bip, para que no quede en la nota.
       const beepLeft = beepEndsAt - Date.now();
       if (beepLeft > 0) await new Promise((resolve) => setTimeout(resolve, beepLeft));
