@@ -23,6 +23,14 @@ export function useIsMobile(breakpoint = 700) {
   return isMobile;
 }
 
+// iPhone o iPad (push.js, sonidos de las notas de voz en sound.js).
+export function isIOS() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  // iPadOS se presenta como Mac: se distingue por la pantalla táctil.
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
 // Crea una notificación para otra persona (nunca para ti mismo). Mismo
 // patrón para likes, comentarios, mensajes nuevos, seguidores nuevos y
 // menciones. "postId" es opcional (solo lo usan las menciones, para poder

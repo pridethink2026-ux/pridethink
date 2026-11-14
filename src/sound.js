@@ -19,6 +19,8 @@
   interruptor con un solo `if (isSoundMuted()) return;`.
 */
 
+import { isIOS } from "./utils";
+
 // AudioContext único, creado recién al primer uso (nunca al cargar la
 // página): los navegadores bloquean el audio hasta el primer gesto real
 // del usuario.
@@ -117,7 +119,15 @@ export function playCommentSound() {
 
 // ---------------------------------------------------------------------
 // Punto 98: notas de voz del Chat (como WhatsApp).
+//
+// Punto 98b: en iPhone no suenan (ni el bip ni enviar/cancelar). Pasar de
+// "reproducir" a "reproducir y grabar" con un sonido en curso hacía que
+// el micrófono tardara en abrir y que enviar se trabara. Android y PC
+// siguen igual. Idea para más adelante (98c): sonar el bip en iPhone
+// recién con el micrófono ya abierto.
 // ---------------------------------------------------------------------
+
+const voiceNoteSoundsOff = () => isSoundMuted() || isIOS();
 
 // Bip corto y suave al tocar el micrófono. Tiene que sonar dentro del
 // mismo toque (antes de cualquier await): Safari solo deja sonar audio
@@ -127,7 +137,7 @@ export function playCommentSound() {
 const RECORD_START_MS = 130;
 
 export function playRecordStartSound() {
-  if (isSoundMuted()) return 0;
+  if (voiceNoteSoundsOff()) return 0;
   try {
     const ctx = getAudioContext();
     if (!ctx) return 0;
@@ -140,7 +150,7 @@ export function playRecordStartSound() {
 
 // Al enviar la nota: dos notas cortas que suben.
 export function playRecordSendSound() {
-  if (isSoundMuted()) return;
+  if (voiceNoteSoundsOff()) return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
@@ -153,7 +163,7 @@ export function playRecordSendSound() {
 
 // Al cancelar la nota: una nota que baja.
 export function playRecordCancelSound() {
-  if (isSoundMuted()) return;
+  if (voiceNoteSoundsOff()) return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;

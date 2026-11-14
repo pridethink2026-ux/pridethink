@@ -29,6 +29,7 @@
 import { useEffect, useState } from "react";
 import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { app, db } from "./firebase";
+import { isIOS } from "./utils";
 
 // Clave pública de "Certificados de push web" (Firebase Console → Cloud
 // Messaging). Es pública a propósito: la privada nunca sale de Firebase.
@@ -73,12 +74,6 @@ function getDeviceId() {
 
 function deviceRef(uid) {
   return doc(db, "users", uid, "devices", getDeviceId());
-}
-
-function isIOS() {
-  const ua = navigator.userAgent || "";
-  // iPadOS se presenta como Mac: se distingue por la pantalla táctil.
-  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
 function isStandalone() {

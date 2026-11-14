@@ -1121,6 +1121,33 @@ function MomentReplyPreview({ message, mine }) {
 // inline) porque useReactionPicker() es un hook y cada mensaje necesita su
 // propia instancia de estado (si abriste el selector no debe abrirse en
 // todos).
+// Punto 98b: nota de voz propia que se está enviando. Misma burbuja que
+// AudioMessage (misma forma de onda, porque usa el id del mensaje real),
+// con un círculo girando en lugar de ▶ y "Enviando…".
+function SendingVoiceNote({ id, duration }) {
+  const { t } = useLanguage();
+  return (
+    <div style={styles.bubbleRow(true)}>
+      <div style={styles.bubbleWrapper}>
+        <div style={{ ...styles.bubble(true), opacity: 0.8 }}>
+          <div style={styles.audioMessage} aria-live="polite">
+            <span style={{ ...styles.audioPlayBtn(true), cursor: "default" }}>
+              <span
+                className="pt-spin"
+                style={{ ...styles.sendingSpinner, borderColor: "var(--border)", borderTopColor: "var(--accent2)" }}
+              />
+            </span>
+            <AudioWaveform seed={id} playing={false} mine />
+            <span style={styles.audioDuration(true)}>
+              {formatDuration(duration)} · {t("chat.sendingVoice")}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenProduct, senderName }) {
   const { open, setOpen, containerRef, triggerProps } = useReactionPicker();
   const myReaction = (message.reactions || {})[currentUid] || null;
@@ -1466,17 +1493,27 @@ export default function Chat({
   const viewportMode = !currentUid ? "flow" : !isMobile ? "page" : activeContact ? "full" : "flow";
   useChatViewport(wrapperRef, viewportMode);
 
-  // Estado del grabador de notas de voz: "idle" | "recording" | "ready"
-  // ("ready" = ya se detuvo por el límite de 60s, esperando que se envíe o cancele)
+  // Estado del grabador de notas de voz: "idle" | "starting" | "recording" | "ready"
+  // ("starting" = ya se ve "Grabando" pero el micrófono todavía se está
+  // abriendo, punto 98b; "ready" = ya se detuvo por el límite de 60s,
+  // esperando que se envíe o cancele)
   const [recordingState, setRecordingState] = useState("idle");
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [pendingAudio, setPendingAudio] = useState(null); // { blob, duration } mientras está en "ready"
-  const [sendingAudio, setSendingAudio] = useState(false);
+  // Punto 98b: notas de voz enviándose, que ya se ven en el chat con
+  // "Enviando…" (SendingVoiceNote) hasta que llega el mensaje real.
+  // [{ id, chatId, duration }]; id es el del mensaje que se va a escribir.
+  const [sendingVoiceNotes, setSendingVoiceNotes] = useState([]);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
-  const chunksRef = useRef([]);
   const secondsRef = useRef(0);
-  const pendingActionRef = useRef(null); // "cancel" | "send" | "auto"
+  // Qué hacer cuando el grabador termine de cerrarse: { action, send }.
+  // Uno por grabación, así una nota que todavía se está cerrando no se
+  // mezcla con la siguiente.
+  const recordSessionRef = useRef(null);
+  // Sube con cada intento de grabar y al cancelar mientras el micrófono se
+  // abre: un micrófono que abre tarde para un intento viejo se apaga solo.
+  const recordAttemptRef = useRef(0);
   // Hora del último envío de texto: ver el botón redondo (punto 91).
   const lastTextSendAtRef = useRef(0);
 
@@ -1706,7 +1743,7 @@ export default function Chat({
   useEffect(() => {
     const area = messagesAreaRef.current;
     if (area) area.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+  }, [messages, sendingVoiceNotes]);
 
   // Si estabas al final, sigues viendo el último mensaje cuando la lista se
   // achica (sale el teclado o crece el cuadro de escribir).
@@ -1759,8 +1796,11 @@ export default function Chat({
   // Si el componente se desmonta (por ejemplo, cambias de pestaña) mientras
   // el micrófono está activo, apaga el micrófono para no dejarlo encendido.
   useEffect(() => {
+    const attempts = recordAttemptRef;
+    const streams = streamRef;
     return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      attempts.current += 1;
+      streams.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
@@ -1769,88 +1809,121 @@ export default function Chat({
       alert(t("chat.noMicSupport"));
       return;
     }
+    // Punto 98b: la fila de grabación aparece en el mismo toque, aunque el
+    // micrófono tarde en abrir (en iPhone puede tardar). El contador corre
+    // recién cuando de verdad graba.
+    const attempt = ++recordAttemptRef.current;
+    secondsRef.current = 0;
+    setRecordSeconds(0);
+    setRecordingState("starting");
     // Punto 98: bip y vibración en el mismo toque (Safari solo deja sonar
-    // audio que nace de un gesto), antes de abrir el micrófono.
+    // audio que nace de un gesto), antes de abrir el micrófono. En iPhone
+    // no suena (punto 98b), así que no hay nada que esperar.
     const beepEndsAt = Date.now() + playRecordStartSound();
     vibrateShort();
+    let stream = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // Se graba recién cuando terminó el bip, para que no quede en la nota.
       const beepLeft = beepEndsAt - Date.now();
       if (beepLeft > 0) await new Promise((resolve) => setTimeout(resolve, beepLeft));
-      // El chat se cerró (o empezó otra grabación) mientras tanto.
-      if (streamRef.current !== stream || stream.getTracks().every((tr) => tr.readyState === "ended")) {
+      // Se canceló, se cerró el chat o empezó otra grabación mientras tanto.
+      if (attempt !== recordAttemptRef.current) {
         stream.getTracks().forEach((tr) => tr.stop());
         return;
       }
-      chunksRef.current = [];
-      secondsRef.current = 0;
-      setRecordSeconds(0);
+      streamRef.current = stream;
 
       const mimeType = MediaRecorder.isTypeSupported(AUDIO_MIME_TYPE)
         ? AUDIO_MIME_TYPE
         : "audio/webm";
       const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 32000 });
+      const chunks = [];
+      const session = { action: null, send: null };
 
       recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) chunks.push(e.data);
       };
 
       recorder.onstop = () => {
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        const action = pendingActionRef.current;
-        pendingActionRef.current = null;
-        const chunks = chunksRef.current;
-        chunksRef.current = [];
+        stream.getTracks().forEach((tr) => tr.stop());
+        if (streamRef.current === stream) streamRef.current = null;
 
-        // Con el micrófono ya apagado, así el sonido no se graba.
-        if (action === "cancel") {
+        // Con el micrófono ya apagado, así el sonido no se graba. La
+        // pantalla ya volvió al cuadro de escribir al tocar (punto 98b).
+        if (session.action === "cancel") {
           playRecordCancelSound();
-          setRecordingState("idle");
-          setRecordSeconds(0);
-          secondsRef.current = 0;
           return;
         }
 
         const blob = new Blob(chunks, { type: mimeType });
-        const duration = secondsRef.current;
 
-        if (action === "send") {
+        if (session.action === "send") {
           playRecordSendSound();
-          setRecordingState("idle");
-          setRecordSeconds(0);
-          secondsRef.current = 0;
-          uploadAudioMessage(blob, duration);
+          uploadAudioMessage(blob, session.send);
         } else {
           // se detuvo sola al llegar al límite: espera confirmación del usuario
-          setPendingAudio({ blob, duration });
+          setPendingAudio({ blob, duration: secondsRef.current });
           setRecordingState("ready");
         }
       };
 
       mediaRecorderRef.current = recorder;
+      recordSessionRef.current = session;
       recorder.start();
       setRecordingState("recording");
     } catch (err) {
+      stream?.getTracks().forEach((tr) => tr.stop());
+      if (attempt !== recordAttemptRef.current) return;
+      setRecordingState("idle");
       alert(t("chat.micPermissionError"));
     }
   };
 
+  // Punto 98b: muestra la nota en el chat con "Enviando…" al instante y
+  // devuelve a dónde mandarla. El destinatario se fija al tocar: si
+  // cambias de conversación mientras se sube, va igual a la correcta.
+  const beginVoiceNoteSend = (duration) => {
+    if (!activeContact || !currentUid) return null;
+    const chatId = getChatId(currentUid, activeContact.uid);
+    const id = doc(collection(db, "chats", chatId, "messages")).id;
+    setSendingVoiceNotes((list) => [...list, { id, chatId, duration }]);
+    return { id, otherUid: activeContact.uid, duration };
+  };
+
+  const resetRecorderUi = () => {
+    setRecordingState("idle");
+    setRecordSeconds(0);
+    secondsRef.current = 0;
+  };
+
+  // ✕ o ➤ mientras graba: la pantalla responde en el mismo toque y el
+  // grabador se cierra por detrás (en iPhone puede tardar). "auto" (límite
+  // de 60 s) deja la fila hasta que la nota quede lista.
   function requestStopRecording(action) {
-    pendingActionRef.current = action;
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+    if (recordingState === "starting") {
+      // El micrófono todavía no abrió: no hay nada grabado.
+      recordAttemptRef.current += 1;
+      resetRecorderUi();
+      return;
     }
+    const recorder = mediaRecorderRef.current;
+    const session = recordSessionRef.current;
+    if (!recorder || !session || recorder.state === "inactive") return;
+    if (action === "send") {
+      session.send = beginVoiceNoteSend(secondsRef.current);
+      session.action = session.send ? "send" : "cancel";
+    } else {
+      session.action = action;
+    }
+    if (action !== "auto") resetRecorderUi();
+    recorder.stop();
   }
 
   const cancelReadyRecording = () => {
     playRecordCancelSound();
     setPendingAudio(null);
-    setRecordingState("idle");
-    setRecordSeconds(0);
-    secondsRef.current = 0;
+    resetRecorderUi();
   };
 
   const sendReadyRecording = () => {
@@ -1858,15 +1931,20 @@ export default function Chat({
     playRecordSendSound();
     const { blob, duration } = pendingAudio;
     setPendingAudio(null);
-    setRecordingState("idle");
-    setRecordSeconds(0);
-    secondsRef.current = 0;
-    uploadAudioMessage(blob, duration);
+    resetRecorderUi();
+    const target = beginVoiceNoteSend(duration);
+    if (target) uploadAudioMessage(blob, target);
   };
 
-  const uploadAudioMessage = async (blob, duration) => {
-    if (!activeContact || !currentUid) return;
-    setSendingAudio(true);
+  // Corre por detrás: la nota ya se ve con "Enviando…". En cuanto se
+  // escribe, Firestore la muestra en el chat sin esperar al servidor y la
+  // provisoria se oculta (mismo id); se quita del todo al terminar.
+  const uploadAudioMessage = async (blob, { id, otherUid, duration }) => {
+    const removeSending = () => setSendingVoiceNotes((list) => list.filter((n) => n.id !== id));
+    if (!currentUid) {
+      removeSending();
+      return;
+    }
     try {
       const dataUrl = await blobToDataUrl(blob);
       if (dataUrl.length > MAX_AUDIO_BASE64_LENGTH) {
@@ -1874,15 +1952,20 @@ export default function Chat({
         return;
       }
 
-      await sendChatMessage(currentUid, activeContact.uid, {
-        type: "audio",
-        audioData: dataUrl,
-        audioDuration: duration,
-      });
+      await sendChatMessage(
+        currentUid,
+        otherUid,
+        {
+          type: "audio",
+          audioData: dataUrl,
+          audioDuration: duration,
+        },
+        id
+      );
     } catch (err) {
       alert(t("chat.audioSendError"));
     } finally {
-      setSendingAudio(false);
+      removeSending();
     }
   };
 
@@ -2304,6 +2387,15 @@ export default function Chat({
                       }
                     />
                   ))}
+                  {sendingVoiceNotes
+                    .filter(
+                      (n) =>
+                        n.chatId === getChatId(currentUid, activeContact.uid) &&
+                        !messages.some((m) => m.id === n.id)
+                    )
+                    .map((n) => (
+                      <SendingVoiceNote key={n.id} id={n.id} duration={n.duration} />
+                    ))}
                 </div>
                 {sendError && activeWriteState === "ok" && (
                   <p style={styles.composerNote} role="alert">
@@ -2425,19 +2517,19 @@ export default function Chat({
                 ) : (
                   <div style={styles.recordingRow}>
                     <span style={styles.recordingMic}>
-                      <MicIcon pulsing={recordingState === "recording"} />
+                      <MicIcon pulsing={recordingState !== "ready"} />
                     </span>
                     <span style={styles.recordingLabel}>
-                      {recordingState === "recording"
-                        ? t("chat.recording")
-                        : t("chat.recordingReady")}
+                      {recordingState === "ready"
+                        ? t("chat.recordingReady")
+                        : t("chat.recording")}
                     </span>
                     <span style={styles.recordingTime}>{formatDuration(recordSeconds)}</span>
                     <button
                       type="button"
                       style={styles.recordCancelBtn}
                       onClick={
-                        recordingState === "recording"
+                        recordingState !== "ready"
                           ? () => requestStopRecording("cancel")
                           : cancelReadyRecording
                       }
@@ -2450,11 +2542,11 @@ export default function Chat({
                       className="pt-relief"
                       style={styles.recordSendBtn}
                       onClick={
-                        recordingState === "recording"
+                        recordingState !== "ready"
                           ? () => requestStopRecording("send")
                           : sendReadyRecording
                       }
-                      disabled={sendingAudio}
+                      disabled={recordingState === "starting"}
                       title={t("chat.sendVoice")}
                     >
                       ➤
