@@ -28,7 +28,10 @@ export function getAudioContext() {
   const Ctor = window.AudioContext || window.webkitAudioContext;
   if (!Ctor) return null;
   if (!audioCtx) audioCtx = new Ctor();
-  if (audioCtx.state === "suspended") audioCtx.resume();
+  // "interrupted": iPhone lo pausa, por ejemplo al abrir el micrófono.
+  if (audioCtx.state === "suspended" || audioCtx.state === "interrupted") {
+    audioCtx.resume().catch(() => {});
+  }
   return audioCtx;
 }
 
@@ -109,5 +112,66 @@ export function playCommentSound() {
   } catch (err) {
     // Web Audio no disponible o bloqueado por el navegador: fallar en
     // silencio, nunca romper el envío del comentario por esto.
+  }
+}
+
+// ---------------------------------------------------------------------
+// Punto 98: notas de voz del Chat (como WhatsApp).
+// ---------------------------------------------------------------------
+
+// Bip corto y suave al tocar el micrófono. Tiene que sonar dentro del
+// mismo toque (antes de cualquier await): Safari solo deja sonar audio
+// que nace de un gesto. Devuelve cuántos ms faltan para que termine, así
+// Chat.jsx empieza a grabar después y el bip no queda en la nota (0 si no
+// sonó).
+const RECORD_START_MS = 130;
+
+export function playRecordStartSound() {
+  if (isSoundMuted()) return 0;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return 0;
+    playTone(ctx, { freq: 880, type: "sine", duration: 0.11, peakGain: 0.06, attack: 0.006, freqRampTo: 1175 });
+    return RECORD_START_MS;
+  } catch (err) {
+    return 0;
+  }
+}
+
+// Al enviar la nota: dos notas cortas que suben.
+export function playRecordSendSound() {
+  if (isSoundMuted()) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    playTone(ctx, { freq: 784, type: "sine", start: 0, duration: 0.08, peakGain: 0.055, attack: 0.005 });
+    playTone(ctx, { freq: 1047, type: "sine", start: 0.06, duration: 0.1, peakGain: 0.055, attack: 0.005 });
+  } catch (err) {
+    // sin audio: la nota se envía igual
+  }
+}
+
+// Al cancelar la nota: una nota que baja.
+export function playRecordCancelSound() {
+  if (isSoundMuted()) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    playTone(ctx, { freq: 620, type: "sine", duration: 0.14, peakGain: 0.05, attack: 0.005, freqRampTo: 330 });
+  } catch (err) {
+    // sin audio: se cancela igual
+  }
+}
+
+// Vibración corta (Android; iPhone no deja vibrar desde la web). No
+// depende de "Silenciar sonidos" (como WhatsApp en silencio), pero se apaga
+// con "reducir movimiento".
+export function vibrateShort() {
+  try {
+    if (typeof navigator.vibrate !== "function") return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    navigator.vibrate(30);
+  } catch (err) {
+    // sin vibración: no pasa nada
   }
 }

@@ -41,7 +41,13 @@ import {
 } from "./Stickers";
 import { blockUser, unblockUser, useMyBlocks } from "./Blocks";
 import { useAllUsers } from "./Mentions";
-import { playReactionSound } from "./sound";
+import {
+  playReactionSound,
+  playRecordStartSound,
+  playRecordSendSound,
+  playRecordCancelSound,
+  vibrateShort,
+} from "./sound";
 import { usePushStatus, useViewingChatBeacon } from "./push";
 import GiftNotification from "./GiftNotification";
 import ImageViewer from "./ImageViewer";
@@ -1763,9 +1769,21 @@ export default function Chat({
       alert(t("chat.noMicSupport"));
       return;
     }
+    // Punto 98: bip y vibración en el mismo toque (Safari solo deja sonar
+    // audio que nace de un gesto), antes de abrir el micrófono.
+    const beepEndsAt = Date.now() + playRecordStartSound();
+    vibrateShort();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      // Se graba recién cuando terminó el bip, para que no quede en la nota.
+      const beepLeft = beepEndsAt - Date.now();
+      if (beepLeft > 0) await new Promise((resolve) => setTimeout(resolve, beepLeft));
+      // El chat se cerró (o empezó otra grabación) mientras tanto.
+      if (streamRef.current !== stream || stream.getTracks().every((tr) => tr.readyState === "ended")) {
+        stream.getTracks().forEach((tr) => tr.stop());
+        return;
+      }
       chunksRef.current = [];
       secondsRef.current = 0;
       setRecordSeconds(0);
@@ -1787,7 +1805,9 @@ export default function Chat({
         const chunks = chunksRef.current;
         chunksRef.current = [];
 
+        // Con el micrófono ya apagado, así el sonido no se graba.
         if (action === "cancel") {
+          playRecordCancelSound();
           setRecordingState("idle");
           setRecordSeconds(0);
           secondsRef.current = 0;
@@ -1798,6 +1818,7 @@ export default function Chat({
         const duration = secondsRef.current;
 
         if (action === "send") {
+          playRecordSendSound();
           setRecordingState("idle");
           setRecordSeconds(0);
           secondsRef.current = 0;
@@ -1825,6 +1846,7 @@ export default function Chat({
   }
 
   const cancelReadyRecording = () => {
+    playRecordCancelSound();
     setPendingAudio(null);
     setRecordingState("idle");
     setRecordSeconds(0);
@@ -1833,6 +1855,7 @@ export default function Chat({
 
   const sendReadyRecording = () => {
     if (!pendingAudio) return;
+    playRecordSendSound();
     const { blob, duration } = pendingAudio;
     setPendingAudio(null);
     setRecordingState("idle");
