@@ -33,6 +33,16 @@
   postVideos/). El lugar para un filtro automático (por ejemplo Google
   Video Intelligence) es moderateVideo().
 
+  Punto 101, parte 6 — limpieza de Storage:
+  - cleanupDeletedPostFiles: al borrar un post, borra su carpeta de video
+    (postVideos/{autor}/{postId}/) y la de fotos (postImages/{autor}/{postId}/).
+  - cleanupOrphanPostFiles: una vez al día, busca carpetas de esas dos rutas
+    cuyo post no existe y que llevan más de 2 días sin cambios (subidas
+    abandonadas, fotos de borradores que nunca se publicaron, y fotos de
+    posts borrados antes de esta función). Con ORPHAN_CLEANUP_DRY_RUN = true
+    solo REGISTRA lo que borraría; se cambia a false después de revisar los
+    registros.
+
   Subir: npx firebase deploy --only functions (o npm run deploy:functions
   desde la raíz del proyecto).
 */
@@ -41,7 +51,8 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getStorage, getDownloadURL } = require("firebase-admin/storage");
 const { getMessaging } = require("firebase-admin/messaging");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const logger = require("firebase-functions/logger");
 
@@ -354,3 +365,93 @@ exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => 
     logger.info("video: el post ya no existe", { postId });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Punto 101, parte 6 — limpieza de Storage de los posts
+// ---------------------------------------------------------------------------
+
+// Carpetas de Storage de un post (las dos con el mismo formato:
+// {raíz}/{autor}/{postId}/...). productImages/ y chatImages/ no se tocan.
+const POST_FILE_ROOTS = ["postVideos/", "postImages/"];
+
+// Al borrar un post (desde la app, la consola o cualquier otro lado), se
+// borran su video, su miniatura y sus fotos. Sin esto quedaban en Storage
+// para siempre (y un video pesa ~15-24 MB).
+exports.cleanupDeletedPostFiles = onDocumentDeleted("posts/{postId}", async (event) => {
+  const post = event.data && event.data.data();
+  const authorId = post && post.authorId;
+  if (!authorId) return;
+  const postId = event.params.postId;
+  const bucket = getStorage().bucket();
+  await Promise.all(
+    POST_FILE_ROOTS.map((root) =>
+      bucket
+        .deleteFiles({ prefix: `${root}${authorId}/${postId}/`, force: true })
+        .catch((err) => logger.warn("limpieza: no se pudo borrar", { root, postId, err: String(err) }))
+    )
+  );
+  logger.info("limpieza: archivos del post borrados", { postId, video: !!post.video });
+});
+
+// Una vez al día: carpetas sin post. ORPHAN_CLEANUP_DRY_RUN = true solo
+// registra ("limpieza (prueba): se borraría") sin borrar nada. Después de
+// revisar en Functions → Registros que solo aparezcan carpetas que de verdad
+// sobran, se cambia a false y se vuelve a subir la función.
+const ORPHAN_CLEANUP_DRY_RUN = true;
+const ORPHAN_MIN_AGE_MS = 2 * 24 * 60 * 60 * 1000; // 2 días sin cambios
+const ORPHAN_MAX_FOLDERS = 200; // tope por pasada
+
+exports.cleanupOrphanPostFiles = onSchedule(
+  { schedule: "every 24 hours" },
+  async () => {
+    const bucket = getStorage().bucket();
+    const db = getFirestore();
+    const now = Date.now();
+    // carpeta -> { root, authorId, postId, newest (ms), files: [File] }
+    const folders = new Map();
+
+    for (const root of POST_FILE_ROOTS) {
+      const [files] = await bucket.getFiles({ prefix: root });
+      for (const file of files) {
+        const parts = file.name.split("/"); // [root, authorId, postId, nombre]
+        if (parts.length < 4 || !parts[1] || !parts[2]) continue;
+        const key = `${parts[0]}/${parts[1]}/${parts[2]}/`;
+        const updated = Date.parse(file.metadata.updated || file.metadata.timeCreated) || now;
+        const folder = folders.get(key) || { root, authorId: parts[1], postId: parts[2], newest: 0, files: [] };
+        folder.newest = Math.max(folder.newest, updated);
+        folder.files.push(file);
+        folders.set(key, folder);
+      }
+    }
+
+    let checked = 0;
+    let orphans = 0;
+    let bytes = 0;
+    for (const [key, folder] of folders) {
+      if (checked >= ORPHAN_MAX_FOLDERS) break;
+      if (now - folder.newest < ORPHAN_MIN_AGE_MS) continue; // puede ser un borrador en curso
+      checked += 1;
+      const postSnap = await db.doc(`posts/${folder.postId}`).get();
+      // Si el post existe y es de ese autor, la carpeta es suya: no se toca.
+      if (postSnap.exists && postSnap.get("authorId") === folder.authorId) continue;
+      orphans += 1;
+      const size = folder.files.reduce((sum, f) => sum + Number(f.metadata.size || 0), 0);
+      bytes += size;
+      if (ORPHAN_CLEANUP_DRY_RUN) {
+        logger.info("limpieza (prueba): se borraría", { folder: key, files: folder.files.length, bytes: size });
+      } else {
+        await Promise.all(folder.files.map((f) => f.delete({ ignoreNotFound: true }))).catch((err) =>
+          logger.warn("limpieza: no se pudo borrar", { folder: key, err: String(err) })
+        );
+        logger.info("limpieza: carpeta sin post borrada", { folder: key, files: folder.files.length, bytes: size });
+      }
+    }
+    logger.info("limpieza: resumen", {
+      dryRun: ORPHAN_CLEANUP_DRY_RUN,
+      folders: folders.size,
+      checked,
+      orphans,
+      megabytes: Math.round((bytes / 1048576) * 10) / 10,
+    });
+  }
+);
