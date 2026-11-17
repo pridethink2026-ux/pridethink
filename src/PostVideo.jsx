@@ -1,6 +1,13 @@
 import React, { useEffect, useRef } from "react";
 import { useLanguage } from "./LanguageContext";
-import { useFeedVideo, registerSlot, togglePlay, toggleSound, enterFullscreen } from "./feedVideo";
+import {
+  useFeedVideo,
+  useAutoplayVideos,
+  registerSlot,
+  togglePlay,
+  toggleSound,
+  enterFullscreen,
+} from "./feedVideo";
 
 /*
   PostVideo — punto 101 (videos en el Muro).
@@ -61,6 +68,7 @@ function ApprovedVideo({ postId, video }) {
   }
   const slotId = slotIdRef.current;
   const player = useFeedVideo(slotId);
+  const autoplay = useAutoplayVideos();
   const isActive = player.activeId === slotId;
 
   useEffect(() => {
@@ -75,7 +83,11 @@ function ApprovedVideo({ postId, video }) {
 
   const remaining = isActive ? player.remaining : Math.ceil(video.duration || 0);
   const soundOn = isActive ? !player.muted : player.soundOn;
-  const showBigPlay = isActive ? player.paused && (player.userPaused || player.blocked) : false;
+  // ▶ grande: en pausa por la persona, bloqueado por el navegador, o con
+  // la reproducción automática apagada (Perfil) mientras no esté sonando.
+  const showBigPlay = isActive
+    ? player.paused && (player.userPaused || player.blocked || !autoplay)
+    : !autoplay;
   const playLabel = isActive && !player.paused ? t("video.pause") : t("video.play");
 
   const frameStyle = {

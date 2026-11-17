@@ -280,11 +280,56 @@ if (typeof document !== "undefined") {
 }
 
 // ---------------------------------------------------------------------
-// Reproducción automática (la parte 5 agrega el interruptor en Perfil)
+// Reproducción automática (parte 5: interruptor en Perfil)
 // ---------------------------------------------------------------------
+// Activada por defecto. Se guarda EN ESTE DISPOSITIVO (localStorage), no en
+// la cuenta: ahorrar datos depende del teléfono (datos móviles) y no de la
+// persona, y así no hace falta tocar las reglas. Apagada: nada arranca ni
+// se descarga solo; cada video muestra su miniatura con ▶ y arranca al
+// tocarlo.
+
+const AUTOPLAY_KEY = "pt-video-autoplay";
+let autoplay = true;
+try {
+  autoplay = window.localStorage.getItem(AUTOPLAY_KEY) !== "0";
+} catch (e) {
+  autoplay = true;
+}
+const autoplayListeners = new Set();
 
 export function autoplayEnabled() {
-  return true;
+  return autoplay;
+}
+
+export function setAutoplayEnabled(value) {
+  autoplay = !!value;
+  try {
+    if (autoplay) window.localStorage.removeItem(AUTOPLAY_KEY);
+    else window.localStorage.setItem(AUTOPLAY_KEY, "0");
+  } catch (e) {
+    /* sin almacenamiento: vale solo mientras la pestaña esté abierta */
+  }
+  // Al apagarla, el video que arrancó solo se pausa; al prenderla, el que
+  // está a la vista arranca.
+  if (!autoplay) {
+    clearTimeout(candidateTimer);
+    candidateTimer = null;
+    candidateId = null;
+    if (el && !el.paused) el.pause();
+  } else {
+    decide();
+  }
+  autoplayListeners.forEach((listener) => listener());
+}
+
+export function useAutoplayVideos() {
+  return useSyncExternalStore(
+    (listener) => {
+      autoplayListeners.add(listener);
+      return () => autoplayListeners.delete(listener);
+    },
+    () => autoplay
+  );
 }
 
 // ---------------------------------------------------------------------

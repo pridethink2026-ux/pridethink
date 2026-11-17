@@ -184,6 +184,11 @@ export const translations = {
     "profile.privateWall": "Muro privado",
     "profile.privateWallHint":
       "Solo oculta tus publicaciones cuando alguien visita tu perfil; el resto de tu información sigue visible.",
+    "profile.autoplayVideos": "Reproducir videos automáticamente",
+    "profile.autoplayVideosOn":
+      "Los videos del Muro arrancan solos, en silencio. Solo en este dispositivo.",
+    "profile.autoplayVideosOff":
+      "Los videos solo se reproducen (y se descargan) al tocarlos: ahorras datos. Solo en este dispositivo.",
     "profile.muteSounds": "Silenciar sonidos",
     "profile.muteSoundsOn":
       "No vas a escuchar ningún sonido de la app (temas, reacciones, comentarios).",
@@ -967,6 +972,10 @@ export const translations = {
     "profile.privateWall": "Private wall",
     "profile.privateWallHint":
       "Only hides your posts when someone visits your profile; the rest of your info stays visible.",
+    "profile.autoplayVideos": "Autoplay videos",
+    "profile.autoplayVideosOn": "Wall videos start on their own, muted. Only on this device.",
+    "profile.autoplayVideosOff":
+      "Videos only play (and download) when you tap them: you save data. Only on this device.",
     "profile.muteSounds": "Mute sounds",
     "profile.muteSoundsOn": "You won't hear any app sounds (themes, reactions, comments).",
     "profile.muteSoundsOff": "You hear theme, reaction, and comment sounds.",

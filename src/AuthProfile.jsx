@@ -23,6 +23,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import { useLanguage } from "./LanguageContext";
 import { useUserProfile } from "./AllUsersContext";
 import { useMyFollows } from "./FollowsContext";
+import { useAutoplayVideos, setAutoplayEnabled } from "./feedVideo";
 import { markOffline } from "./presence";
 import { syncFollowsPrivacy } from "./follows";
 import { unblockUser, useMyBlocks } from "./Blocks";
@@ -181,6 +182,7 @@ function ProfileView({
   const [profileTab, setProfileTab] = useState("info"); // "info" | "posts"
   const [myPosts, setMyPosts] = useState([]);
   const followingCount = myFollowing.length;
+  const autoplayVideos = useAutoplayVideos();
 
   // Pestaña "Posts": TODOS tus propios posts, sin filtrar por
   // authorIsPrivate/authorIsWallPrivate (sos el dueño, siempre te ves a vos
@@ -337,6 +339,28 @@ function ProfileView({
                 onClick={() => onToggleSoundMuted(!user.soundMuted)}
               >
                 <span style={styles.toggleDot(!!user.soundMuted)} />
+              </button>
+            </div>
+
+            {/* Punto 101: se guarda en este dispositivo (feedVideo.js). */}
+            <div style={styles.privacyRow}>
+              <div>
+                <p style={{ ...styles.privacyText, margin: 0, fontWeight: 600 }}>
+                  {t("profile.autoplayVideos")}
+                </p>
+                <p style={styles.privacyHint}>
+                  {autoplayVideos ? t("profile.autoplayVideosOn") : t("profile.autoplayVideosOff")}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoplayVideos}
+                aria-label={t("profile.autoplayVideos")}
+                style={styles.toggle(autoplayVideos)}
+                onClick={() => setAutoplayEnabled(!autoplayVideos)}
+              >
+                <span style={styles.toggleDot(autoplayVideos)} />
               </button>
             </div>
 
