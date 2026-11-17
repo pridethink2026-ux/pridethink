@@ -26,12 +26,20 @@
   leer de quien recibe (el mismo número del globito del Chat), para el
   número sobre el ícono de la app. Ver countUnreadMessages.
 
+  Punto 101 — approvePostVideo: con cada post nuevo que trae video
+  (video.status == "pending"), revisa los archivos y lo aprueba: escribe
+  los links (video.url, video.posterUrl) y pasa a "approved". Hasta
+  entonces nadie más que el autor puede ver el video (ver storage.rules,
+  postVideos/). El lugar para un filtro automático (por ejemplo Google
+  Video Intelligence) es moderateVideo().
+
   Subir: npx firebase deploy --only functions (o npm run deploy:functions
   desde la raíz del proyecto).
 */
 
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getStorage, getDownloadURL } = require("firebase-admin/storage");
 const { getMessaging } = require("firebase-admin/messaging");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { setGlobalOptions } = require("firebase-functions/v2");
@@ -248,4 +256,101 @@ exports.notifyChatMessage = onDocumentCreated("chats/{chatId}/messages/{messageI
     failed: response.failureCount,
     removed: stale.length,
   });
+});
+
+// ---------------------------------------------------------------------------
+// Punto 101 — approvePostVideo
+// ---------------------------------------------------------------------------
+//
+// El cliente (src/videoJob.js) sube postVideos/{uid}/{postId}/video.mp4 y
+// poster.jpg y DESPUÉS crea el post con video.status = "pending" y solo las
+// rutas (firestore.rules no le deja poner links ni otro estado). Aquí:
+// 1. se comprueba que las rutas sean las de ese autor y ese post, y que los
+//    archivos existan con el tipo y el peso esperados;
+// 2. moderateVideo() decide (hoy siempre "approved");
+// 3. aprobado: se escriben los links con token (getDownloadURL) y el estado;
+//    rechazado: se borran los archivos y queda "rejected" con el motivo.
+// Si el post se borró mientras tanto, no se hace nada.
+
+const MAX_VIDEO_BYTES = 40 * 1024 * 1024; // igual que storage.rules
+const MAX_POSTER_BYTES = 1024 * 1024;
+
+// Lugar preparado para un filtro automático. Por ejemplo, con Google Video
+// Intelligence (explicit content detection) sobre gs://{bucket}/{ruta}: si
+// detecta contenido explícito, devolver { decision: "rejected", reason }.
+// Hoy aprueba todo lo que pasó las comprobaciones de abajo.
+async function moderateVideo(/* { post, videoFile, posterFile } */) {
+  return { decision: "approved" };
+}
+
+exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const post = snap.data();
+  const video = post && post.video;
+  if (!video || video.status !== "pending") return;
+
+  const postId = event.params.postId;
+  const base = `postVideos/${post.authorId}/${postId}/`;
+  const bucket = getStorage().bucket();
+
+  const reject = async (reason) => {
+    logger.warn("video: rechazado", { postId, reason });
+    await Promise.all([
+      bucket.file(base + "video.mp4").delete({ ignoreNotFound: true }),
+      bucket.file(base + "poster.jpg").delete({ ignoreNotFound: true }),
+    ]).catch((err) => logger.warn("video: no se pudieron borrar los archivos", { postId, err: String(err) }));
+    await snap.ref
+      .update({
+        "video.status": "rejected",
+        "video.reason": reason,
+        "video.moderatedAt": FieldValue.serverTimestamp(),
+      })
+      .catch(() => {}); // el post pudo haberse borrado
+  };
+
+  if (video.path !== base + "video.mp4" || video.posterPath !== base + "poster.jpg") {
+    await reject("bad_path");
+    return;
+  }
+
+  const videoFile = bucket.file(video.path);
+  const posterFile = bucket.file(video.posterPath);
+  let videoMeta;
+  let posterMeta;
+  try {
+    [[videoMeta], [posterMeta]] = await Promise.all([videoFile.getMetadata(), posterFile.getMetadata()]);
+  } catch (err) {
+    await reject("missing_file");
+    return;
+  }
+  if (
+    videoMeta.contentType !== "video/mp4" ||
+    Number(videoMeta.size) > MAX_VIDEO_BYTES ||
+    posterMeta.contentType !== "image/jpeg" ||
+    Number(posterMeta.size) > MAX_POSTER_BYTES
+  ) {
+    await reject("bad_file");
+    return;
+  }
+
+  const { decision, reason } = await moderateVideo({ post, videoFile, posterFile });
+  if (decision !== "approved") {
+    await reject(reason || "moderation");
+    return;
+  }
+
+  const [url, posterUrl] = await Promise.all([getDownloadURL(videoFile), getDownloadURL(posterFile)]);
+  try {
+    await snap.ref.update({
+      "video.status": "approved",
+      "video.url": url,
+      "video.posterUrl": posterUrl,
+      "video.moderatedAt": FieldValue.serverTimestamp(),
+    });
+    logger.info("video: aprobado", { postId, bytes: Number(videoMeta.size) });
+  } catch (err) {
+    // El post se borró mientras tanto: no hay nada que aprobar.
+    logger.info("video: el post ya no existe", { postId });
+  }
 });

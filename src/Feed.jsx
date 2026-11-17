@@ -18,7 +18,8 @@ import {
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
 import VideoPicker, { videoBetaEnabled } from "./VideoPicker";
-import { useVideoJob, clearVideoJob } from "./videoJob";
+import { useVideoJob, clearVideoJob, publishVideoPost } from "./videoJob";
+import PostVideo from "./PostVideo";
 import MomentsStrip from "./MomentsStrip";
 import { useMoments } from "./MomentsContext";
 import { useSavedPosts } from "./SavedPostsContext";
@@ -815,6 +816,11 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
     await deleteDoc(doc(db, "posts", post.id));
   };
 
+  // Punto 101: un post con video solo se muestra a los demás cuando la
+  // Cloud Function lo aprobó (hasta entonces no tiene links: nadie más
+  // podría verlo igual). El autor sí lo ve, con "Procesando…".
+  if (post.video && post.video.status !== "approved" && !isMine) return null;
+
   return (
     <div style={styles.post}>
       <div style={styles.postHeader}>
@@ -916,6 +922,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
               </div>
             )
           )}
+          {post.video && <PostVideo video={post.video} />}
         </>
       )}
 
@@ -1053,7 +1060,8 @@ export default function Feed({
   // donde se activó desde la página de prueba (videoBetaEnabled).
   const videoJob = useVideoJob();
   const hasVideo = videoJob.status !== "idle";
-  const videoBusy = videoJob.status === "working" || videoJob.status === "paused";
+  const videoBusy =
+    videoJob.status === "working" || videoJob.status === "paused" || videoJob.status === "uploading";
   const [composerNotice, setComposerNotice] = useState("");
   const [videoBeta] = useState(videoBetaEnabled);
   useEffect(() => {
@@ -1078,6 +1086,16 @@ export default function Feed({
     composerDraft.images = composerImages;
     composerDraft.postId = composerPostId;
   }, [text, composerImages, composerPostId]);
+  // Punto 101: cuando videoJob.js termina de publicar el post de este
+  // borrador (aunque haya terminado con el Muro cerrado), se limpia el
+  // editor y se rota el id, igual que después de un post normal.
+  const publishedPostId = videoJob.status === "idle" ? videoJob.publishedPostId : null;
+  useEffect(() => {
+    if (!publishedPostId || publishedPostId !== composerPostId) return;
+    setText("");
+    setComposerImages([]);
+    setComposerPostId(doc(collection(db, "posts")).id);
+  }, [publishedPostId, composerPostId]);
   const allUsers = useAllUsers();
   // Mismos datos de allUsers (AllUsersContext, ver Mentions.jsx), como mapa
   // por uid para lookup O(1) por autor (antes era su propio onSnapshot
@@ -1141,13 +1159,37 @@ export default function Feed({
   // nacer con ese mismo id.
   const handlePost = async (e) => {
     e.preventDefault();
-    // Punto 101, parte 2: el video ya se comprime y se previsualiza, pero
-    // subirlo y publicarlo llega en la parte 3.
+    const trimmed = text.trim();
+    // Punto 101: un post con video lo publica videoJob.js (sube y después
+    // crea el post), para que siga aunque la persona cambie de sección. El
+    // editor se limpia cuando el post ya existe (ver el efecto de
+    // publishedPostId más abajo); mientras tanto queda bloqueado.
     if (hasVideo) {
-      setComposerNotice(t("video.publishSoon"));
+      if (videoJob.status !== "ready") {
+        setComposerNotice(t("video.notReady"));
+        return;
+      }
+      if (!currentUid || !myProfile) return;
+      postMention.closeMentions();
+      publishVideoPost({
+        uid: currentUid,
+        postId: composerPostId,
+        fields: {
+          authorName: myProfile.displayName || "Sin nombre",
+          authorIdentity: myProfile.identity || "",
+          text: trimmed,
+          hashtags: extractHashtags(trimmed),
+          mentionedUids: extractMentionedUids(trimmed, allUsers, currentUid),
+          authorIsPrivate: myProfile.isPrivate || false,
+          authorIsWallPrivate: myProfile.isWallPrivate || false,
+        },
+        notifyFrom: {
+          fromName: myProfile.displayName || "Alguien",
+          fromIdentity: myProfile.identity || "",
+        },
+      });
       return;
     }
-    const trimmed = text.trim();
     if ((!trimmed && composerImages.length === 0) || !currentUid || !myProfile) return;
     setPosting(true);
     try {
@@ -1334,6 +1376,7 @@ export default function Feed({
                 style={styles.textarea}
                 placeholder={t("feed.composerPlaceholder")}
                 value={text}
+                disabled={videoJob.status === "uploading"}
                 onChange={(e) => postMention.handleMentionChange(e, setText)}
               />
               {postMention.mentionOpen && (

@@ -564,6 +564,36 @@ service cloud.firestore {
       );
     }
 
+    // Punto 101: video de un post al CREARLO (ver videoJob.js). Si el post
+    // no trae "video", no se exige nada. Si lo trae:
+    // - nace en "pending" y SOLO con las rutas de los archivos, sin links
+    //   ("url"/"posterUrl"): los escribe la Cloud Function approvePostVideo
+    //   (firebase-admin, no pasa por estas reglas) al aprobarlo. Así nadie
+    //   puede publicar un video "ya aprobado" ni apuntar a un archivo ajeno
+    //   o de otro sitio;
+    // - las rutas son exactamente las de su propia carpeta para ESTE post
+    //   (storage.rules solo deja leerla al dueño);
+    // - un post lleva fotos O un video, no las dos cosas;
+    // - duración hasta 95 s (90 + margen), medidas hasta 1280 y peso hasta
+    //   40 MB, igual que el tope de storage.rules.
+    function videoDePostValido(postId) {
+      let d = request.resource.data;
+      let base = 'postVideos/' + request.auth.uid + '/' + postId + '/';
+      return !('video' in d) || (
+        d.video is map
+        && d.video.keys().hasOnly(['status', 'path', 'posterPath', 'duration', 'width', 'height', 'size'])
+        && d.video.keys().hasAll(['status', 'path', 'posterPath', 'duration', 'width', 'height', 'size'])
+        && d.video.status == 'pending'
+        && d.video.path == base + 'video.mp4'
+        && d.video.posterPath == base + 'poster.jpg'
+        && d.video.duration is number && d.video.duration > 0 && d.video.duration <= 95
+        && d.video.width is int && d.video.width > 0 && d.video.width <= 1280
+        && d.video.height is int && d.video.height > 0 && d.video.height <= 1280
+        && d.video.size is int && d.video.size > 0 && d.video.size < 40 * 1024 * 1024
+        && d.get('imageUrls', []).size() == 0
+      );
+    }
+
     match /posts/{postId} {
       // Auditoría de seguridad (2026-07-28, hallazgo H2): antes,
       // cualquier autenticado podía leer CUALQUIER post — un perfil
@@ -599,6 +629,7 @@ service cloud.firestore {
       allow create: if estaAutenticado()
         && request.resource.data.authorId == request.auth.uid
         && textoValido(request.resource.data.text, 5000)
+        && videoDePostValido(postId)
         && (
           !('groupId' in request.resource.data)
           || request.resource.data.groupId == null
@@ -625,6 +656,10 @@ service cloud.firestore {
             resource.data.authorId == request.auth.uid
             && request.resource.data.get('groupId', null) == resource.data.get('groupId', null)
             && textoValido(request.resource.data.text, 5000)
+            // Punto 101: el video no se toca al editar (ni agregarlo, ni
+            // cambiarlo, ni aprobarlo uno mismo); solo lo cambia la Cloud
+            // Function.
+            && request.resource.data.get('video', null) == resource.data.get('video', null)
           )
           ||
           // 2) Cualquier OTRA persona autenticada puede reaccionar: solo se

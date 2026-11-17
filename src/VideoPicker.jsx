@@ -17,7 +17,10 @@ import { useVideoJob, startVideoJob, retryVideoJob, clearVideoJob } from "./vide
   sigue; si se interrumpió, "Reintentar" vuelve a empezar con el mismo
   archivo, sin elegirlo otra vez.
 
-  Todavía no sube nada: la subida se hace al tocar "Publicar" (parte 3).
+  La subida empieza al tocar "Publicar" (Feed.jsx → publishVideoPost), no
+  al elegir el video, para no dejar archivos huérfanos si la persona se
+  arrepiente. Mientras sube: "Publicando video… 45 %"; si falla:
+  "Reintentar" (con el mismo video ya comprimido) o "Descartar".
 
   Mientras dure la prueba, solo aparece en los teléfonos donde se activó
   desde https://pridethink.vercel.app/pruebas/video-ios.html
@@ -90,7 +93,8 @@ export default function VideoPicker({ disabled = false }) {
   };
 
   const busy = job.status === "working" || job.status === "paused";
-  const percent = busy ? Math.round((job.progress || 0) * 100) : 0;
+  const uploading = job.status === "uploading";
+  const percent = busy || uploading ? Math.round((job.progress || 0) * 100) : 0;
 
   const addBtnStyle = {
     display: "inline-flex",
@@ -201,6 +205,32 @@ export default function VideoPicker({ disabled = false }) {
           <span style={mutedTextStyle}>
             {job.status === "paused" ? t("video.pausedHint") : t("video.preparingHint")}
           </span>
+        </div>
+      )}
+
+      {uploading && (
+        <div style={boxStyle} role="status">
+          <div style={rowStyle}>
+            <span>{t("video.uploading", { percent })}</span>
+          </div>
+          <div style={barTrackStyle}>
+            <div style={barFillStyle} />
+          </div>
+          <span style={mutedTextStyle}>{t("video.uploadingHint")}</span>
+        </div>
+      )}
+
+      {job.status === "uploadError" && (
+        <div>
+          <p style={errorStyle}>{t("video.errorUpload")}</p>
+          <div style={retryRowStyle}>
+            <button type="button" className="pt-relief" style={addBtnStyle} onClick={retryVideoJob}>
+              ↻ {t("video.retry")}
+            </button>
+            <button type="button" style={linkBtnStyle} onClick={clearVideoJob}>
+              {t("video.discard")}
+            </button>
+          </div>
         </div>
       )}
 

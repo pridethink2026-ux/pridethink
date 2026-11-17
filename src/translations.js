@@ -267,8 +267,13 @@ export const translations = {
     "video.pillReady": "Video listo para publicar",
     "video.pillError": "El video necesita atención",
     "video.photosOrVideo": "Un post lleva fotos o un video, no las dos cosas.",
-    "video.publishSoon":
-      "Publicar videos todavía no está listo: por ahora solo se prueba la compresión. Quita el video para publicar.",
+    "video.uploading": "Publicando video… {percent} %",
+    "video.uploadingHint": "Puedes seguir usando la app, pero no salgas de ella.",
+    "video.errorUpload": "No se pudo publicar el video. Revisa tu conexión y toca Reintentar.",
+    "video.discard": "Descartar",
+    "video.notReady": "Espera a que el video esté listo, o quítalo para publicar sin él.",
+    "video.processing": "Procesando tu video… Solo tú lo ves hasta que esté listo.",
+    "video.rejected": "Este video no se aprobó y no se muestra a nadie.",
 
     // Visor de imagen completa (ImageViewer.jsx, punto 60)
     "imageViewer.close": "Cerrar",
@@ -1043,8 +1048,13 @@ export const translations = {
     "video.pillReady": "Video ready to post",
     "video.pillError": "The video needs attention",
     "video.photosOrVideo": "A post has photos or one video, not both.",
-    "video.publishSoon":
-      "Publishing videos isn't ready yet: for now only compression is being tested. Remove the video to post.",
+    "video.uploading": "Posting video… {percent}%",
+    "video.uploadingHint": "You can keep using the app, but don't leave it.",
+    "video.errorUpload": "The video could not be posted. Check your connection and tap Retry.",
+    "video.discard": "Discard",
+    "video.notReady": "Wait until the video is ready, or remove it to post without it.",
+    "video.processing": "Processing your video… Only you can see it until it's ready.",
+    "video.rejected": "This video was not approved and is not shown to anyone.",
 
     // Full image viewer (ImageViewer.jsx, point 60)
     "imageViewer.close": "Close",

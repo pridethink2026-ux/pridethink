@@ -7,8 +7,9 @@ import { useVideoJob } from "./videoJob";
 
   Globito en el botón del Muro de la barra de navegación (abajo en el
   teléfono, arriba en la PC) mientras hay un video del próximo post en
-  preparación o listo: "46%" mientras se comprime (más tenue en pausa), "✓"
-  cuando está listo y "!" si necesita atención. Reemplaza al aviso flotante
+  preparación o listo: "46%" mientras se comprime (más tenue en pausa),
+  "↑46%" mientras se sube, "✓" cuando está listo para publicar y "!" si
+  necesita atención. Reemplaza al aviso flotante
   de la parte 2b, que tapaba contenido (el botón de borrar de un chat, el
   último mensaje de una conversación): la barra ya ocupa su lugar, así que
   aquí no tapa nada. Tocar el Muro lleva al editor (App.js, handleNavClick).
@@ -30,6 +31,9 @@ export default function VideoJobBadge({ style }) {
   } else if (job.status === "paused") {
     text = `${percent}%`;
     label = t("video.pillPaused", { percent });
+  } else if (job.status === "uploading") {
+    text = `↑${percent}%`;
+    label = t("video.uploading", { percent });
   } else if (job.status === "ready") {
     text = "✓";
     label = t("video.pillReady");
@@ -41,7 +45,8 @@ export default function VideoJobBadge({ style }) {
   const badgeStyle = {
     position: "absolute",
     boxSizing: "border-box",
-    background: job.status === "error" ? "var(--accent2)" : "var(--accent)",
+    background:
+      job.status === "error" || job.status === "uploadError" ? "var(--accent2)" : "var(--accent)",
     color: "var(--bg)",
     fontSize: "10px",
     fontWeight: 700,
