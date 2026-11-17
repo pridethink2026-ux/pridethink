@@ -273,6 +273,11 @@ export const translations = {
     "video.discard": "Descartar",
     "video.notReady": "Espera a que el video esté listo, o quítalo para publicar sin él.",
     "video.processing": "Procesando tu video… Solo tú lo ves hasta que esté listo.",
+    "video.play": "Reproducir video",
+    "video.pause": "Pausar video",
+    "video.soundOn": "Activar sonido",
+    "video.soundOff": "Silenciar",
+    "video.fullscreen": "Pantalla completa",
     "video.rejected": "Este video no se aprobó y no se muestra a nadie.",
 
     // Visor de imagen completa (ImageViewer.jsx, punto 60)
@@ -1054,6 +1059,11 @@ export const translations = {
     "video.discard": "Discard",
     "video.notReady": "Wait until the video is ready, or remove it to post without it.",
     "video.processing": "Processing your video… Only you can see it until it's ready.",
+    "video.play": "Play video",
+    "video.pause": "Pause video",
+    "video.soundOn": "Turn sound on",
+    "video.soundOff": "Mute",
+    "video.fullscreen": "Full screen",
     "video.rejected": "This video was not approved and is not shown to anyone.",
 
     // Full image viewer (ImageViewer.jsx, point 60)

@@ -922,7 +922,7 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
               </div>
             )
           )}
-          {post.video && <PostVideo video={post.video} />}
+          {post.video && <PostVideo postId={post.id} video={post.video} />}
         </>
       )}
 
