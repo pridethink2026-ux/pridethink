@@ -14,14 +14,24 @@
   Si el teléfono no puede comprimir, falla con un código y NO se sube el
   original (decisión del punto 101): quien llama muestra el aviso.
 
+  AUDIO: si viene en AAC o MP3 (lo normal en la cámara de iPhone y
+  Android) se COPIA tal cual, sin recodificar. Ojo: Mediabunny recodifica
+  siempre que se le pasa `quality` o `codec` para el audio, aunque ya sea
+  AAC, y hay iPhones que no pueden codificar AAC: con eso el audio se
+  perdía (prueba del 2026-11-16). Solo si el audio viene en otro formato se
+  pasa a AAC; si el teléfono no puede, falla con "audioFailed": un video
+  que tenía sonido nunca se publica sin él.
+
   Uso:
     const job = compressVideo(file, (progress) => ...);  // progress 0..1
     const result = await job.promise;
+    job.pause(); job.resume();  // al salir y volver a la app (videoJob.js)
     job.cancel();  // por ejemplo si la persona quita el video a la mitad
 
-  result: { blob, posterBlob, duration, width, height, audioDropped }
-  Errores (error.code): "notVideo" | "tooLong" | "unsupported" | "failed"
-  | "canceled". En "tooLong", error.duration trae los segundos.
+  result: { blob, posterBlob, duration, width, height }
+  Errores (error.code): "notVideo" | "tooLong" | "unsupported" |
+  "audioFailed" | "failed" | "canceled". En "tooLong", error.duration trae
+  los segundos.
 */
 
 export const MAX_VIDEO_SECONDS = 90;
@@ -31,6 +41,11 @@ const VIDEO_BITRATE = 2000000;
 const AUDIO_BITRATE = 128000;
 const POSTER_LONG_SIDE = 720;
 const POSTER_QUALITY = 0.8;
+// Códecs de audio que se copian sin recodificar: MP4 los admite y se
+// reproducen en todos los navegadores.
+const COPYABLE_AUDIO = ["aac", "mp3"];
+// Margen para alinear el audio copiado con el inicio (ver `copy` abajo).
+const AUDIO_SHIFT_TOLERANCE = 0.5;
 
 function videoError(code, extra) {
   const err = new Error(code);
@@ -80,9 +95,36 @@ async function makePoster(mb, blob, duration) {
   }
 }
 
+// Elige la pista de audio: la primera que se pueda copiar (algunos iPhone
+// graban más de una, por ejemplo audio espacial además del estéreo); si
+// ninguna, la principal (habrá que recodificarla).
+async function pickAudioTrack(input) {
+  const tracks = await input.getAudioTracks().catch(() => []);
+  if (tracks.length === 0) return null;
+  for (const track of tracks) {
+    const codec = await track.getCodec().catch(() => null);
+    if (COPYABLE_AUDIO.includes(codec)) return { track, copy: true };
+  }
+  const primary = (await input.getPrimaryAudioTrack().catch(() => null)) || tracks[0];
+  return { track: primary, copy: false };
+}
+
 export function compressVideo(file, onProgress) {
   let conversion = null;
   let canceled = false;
+  // Pausa (videoJob.js la pide al salir de la app): se pasa a execute()
+  // como pauseSignal; para seguir, se vuelve a llamar a execute().
+  let paused = false;
+  let pauseController = null;
+  let wakeUp = null;
+  const waitForResume = () =>
+    new Promise((resolve) => {
+      wakeUp = () => {
+        wakeUp = null;
+        resolve();
+      };
+      if (!paused || canceled) wakeUp();
+    });
 
   const run = async () => {
     // Sin WebCodecs no hay nada que hacer (ni siquiera vale la pena bajar
@@ -120,7 +162,7 @@ export function compressVideo(file, onProgress) {
       });
       if (!canEncode) throw videoError("unsupported");
 
-      const audioTrack = await input.getPrimaryAudioTrack().catch(() => null);
+      const audio = await pickAudioTrack(input);
 
       const output = new mb.Output({
         format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }),
@@ -130,35 +172,56 @@ export function compressVideo(file, onProgress) {
       conversion = await mb.Conversion.init({
         input,
         output,
-        tracks: "primary",
         showWarnings: false,
-        video: {
-          codec: "avc",
-          width: size.width,
-          height: size.height,
-          fit: "fill",
-          quality: videoQuality,
-          forceTranscode: true,
-          // La rotación del iPhone se aplica a los cuadros, no se deja como
-          // dato aparte: así se ve derecho en cualquier reproductor.
-          allowTransformationMetadata: false,
+        // Permite correr el audio copiado hasta medio segundo para que
+        // empiece junto con el video (el AAC de la cámara suele traer un
+        // pequeño desfase al principio). Sin esto Mediabunny intentaría
+        // recodificarlo.
+        copy: { shiftTolerance: AUDIO_SHIFT_TOLERANCE },
+        // Solo el video principal; cualquier otro se descarta.
+        video: (track) =>
+          track !== videoTrack
+            ? { discard: true }
+            : {
+                codec: "avc",
+                width: size.width,
+                height: size.height,
+                fit: "fill",
+                quality: videoQuality,
+                forceTranscode: true,
+                // La rotación del iPhone se aplica a los cuadros, no se deja
+                // como dato aparte: así se ve derecho en cualquier reproductor.
+                allowTransformationMetadata: false,
+              },
+        // Solo la pista elegida. Si se puede copiar, SIN codec ni quality
+        // (cualquiera de los dos obliga a recodificar, ver arriba).
+        audio: (track) => {
+          if (!audio || track !== audio.track) return { discard: true };
+          if (audio.copy) return {};
+          return { codec: "aac", quality: new mb.Quality({ bitrate: AUDIO_BITRATE }) };
         },
-        // El audio de la cámara (AAC) se copia tal cual; si viniera en otro
-        // formato, se pasa a AAC.
-        audio: { codec: "aac", quality: new mb.Quality({ bitrate: AUDIO_BITRATE }) },
       });
       if (canceled) throw videoError("canceled");
       if (!conversion.isValid) throw videoError("unsupported");
-
-      // Si el video traía sonido y el teléfono no pudo conservarlo, se
-      // sigue igual pero se avisa (audioDropped).
-      const audioDropped =
-        !!audioTrack && conversion.discardedTracks.some((d) => d.track === audioTrack);
+      if (!conversion.utilizedTracks.includes(videoTrack)) throw videoError("unsupported");
+      // Un video que tenía sonido nunca se publica sin él.
+      if (audio && !conversion.utilizedTracks.includes(audio.track)) {
+        throw videoError("audioFailed");
+      }
 
       if (onProgress) {
         conversion.onProgress = (p) => onProgress(Math.min(1, Math.max(0, p)));
       }
-      await conversion.execute();
+      // Corre hasta terminar; si se pausa, espera a resume() y sigue desde
+      // donde iba.
+      for (;;) {
+        pauseController = new AbortController();
+        if (paused) pauseController.abort();
+        await conversion.execute({ pauseSignal: pauseController.signal });
+        if (conversion.state === "done") break;
+        if (canceled) throw videoError("canceled");
+        await waitForResume();
+      }
 
       const buffer = output.target.buffer;
       if (!buffer) throw videoError("failed");
@@ -172,7 +235,6 @@ export function compressVideo(file, onProgress) {
         duration,
         width: size.width,
         height: size.height,
-        audioDropped,
       };
     } finally {
       input.dispose();
@@ -190,9 +252,18 @@ export function compressVideo(file, onProgress) {
 
   return {
     promise,
+    pause: () => {
+      paused = true;
+      if (pauseController) pauseController.abort();
+    },
+    resume: () => {
+      paused = false;
+      if (wakeUp) wakeUp();
+    },
     cancel: () => {
       canceled = true;
       if (conversion) conversion.cancel().catch(() => {});
+      if (wakeUp) wakeUp();
     },
   };
 }

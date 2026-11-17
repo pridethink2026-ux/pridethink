@@ -7,6 +7,7 @@ import Feed from "./Feed";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import MomentViewer from "./MomentViewer";
 import { StarRainHost } from "./StarRain";
+import VideoJobPill from "./VideoJobPill";
 import HomeIcon from "./HomeNavIcon";
 import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
@@ -1307,6 +1308,19 @@ function App() {
           myIdentity={myIdentity}
         />
       )}
+
+      {/* Punto 101: video del próximo post en preparación o listo, visible
+          cuando el editor del Muro no está a la vista. Lleva al Muro. */}
+      <VideoJobPill
+        visible={
+          !(view === "feed" && !anyOverlayOpen && (feedTab === "todos" || feedTab === "siguiendo"))
+        }
+        isMobile={isMobile}
+        onOpen={() => {
+          setFeedTab("todos");
+          handleNavClick("feed");
+        }}
+      />
 
       {/* Punto 86: lluvia de estrellas (StarRain.jsx), una sola vez acá,
           por encima de todo; la dispara MomentViewer. */}

@@ -18,6 +18,7 @@ import {
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
 import VideoPicker, { videoBetaEnabled } from "./VideoPicker";
+import { useVideoJob } from "./videoJob";
 import MomentsStrip from "./MomentsStrip";
 import { useMoments } from "./MomentsContext";
 import { useSavedPosts } from "./SavedPostsContext";
@@ -1038,13 +1039,18 @@ export default function Feed({
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [composerImages, setComposerImages] = useState([]);
-  // Punto 101: video del próximo post (null, { status: "working" } o
-  // { status: "ready", ... }, ver VideoPicker.jsx). Un post lleva fotos O
-  // un video. Mientras dure la prueba, el botón solo aparece donde se
-  // activó desde la página de prueba (videoBetaEnabled).
-  const [composerVideo, setComposerVideo] = useState(null);
+  // Punto 101: el video del próximo post vive en videoJob.js (no aquí),
+  // para que la compresión siga si la persona se va a otra sección. Un post
+  // lleva fotos O un video. Mientras dure la prueba, el botón solo aparece
+  // donde se activó desde la página de prueba (videoBetaEnabled).
+  const videoJob = useVideoJob();
+  const hasVideo = videoJob.status !== "idle";
+  const videoBusy = videoJob.status === "working" || videoJob.status === "paused";
   const [composerNotice, setComposerNotice] = useState("");
   const [videoBeta] = useState(videoBetaEnabled);
+  useEffect(() => {
+    if (!hasVideo) setComposerNotice("");
+  }, [hasVideo]);
   // Id del PRÓXIMO post a publicar, generado del lado del cliente (punto
   // 61): las fotos se suben a "postImages/{uid}/{postId}/img_N.jpg" ANTES
   // de que el post exista en Firestore, así que hace falta un id de
@@ -1108,7 +1114,7 @@ export default function Feed({
     e.preventDefault();
     // Punto 101, parte 2: el video ya se comprime y se previsualiza, pero
     // subirlo y publicarlo llega en la parte 3.
-    if (composerVideo) {
+    if (hasVideo) {
       setComposerNotice(t("video.publishSoon"));
       return;
     }
@@ -1309,7 +1315,7 @@ export default function Feed({
               )}
             </div>
             <div style={styles.composerImagesWrap}>
-              {!composerVideo && (
+              {!hasVideo && (
                 <MultiImageUploader
                   basePath={`postImages/${currentUid}/${composerPostId}`}
                   images={composerImages}
@@ -1320,15 +1326,8 @@ export default function Feed({
               )}
               {videoBeta &&
                 (composerImages.length === 0 ? (
-                  <div style={composerVideo ? undefined : styles.composerVideoWrap}>
-                    <VideoPicker
-                      key={composerPostId}
-                      disabled={posting}
-                      onChange={(value) => {
-                        setComposerVideo(value);
-                        setComposerNotice("");
-                      }}
-                    />
+                  <div style={hasVideo ? undefined : styles.composerVideoWrap}>
+                    <VideoPicker disabled={posting} />
                   </div>
                 ) : (
                   <p style={styles.composerHint}>{t("video.photosOrVideo")}</p>
@@ -1339,7 +1338,7 @@ export default function Feed({
               type="submit"
               className="pt-relief"
               style={styles.postBtn}
-              disabled={posting || (composerVideo && composerVideo.status === "working")}
+              disabled={posting || videoBusy}
             >
               {posting ? t("feed.posting") : t("feed.postButton")}
             </button>

@@ -1,28 +1,27 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLanguage } from "./LanguageContext";
-import { compressVideo, MAX_VIDEO_SECONDS } from "./videoCompress";
+import { MAX_VIDEO_SECONDS } from "./videoCompress";
+import { useVideoJob, startVideoJob, retryVideoJob, clearVideoJob } from "./videoJob";
 
 /*
-  VideoPicker — punto 101 (videos en el Muro), parte 2.
+  VideoPicker — punto 101 (videos en el Muro).
 
   Botón "🎥 Video" del editor de posts del Muro. Al elegir un video (de la
   galería o grabándolo: el selector del teléfono ofrece las dos cosas) lo
-  prepara en el teléfono con videoCompress.js, mostrando el avance, y
-  después muestra la vista previa del video ya comprimido con su duración y
-  su peso. Todavía no sube nada: la subida se hace al tocar "Publicar" (parte
-  3), para no dejar archivos huérfanos si la persona se arrepiente.
+  prepara en el teléfono (videoCompress.js) y después muestra la vista
+  previa del video ya comprimido con su duración, su peso y su resolución.
+
+  El trabajo NO vive aquí sino en videoJob.js: si la persona se va a otra
+  sección de la app, la compresión sigue, y al volver este componente
+  muestra en qué va. Al salir de la app se pausa ("En pausa…") y al volver
+  sigue; si se interrumpió, "Reintentar" vuelve a empezar con el mismo
+  archivo, sin elegirlo otra vez.
+
+  Todavía no sube nada: la subida se hace al tocar "Publicar" (parte 3).
 
   Mientras dure la prueba, solo aparece en los teléfonos donde se activó
   desde https://pridethink.vercel.app/pruebas/video-ios.html
   (videoBetaEnabled). Se quita al terminar el punto 101.
-
-  Props:
-  - onChange(value): null (sin video), { status: "working" } mientras se
-    prepara, o { status: "ready", blob, posterBlob, duration, width,
-    height, audioDropped } cuando está listo.
-  - disabled: por ejemplo mientras se publica.
-
-  Para empezar de cero después de publicar, quien lo usa le cambia la key.
 */
 
 const BETA_KEY = "pt-video-beta";
@@ -40,95 +39,58 @@ function formatDuration(seconds) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export default function VideoPicker({ onChange, disabled = false }) {
+export default function VideoPicker({ disabled = false }) {
   const { t } = useLanguage();
   const inputRef = useRef(null);
-  const jobRef = useRef(null);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  const job = useVideoJob();
+  const result = job.status === "ready" ? job.result : null;
 
-  const [phase, setPhase] = useState("idle"); // idle | working | ready
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
-  const [urls, setUrls] = useState(null); // { video, poster } (object URLs)
-
-  // Libera las object URLs cuando cambian o al desmontarse.
+  // Object URLs de la vista previa: se crean al tener el resultado y se
+  // liberan al cambiar o al salir del Muro (el resultado sigue en
+  // videoJob.js y se vuelven a crear al volver).
+  const [urls, setUrls] = useState(null);
   useEffect(() => {
-    return () => {
-      if (urls) {
-        URL.revokeObjectURL(urls.video);
-        URL.revokeObjectURL(urls.poster);
-      }
+    if (!result) {
+      setUrls(null);
+      return undefined;
+    }
+    const next = {
+      video: URL.createObjectURL(result.blob),
+      poster: URL.createObjectURL(result.posterBlob),
     };
-  }, [urls]);
-
-  // Si el componente se desmonta a la mitad, se cancela la compresión.
-  useEffect(() => {
+    setUrls(next);
     return () => {
-      if (jobRef.current) jobRef.current.cancel();
+      URL.revokeObjectURL(next.video);
+      URL.revokeObjectURL(next.poster);
     };
-  }, []);
+  }, [result]);
 
-  const errorText = (err) => {
-    switch (err && err.code) {
+  const handleFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (file) startVideoJob(file);
+  };
+
+  const errorText = () => {
+    switch (job.code) {
       case "notVideo":
         return t("video.errorNotVideo");
       case "tooLong":
         return t("video.errorTooLong", {
-          duration: formatDuration(err.duration),
+          duration: formatDuration(job.duration),
           max: formatDuration(MAX_VIDEO_SECONDS),
         });
       case "unsupported":
         return t("video.errorUnsupported");
+      case "audioFailed":
+        return t("video.errorAudio");
       default:
-        return t("video.errorFailed");
+        return t("video.errorInterrupted");
     }
   };
 
-  const handleFile = async (e) => {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = "";
-    if (!file) return;
-
-    setError("");
-    setResult(null);
-    setUrls(null);
-    setProgress(0);
-    setPhase("working");
-    onChangeRef.current({ status: "working" });
-
-    const job = compressVideo(file, setProgress);
-    jobRef.current = job;
-    try {
-      const res = await job.promise;
-      if (jobRef.current !== job) return;
-      jobRef.current = null;
-      setResult(res);
-      setUrls({ video: URL.createObjectURL(res.blob), poster: URL.createObjectURL(res.posterBlob) });
-      setPhase("ready");
-      onChangeRef.current({ status: "ready", ...res });
-    } catch (err) {
-      if (jobRef.current !== job) return;
-      jobRef.current = null;
-      setPhase("idle");
-      onChangeRef.current(null);
-      if (err.code !== "canceled") setError(errorText(err));
-    }
-  };
-
-  const handleRemove = () => {
-    if (jobRef.current) {
-      jobRef.current.cancel();
-      jobRef.current = null;
-    }
-    setResult(null);
-    setUrls(null);
-    setProgress(0);
-    setError("");
-    setPhase("idle");
-    onChangeRef.current(null);
-  };
+  const busy = job.status === "working" || job.status === "paused";
+  const percent = busy ? Math.round((job.progress || 0) * 100) : 0;
 
   const addBtnStyle = {
     display: "inline-flex",
@@ -159,8 +121,9 @@ export default function VideoPicker({ onChange, disabled = false }) {
   };
   const barFillStyle = {
     height: "100%",
-    width: `${Math.round(progress * 100)}%`,
+    width: `${percent}%`,
     background: "var(--accent)",
+    opacity: job.status === "paused" ? 0.5 : 1,
     transition: "width 0.2s linear",
   };
   const rowStyle = {
@@ -205,10 +168,11 @@ export default function VideoPicker({ onChange, disabled = false }) {
     fontSize: "12px",
     lineHeight: 1.4,
   };
+  const retryRowStyle = { display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" };
 
   return (
     <div>
-      {phase === "idle" && (
+      {(job.status === "idle" || (job.status === "error" && !job.canRetry)) && (
         <button
           type="button"
           style={addBtnStyle}
@@ -219,22 +183,28 @@ export default function VideoPicker({ onChange, disabled = false }) {
         </button>
       )}
 
-      {phase === "working" && (
+      {busy && (
         <div style={boxStyle} role="status">
           <div style={rowStyle}>
-            <span>{t("video.preparing", { percent: Math.round(progress * 100) })}</span>
-            <button type="button" style={linkBtnStyle} onClick={handleRemove}>
+            <span>
+              {job.status === "paused"
+                ? t("video.paused", { percent })
+                : t("video.preparing", { percent })}
+            </span>
+            <button type="button" style={linkBtnStyle} onClick={clearVideoJob}>
               {t("video.cancel")}
             </button>
           </div>
           <div style={barTrackStyle}>
             <div style={barFillStyle} />
           </div>
-          <span style={mutedTextStyle}>{t("video.preparingHint")}</span>
+          <span style={mutedTextStyle}>
+            {job.status === "paused" ? t("video.pausedHint") : t("video.preparingHint")}
+          </span>
         </div>
       )}
 
-      {phase === "ready" && result && urls && (
+      {result && urls && (
         <div style={boxStyle}>
           <video
             src={urls.video}
@@ -252,11 +222,26 @@ export default function VideoPicker({ onChange, disabled = false }) {
                 resolution: `${result.width}×${result.height}`,
               })}
             </span>
-            <button type="button" style={linkBtnStyle} onClick={handleRemove} disabled={disabled}>
+            <button type="button" style={linkBtnStyle} onClick={clearVideoJob} disabled={disabled}>
               ✕ {t("video.remove")}
             </button>
           </div>
-          {result.audioDropped && <p style={errorStyle}>{t("video.audioDropped")}</p>}
+        </div>
+      )}
+
+      {job.status === "error" && (
+        <div>
+          <p style={errorStyle}>{errorText()}</p>
+          {job.canRetry && (
+            <div style={retryRowStyle}>
+              <button type="button" className="pt-relief" style={addBtnStyle} onClick={retryVideoJob}>
+                ↻ {t("video.retry")}
+              </button>
+              <button type="button" style={linkBtnStyle} onClick={clearVideoJob}>
+                {t("video.remove")}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -267,8 +252,6 @@ export default function VideoPicker({ onChange, disabled = false }) {
         onChange={handleFile}
         style={{ display: "none" }}
       />
-
-      {error && <p style={errorStyle}>{error}</p>}
     </div>
   );
 }

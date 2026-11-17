@@ -248,14 +248,24 @@ export const translations = {
     "video.remove": "Quitar video",
     "video.cancel": "Cancelar",
     "video.preparing": "Preparando el video… {percent} %",
-    "video.preparingHint": "Se comprime en tu teléfono para que suba rápido. No cierres la app.",
+    "video.preparingHint":
+      "Se comprime en tu teléfono para que suba rápido. Puedes seguir usando la app, pero no salgas de ella.",
+    "video.paused": "En pausa… {percent} %",
+    "video.pausedHint": "Saliste de la app. Sigue solo al volver.",
+    "video.retry": "Reintentar",
     "video.readyInfo": "{duration} · {size} MB · {resolution}",
     "video.errorNotVideo": "Ese archivo no es un video. Elige otro.",
     "video.errorTooLong": "El video dura {duration}. El máximo es {max}.",
     "video.errorUnsupported":
       "Tu teléfono no puede preparar este video. Prueba desde otro teléfono o actualiza el sistema.",
-    "video.errorFailed": "No se pudo preparar el video. Prueba otra vez o con otro video.",
-    "video.audioDropped": "Este video quedó sin sonido: tu teléfono no pudo conservar el audio.",
+    "video.errorAudio":
+      "Tu teléfono no pudo conservar el sonido de este video, así que no se puede publicar. Prueba con otro video.",
+    "video.errorInterrupted":
+      "Se interrumpió la preparación del video (por ejemplo, al salir de la app). Toca Reintentar.",
+    "video.pillPreparing": "Preparando video… {percent} %",
+    "video.pillPaused": "Video en pausa · {percent} %",
+    "video.pillReady": "Video listo para publicar",
+    "video.pillError": "El video necesita atención",
     "video.photosOrVideo": "Un post lleva fotos o un video, no las dos cosas.",
     "video.publishSoon":
       "Publicar videos todavía no está listo: por ahora solo se prueba la compresión. Quita el video para publicar.",
@@ -1014,14 +1024,24 @@ export const translations = {
     "video.remove": "Remove video",
     "video.cancel": "Cancel",
     "video.preparing": "Preparing the video… {percent}%",
-    "video.preparingHint": "It's compressed on your phone so it uploads fast. Don't close the app.",
+    "video.preparingHint":
+      "It's compressed on your phone so it uploads fast. You can keep using the app, but don't leave it.",
+    "video.paused": "Paused… {percent}%",
+    "video.pausedHint": "You left the app. It continues when you come back.",
+    "video.retry": "Retry",
     "video.readyInfo": "{duration} · {size} MB · {resolution}",
     "video.errorNotVideo": "That file is not a video. Pick another one.",
     "video.errorTooLong": "The video is {duration} long. The maximum is {max}.",
     "video.errorUnsupported":
       "Your phone can't prepare this video. Try from another phone or update the system.",
-    "video.errorFailed": "The video could not be prepared. Try again or with another video.",
-    "video.audioDropped": "This video has no sound: your phone could not keep the audio.",
+    "video.errorAudio":
+      "Your phone could not keep this video's sound, so it can't be posted. Try another video.",
+    "video.errorInterrupted":
+      "Preparing the video was interrupted (for example, when leaving the app). Tap Retry.",
+    "video.pillPreparing": "Preparing video… {percent}%",
+    "video.pillPaused": "Video paused · {percent}%",
+    "video.pillReady": "Video ready to post",
+    "video.pillError": "The video needs attention",
     "video.photosOrVideo": "A post has photos or one video, not both.",
     "video.publishSoon":
       "Publishing videos isn't ready yet: for now only compression is being tested. Remove the video to post.",
