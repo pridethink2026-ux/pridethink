@@ -33,3 +33,7 @@ scripts/serviceAccountKey*
 # (hallazgo H1) — contienen datos personales (nombre completo, fecha de
 # nacimiento, género, país, email viejo), nunca se suben al repo.
 scripts/backups/
+
+# Configuración local de Claude Code y archivos personales sueltos en la raíz
+/.claude/
+/WhatsApp Image 2026-10-27 at 21.28.192.jpeg

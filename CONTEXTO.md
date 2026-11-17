@@ -66,6 +66,7 @@ Pridethink es una app social centrada en la libre expresión de identidad para l
 11. Terminal: siempre cmd, nunca PowerShell
 12. Al empezar cualquier sesión (Rorby y Ernesto): `git status` y `git pull` antes de tocar nada. Si hay cambios locales sin subir, avisar y NO hacer pull
 13. Nunca dejar trabajo sin subir al cerrar la sesión
+14. Para instalar dependencias usar `npm ci` (no `npm install`), así package-lock.json no cambia
 
 ---
 
