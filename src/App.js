@@ -7,7 +7,8 @@ import Feed from "./Feed";
 import Notifications, { useNotifications, NotificationsScreen } from "./Notifications";
 import MomentViewer from "./MomentViewer";
 import { StarRainHost } from "./StarRain";
-import VideoJobPill from "./VideoJobPill";
+import VideoJobBadge from "./VideoJobBadge";
+import { getVideoJobState } from "./videoJob";
 import HomeIcon from "./HomeNavIcon";
 import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
@@ -856,6 +857,7 @@ function BottomNav({ active, unreadCount, chatUnread, chatEnergy, onNavigate, my
               )}
               {hasUnread && <span style={bottomNavStyles.dot} />}
               {hasChatUnread && <ChatUnreadBadge count={chatUnread} style={chatAlertStyles.mobileBadge} />}
+              {tab.key === "feed" && <VideoJobBadge style={chatAlertStyles.mobileBadge} />}
             </span>
             <span style={bottomNavStyles.label}>{tab.label}</span>
             {isActive && <span style={bottomNavStyles.activeMark} aria-hidden="true" />}
@@ -1080,6 +1082,12 @@ function App() {
       navigate(key);
       return;
     }
+    // Punto 101: con un video del próximo post en curso, el Muro abre en
+    // una pestaña donde se ve el editor (en Explorar, Grupos y Eventos no
+    // está).
+    if (getVideoJobState().status !== "idle" && feedTab !== "todos" && feedTab !== "siguiendo") {
+      setFeedTab("todos");
+    }
     const alreadyOnWall = view === "feed" && !anyOverlayOpen;
     if (alreadyOnWall) {
       window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
@@ -1205,6 +1213,7 @@ function App() {
             {getDesktopTabs(t).map((tab) => {
               const active = !anyOverlayOpen && view === tab.key;
               const isChat = tab.key === "chat";
+              const isFeed = tab.key === "feed";
               const hasChatUnread = isChat && chatUnread > 0;
               const button = (
                 <button
@@ -1222,6 +1231,15 @@ function App() {
                   {tab.label}
                 </button>
               );
+              // Punto 101: globito del video en preparación sobre el Muro.
+              if (isFeed) {
+                return (
+                  <span key={tab.key} style={chatAlertStyles.desktopWrap}>
+                    {button}
+                    <VideoJobBadge style={chatAlertStyles.desktopBadge} />
+                  </span>
+                );
+              }
               if (!isChat) return button;
               return (
                 <span key={tab.key} style={chatAlertStyles.desktopWrap}>
@@ -1308,19 +1326,6 @@ function App() {
           myIdentity={myIdentity}
         />
       )}
-
-      {/* Punto 101: video del próximo post en preparación o listo, visible
-          cuando el editor del Muro no está a la vista. Lleva al Muro. */}
-      <VideoJobPill
-        visible={
-          !(view === "feed" && !anyOverlayOpen && (feedTab === "todos" || feedTab === "siguiendo"))
-        }
-        isMobile={isMobile}
-        onOpen={() => {
-          setFeedTab("todos");
-          handleNavClick("feed");
-        }}
-      />
 
       {/* Punto 86: lluvia de estrellas (StarRain.jsx), una sola vez acá,
           por encima de todo; la dispara MomentViewer. */}

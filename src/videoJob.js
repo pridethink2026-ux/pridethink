@@ -50,6 +50,10 @@ function getSnapshot() {
   return state;
 }
 
+export function getVideoJobState() {
+  return state;
+}
+
 export function useVideoJob() {
   return useSyncExternalStore(subscribe, getSnapshot);
 }

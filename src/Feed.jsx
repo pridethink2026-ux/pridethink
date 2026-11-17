@@ -18,7 +18,7 @@ import {
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
 import VideoPicker, { videoBetaEnabled } from "./VideoPicker";
-import { useVideoJob } from "./videoJob";
+import { useVideoJob, clearVideoJob } from "./videoJob";
 import MomentsStrip from "./MomentsStrip";
 import { useMoments } from "./MomentsContext";
 import { useSavedPosts } from "./SavedPostsContext";
@@ -1019,6 +1019,14 @@ export function PostCard({ post, currentUid, myProfile, onOpenProfile, onHashtag
   );
 }
 
+// Punto 101: borrador del editor del Muro (texto, fotos ya subidas e id del
+// próximo post) guardado fuera del componente, porque el Muro se desmonta
+// al ir a otra sección y antes el texto se perdía (y las fotos ya subidas
+// quedaban huérfanas en Storage). Igual que el video (videoJob.js): solo en
+// memoria, al recargar la página se pierde. Es de UNA cuenta: si entra
+// otra (uid distinto), se descarta.
+const composerDraft = { uid: null, text: "", images: [], postId: null };
+
 // Punto 87: el filtro del muro (feedTab) y el hashtag elegido
 // (activeHashtag) viven en App.js y llegan como props, así no se pierden al
 // ir a otra pestaña y volver (el muro se desmonta al cambiar de pantalla).
@@ -1036,9 +1044,9 @@ export default function Feed({
   const [currentUid, setCurrentUid] = useState(null);
   // Tu perfil en vivo, de AllUsersContext (punto 70, commit 9c).
   const myProfile = useUserProfile(currentUid);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => composerDraft.text);
   const [posting, setPosting] = useState(false);
-  const [composerImages, setComposerImages] = useState([]);
+  const [composerImages, setComposerImages] = useState(() => composerDraft.images);
   // Punto 101: el video del próximo post vive en videoJob.js (no aquí),
   // para que la compresión siga si la persona se va a otra sección. Un post
   // lleva fotos O un video. Mientras dure la prueba, el botón solo aparece
@@ -1061,7 +1069,15 @@ export default function Feed({
   // "rota" a uno nuevo después de cada post exitoso (ver handlePost), si
   // no, el segundo post subiría sus fotos a la carpeta del primero y
   // pisaría sus archivos.
-  const [composerPostId, setComposerPostId] = useState(() => doc(collection(db, "posts")).id);
+  const [composerPostId, setComposerPostId] = useState(
+    () => composerDraft.postId || doc(collection(db, "posts")).id
+  );
+  // Borrador fuera del componente (ver composerDraft): se copia en cada cambio.
+  useEffect(() => {
+    composerDraft.text = text;
+    composerDraft.images = composerImages;
+    composerDraft.postId = composerPostId;
+  }, [text, composerImages, composerPostId]);
   const allUsers = useAllUsers();
   // Mismos datos de allUsers (AllUsersContext, ver Mentions.jsx), como mapa
   // por uid para lookup O(1) por autor (antes era su propio onSnapshot
@@ -1083,6 +1099,19 @@ export default function Feed({
     });
     return unsub;
   }, []);
+
+  // El borrador (y el video en preparación) son de una sola cuenta: si
+  // entra otra en esta misma pestaña, se descartan.
+  useEffect(() => {
+    if (!currentUid) return;
+    if (composerDraft.uid && composerDraft.uid !== currentUid) {
+      setText("");
+      setComposerImages([]);
+      setComposerPostId(doc(collection(db, "posts")).id);
+      clearVideoJob();
+    }
+    composerDraft.uid = currentUid;
+  }, [currentUid]);
 
   // El feed, paginado y en vivo (punto 70, commit 9e): ver feedPosts.js.
   // Las consultas siguen exigiendo authorIsPrivate == false (o ser el
