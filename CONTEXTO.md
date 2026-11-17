@@ -62,8 +62,10 @@ Pridethink es una app social centrada en la libre expresión de identidad para l
 7. Reglas Firestore se publican manualmente: type firestore.rules | clip → pegar en Firebase Console → Publish
 8. Nunca guardar conteos como campos numéricos — calcular en tiempo real desde queries
 9. Privacidad siempre en reglas de Firestore server-side, no solo client-side
-10. CONTEXTO.md se actualiza al final de cada sesión de desarrollo
+10. Al terminar cada punto: actualizar CONTEXTO.md, commit y push (no esperar al final de la sesión)
 11. Terminal: siempre cmd, nunca PowerShell
+12. Al empezar cualquier sesión (Rorby y Ernesto): `git status` y `git pull` antes de tocar nada. Si hay cambios locales sin subir, avisar y NO hacer pull
+13. Nunca dejar trabajo sin subir al cerrar la sesión
 
 ---
 
