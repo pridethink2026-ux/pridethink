@@ -243,6 +243,23 @@ export const translations = {
     "image.countHint": "{count} de {max} fotos",
     "image.tooMany": "Solo entran {count} foto(s) más: el máximo es {max}. Se agregaron las primeras.",
 
+    // Video de un post del Muro (VideoPicker.jsx, punto 101)
+    "video.add": "Video",
+    "video.remove": "Quitar video",
+    "video.cancel": "Cancelar",
+    "video.preparing": "Preparando el video… {percent} %",
+    "video.preparingHint": "Se comprime en tu teléfono para que suba rápido. No cierres la app.",
+    "video.readyInfo": "{duration} · {size} MB · {resolution}",
+    "video.errorNotVideo": "Ese archivo no es un video. Elige otro.",
+    "video.errorTooLong": "El video dura {duration}. El máximo es {max}.",
+    "video.errorUnsupported":
+      "Tu teléfono no puede preparar este video. Prueba desde otro teléfono o actualiza el sistema.",
+    "video.errorFailed": "No se pudo preparar el video. Prueba otra vez o con otro video.",
+    "video.audioDropped": "Este video quedó sin sonido: tu teléfono no pudo conservar el audio.",
+    "video.photosOrVideo": "Un post lleva fotos o un video, no las dos cosas.",
+    "video.publishSoon":
+      "Publicar videos todavía no está listo: por ahora solo se prueba la compresión. Quita el video para publicar.",
+
     // Visor de imagen completa (ImageViewer.jsx, punto 60)
     "imageViewer.close": "Cerrar",
     "imageViewer.previous": "Foto anterior",
@@ -991,6 +1008,23 @@ export const translations = {
     "image.errorRemove": "The image could not be removed. Please try again in a moment.",
     "image.countHint": "{count} of {max} photos",
     "image.tooMany": "Only {count} more photo(s) fit: the maximum is {max}. The first ones were added.",
+
+    // Video in a Wall post (VideoPicker.jsx, point 101)
+    "video.add": "Video",
+    "video.remove": "Remove video",
+    "video.cancel": "Cancel",
+    "video.preparing": "Preparing the video… {percent}%",
+    "video.preparingHint": "It's compressed on your phone so it uploads fast. Don't close the app.",
+    "video.readyInfo": "{duration} · {size} MB · {resolution}",
+    "video.errorNotVideo": "That file is not a video. Pick another one.",
+    "video.errorTooLong": "The video is {duration} long. The maximum is {max}.",
+    "video.errorUnsupported":
+      "Your phone can't prepare this video. Try from another phone or update the system.",
+    "video.errorFailed": "The video could not be prepared. Try again or with another video.",
+    "video.audioDropped": "This video has no sound: your phone could not keep the audio.",
+    "video.photosOrVideo": "A post has photos or one video, not both.",
+    "video.publishSoon":
+      "Publishing videos isn't ready yet: for now only compression is being tested. Remove the video to post.",
 
     // Full image viewer (ImageViewer.jsx, point 60)
     "imageViewer.close": "Close",

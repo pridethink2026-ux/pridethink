@@ -72,6 +72,12 @@
   <div class="row" style="margin-top:8px"><video id="c1" playsinline></video><video id="c2" playsinline></video></div>
 </div>
 
+<h2>5. Botón de video en el Muro (prueba)</h2>
+<div class="box">
+  <p>Muestra el botón 🎥 en el editor de posts del Muro <b>solo en este teléfono</b>. Comprime y muestra la vista previa; todavía no publica.</p>
+  <div class="row"><button id="betaOn">Activar</button><button id="betaOff">Desactivar</button><span id="betaState"></span></div>
+</div>
+
 <h2>Resultados</h2>
 <div class="row"><button id="copy">Copiar resultados</button><span id="copied"></span></div>
 <div id="log" style="margin-top:8px"></div>
@@ -266,6 +272,23 @@
       }).catch(function (e) { log("Control: Video 2 sin toque → rechazado (" + e.name + ")"); });
     }, 5000);
   });
+
+  // ---------- 5. Botón de video en el Muro (localStorage, solo este teléfono) ----------
+  var BETA_KEY = "pt-video-beta";
+  function showBeta() {
+    var on = false;
+    try { on = localStorage.getItem(BETA_KEY) === "1"; } catch (e) { /* sin almacenamiento */ }
+    document.getElementById("betaState").textContent = on ? "Activado ✔ (abre el Muro)" : "Desactivado";
+  }
+  document.getElementById("betaOn").addEventListener("click", function () {
+    try { localStorage.setItem(BETA_KEY, "1"); } catch (e) { log("No se pudo guardar (¿navegación privada?)"); }
+    showBeta();
+  });
+  document.getElementById("betaOff").addEventListener("click", function () {
+    try { localStorage.removeItem(BETA_KEY); } catch (e) { /* nada */ }
+    showBeta();
+  });
+  showBeta();
 
   document.getElementById("copy").addEventListener("click", function () {
     var done = function (ok) { document.getElementById("copied").textContent = ok ? "Copiado ✔" : "No se pudo copiar: selecciona el texto a mano"; };

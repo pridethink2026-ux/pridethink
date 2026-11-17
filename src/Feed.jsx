@@ -17,6 +17,7 @@ import {
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
+import VideoPicker, { videoBetaEnabled } from "./VideoPicker";
 import MomentsStrip from "./MomentsStrip";
 import { useMoments } from "./MomentsContext";
 import { useSavedPosts } from "./SavedPostsContext";
@@ -195,6 +196,18 @@ const styles = {
     fontFamily: "inherit",
   },
   composerImagesWrap: { marginTop: "12px" },
+  composerVideoWrap: { marginTop: "10px" },
+  composerHint: { fontSize: "11px", color: "var(--text-muted)", margin: "8px 0 0" },
+  composerNotice: {
+    margin: "10px 0 0",
+    padding: "8px 12px",
+    borderRadius: "10px",
+    background: "var(--accent2-soft)",
+    border: "1px solid var(--accent2-soft-border)",
+    color: "var(--text)",
+    fontSize: "12px",
+    lineHeight: 1.4,
+  },
   postBtn: {
     marginTop: "10px",
     padding: "10px 20px",
@@ -1025,6 +1038,13 @@ export default function Feed({
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [composerImages, setComposerImages] = useState([]);
+  // Punto 101: video del próximo post (null, { status: "working" } o
+  // { status: "ready", ... }, ver VideoPicker.jsx). Un post lleva fotos O
+  // un video. Mientras dure la prueba, el botón solo aparece donde se
+  // activó desde la página de prueba (videoBetaEnabled).
+  const [composerVideo, setComposerVideo] = useState(null);
+  const [composerNotice, setComposerNotice] = useState("");
+  const [videoBeta] = useState(videoBetaEnabled);
   // Id del PRÓXIMO post a publicar, generado del lado del cliente (punto
   // 61): las fotos se suben a "postImages/{uid}/{postId}/img_N.jpg" ANTES
   // de que el post exista en Firestore, así que hace falta un id de
@@ -1086,6 +1106,12 @@ export default function Feed({
   // nacer con ese mismo id.
   const handlePost = async (e) => {
     e.preventDefault();
+    // Punto 101, parte 2: el video ya se comprime y se previsualiza, pero
+    // subirlo y publicarlo llega en la parte 3.
+    if (composerVideo) {
+      setComposerNotice(t("video.publishSoon"));
+      return;
+    }
     const trimmed = text.trim();
     if ((!trimmed && composerImages.length === 0) || !currentUid || !myProfile) return;
     setPosting(true);
@@ -1283,15 +1309,38 @@ export default function Feed({
               )}
             </div>
             <div style={styles.composerImagesWrap}>
-              <MultiImageUploader
-                basePath={`postImages/${currentUid}/${composerPostId}`}
-                images={composerImages}
-                onChange={setComposerImages}
-                maxImages={4}
-                maxSize={1024}
-              />
+              {!composerVideo && (
+                <MultiImageUploader
+                  basePath={`postImages/${currentUid}/${composerPostId}`}
+                  images={composerImages}
+                  onChange={setComposerImages}
+                  maxImages={4}
+                  maxSize={1024}
+                />
+              )}
+              {videoBeta &&
+                (composerImages.length === 0 ? (
+                  <div style={composerVideo ? undefined : styles.composerVideoWrap}>
+                    <VideoPicker
+                      key={composerPostId}
+                      disabled={posting}
+                      onChange={(value) => {
+                        setComposerVideo(value);
+                        setComposerNotice("");
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p style={styles.composerHint}>{t("video.photosOrVideo")}</p>
+                ))}
+              {composerNotice && <p style={styles.composerNotice}>{composerNotice}</p>}
             </div>
-            <button type="submit" className="pt-relief" style={styles.postBtn} disabled={posting}>
+            <button
+              type="submit"
+              className="pt-relief"
+              style={styles.postBtn}
+              disabled={posting || (composerVideo && composerVideo.status === "working")}
+            >
               {posting ? t("feed.posting") : t("feed.postButton")}
             </button>
             <div style={{ clear: "both" }} />
