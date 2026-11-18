@@ -40,13 +40,16 @@ import { compressVideo } from "./videoCompress";
     acaba de publicar (Feed.jsx limpia el editor cuando coincide)
   - { status: "working" | "paused", progress }   compresión, progress 0..1
   - { status: "ready", result }                  ver videoCompress.js
-  - { status: "error", code, duration, canRetry } falló la compresión
+  - { status: "error", code, duration, max, canRetry } falló la compresión
+    (en "tooLong": duration = segundos del tramo pedido, max = el máximo)
   - { status: "uploading", result, progress }    subiendo y publicando
   - { status: "uploadError", result }            falló la subida o el post
 */
 
 let state = { status: "idle" };
 let file = null; // el archivo elegido, para "Reintentar" la compresión
+// Tramo y máximo (punto 102: { start, end, maxSeconds }), para "Reintentar".
+let compressOptions = {};
 let job = null; // la compresión en curso
 let result = null; // el video ya comprimido
 let publishPayload = null; // datos del post, para "Reintentar" la subida
@@ -145,7 +148,7 @@ function runCompression() {
     if (percent === lastPercent) return;
     lastPercent = percent;
     setState({ ...state, progress });
-  });
+  }, compressOptions);
   job = thisJob;
 
   if (isHidden()) {
@@ -177,14 +180,23 @@ function runCompression() {
       // fallar igual.
       const canRetry = err.code === "failed";
       if (!canRetry) file = null;
-      setState({ status: "error", code: err.code, duration: err.duration || 0, canRetry });
+      setState({
+        status: "error",
+        code: err.code,
+        duration: err.duration || 0,
+        max: err.max || 0,
+        canRetry,
+      });
     }
   );
 }
 
-export function startVideoJob(pickedFile) {
+// options (punto 102, opcional): { start, end, maxSeconds }, ver
+// videoCompress.js. Sin options, el video entero con el máximo del Muro.
+export function startVideoJob(pickedFile, options = {}) {
   clearVideoJob();
   file = pickedFile;
+  compressOptions = { ...options };
   runCompression();
 }
 

@@ -67,7 +67,7 @@ export default function VideoPicker({ disabled = false }) {
       case "tooLong":
         return t("video.errorTooLong", {
           duration: formatDuration(job.duration),
-          max: formatDuration(MAX_VIDEO_SECONDS),
+          max: formatDuration(job.max || MAX_VIDEO_SECONDS),
         });
       case "unsupported":
         return t("video.errorUnsupported");

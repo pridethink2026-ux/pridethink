@@ -22,19 +22,35 @@
   pasa a AAC; si el teléfono no puede, falla con "audioFailed": un video
   que tenía sonido nunca se publica sin él.
 
+  RECORTE (punto 102): se puede pedir solo un tramo del video
+  ({ start, end } en segundos del original). Se recorta en el mismo paso
+  de la compresión (opción `trim` de Mediabunny): el video ya se
+  recodifica, así que el corte es exacto; el audio copiado puede empezar
+  unas milésimas antes (lo que mide un paquete de AAC). El máximo depende
+  del destino (`maxSeconds`: 90 s el Muro, 77 s Momentos) y se mide sobre
+  el TRAMO, no sobre el video entero: un video largo se puede publicar si
+  se elige una parte que entre. Sin tramo, se usa el video entero.
+
   Uso:
-    const job = compressVideo(file, (progress) => ...);  // progress 0..1
+    const job = compressVideo(file, (progress) => ..., {  // progress 0..1
+      start, end,            // opcional: el tramo elegido
+      maxSeconds,            // opcional: MAX_VIDEO_SECONDS por defecto
+    });
     const result = await job.promise;
     job.pause(); job.resume();  // al salir y volver a la app (videoJob.js)
     job.cancel();  // por ejemplo si la persona quita el video a la mitad
 
-  result: { blob, posterBlob, duration, width, height }
+  result: { blob, posterBlob, duration, width, height } (duration: la del
+  tramo publicado)
   Errores (error.code): "notVideo" | "tooLong" | "unsupported" |
   "audioFailed" | "failed" | "canceled". En "tooLong", error.duration trae
-  los segundos.
+  los segundos del tramo pedido y error.max el máximo.
 */
 
-export const MAX_VIDEO_SECONDS = 90;
+export const MAX_VIDEO_SECONDS = 90; // Muro (punto 101)
+export const MAX_MOMENT_VIDEO_SECONDS = 77; // Momentos (punto 102)
+// Un tramo más corto que esto no tiene sentido (y el editor no lo deja).
+export const MIN_TRIM_SECONDS = 1;
 const DURATION_MARGIN = 0.5; // un video "de 90 s" a veces mide 90,3 s
 const MAX_LONG_SIDE = 1280; // 720p: 1280x720 horizontal, 720x1280 vertical
 const VIDEO_BITRATE = 2000000;
@@ -109,7 +125,24 @@ async function pickAudioTrack(input) {
   return { track: primary, copy: false };
 }
 
-export function compressVideo(file, onProgress) {
+// El tramo pedido, ajustado al video real: { start, end, length, trimmed }.
+// "trimmed" es false si es el video entero (entonces no se pasa `trim`).
+// Exportada para el editor de recorte (parte 2), que usa el mismo cálculo.
+export function resolveTrim(duration, start, end) {
+  const total = Math.max(0, duration || 0);
+  let s = Number.isFinite(start) ? Math.min(Math.max(0, start), total) : 0;
+  let e = Number.isFinite(end) ? Math.min(Math.max(0, end), total) : total;
+  if (e - s < MIN_TRIM_SECONDS) {
+    // Tramo vacío o al revés: se toma lo mínimo desde el inicio pedido.
+    e = Math.min(total, s + MIN_TRIM_SECONDS);
+    s = Math.max(0, e - MIN_TRIM_SECONDS);
+  }
+  const trimmed = s > 0.05 || e < total - 0.05;
+  return { start: s, end: e, length: e - s, trimmed };
+}
+
+export function compressVideo(file, onProgress, options = {}) {
+  const maxSeconds = options.maxSeconds || MAX_VIDEO_SECONDS;
   let conversion = null;
   let canceled = false;
   // Pausa (videoJob.js la pide al salir de la app): se pasa a execute()
@@ -149,8 +182,10 @@ export function compressVideo(file, onProgress) {
 
       let duration = await input.getDurationFromMetadata().catch(() => null);
       if (!duration) duration = await input.computeDuration();
-      if (duration > MAX_VIDEO_SECONDS + DURATION_MARGIN) {
-        throw videoError("tooLong", { duration });
+      // Se mide el tramo elegido, no el video entero (punto 102).
+      const trim = resolveTrim(duration, options.start, options.end);
+      if (trim.length > maxSeconds + DURATION_MARGIN) {
+        throw videoError("tooLong", { duration: trim.length, max: maxSeconds });
       }
 
       const size = fitInside(videoTrack.displayWidth, videoTrack.displayHeight, MAX_LONG_SIDE);
@@ -173,6 +208,8 @@ export function compressVideo(file, onProgress) {
         input,
         output,
         showWarnings: false,
+        // Solo el tramo elegido (punto 102); sin recorte, el video entero.
+        ...(trim.trimmed ? { trim: { start: trim.start, end: trim.end } } : {}),
         // Permite correr el audio copiado hasta medio segundo para que
         // empiece junto con el video (el AAC de la cámara suele traer un
         // pequeño desfase al principio). Sin esto Mediabunny intentaría
@@ -227,12 +264,12 @@ export function compressVideo(file, onProgress) {
       if (!buffer) throw videoError("failed");
       const blob = new Blob([buffer], { type: "video/mp4" });
 
-      const posterBlob = await makePoster(mb, blob, duration);
+      const posterBlob = await makePoster(mb, blob, trim.length);
 
       return {
         blob,
         posterBlob,
-        duration,
+        duration: trim.length,
         width: size.width,
         height: size.height,
       };
