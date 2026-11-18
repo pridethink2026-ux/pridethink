@@ -284,6 +284,18 @@ export const translations = {
     "video.soundOff": "Silenciar",
     "video.fullscreen": "Pantalla completa",
     "video.rejected": "Este video no se aprobó y no se muestra a nadie.",
+    // Editor de recorte (VideoTrimmer.jsx, punto 102)
+    "video.trimTitle": "Recortar video",
+    "video.trimLoading": "Abriendo el video…",
+    "video.trimDone": "Listo",
+    "video.trimClose": "Cerrar",
+    "video.trimInfo": "Inicio {start} · Duración {length}",
+    "video.trimHint": "Arrastra los bordes para elegir el inicio y el final. Máximo {max}.",
+    "video.trimTooLongHint": "El video dura {duration} y el máximo es {max}: elige qué parte usar.",
+    "video.trimNoPreview":
+      "Tu teléfono no puede reproducir este video aquí: se ve el cuadro del borde elegido. Se publica igual.",
+    "video.trimStartLabel": "Inicio del recorte",
+    "video.trimEndLabel": "Final del recorte",
 
     // Visor de imagen completa (ImageViewer.jsx, punto 60)
     "imageViewer.close": "Cerrar",
@@ -1074,6 +1086,18 @@ export const translations = {
     "video.soundOff": "Mute",
     "video.fullscreen": "Full screen",
     "video.rejected": "This video was not approved and is not shown to anyone.",
+    // Trim editor (VideoTrimmer.jsx, point 102)
+    "video.trimTitle": "Trim video",
+    "video.trimLoading": "Opening the video…",
+    "video.trimDone": "Done",
+    "video.trimClose": "Close",
+    "video.trimInfo": "Start {start} · Length {length}",
+    "video.trimHint": "Drag the edges to choose the start and the end. Maximum {max}.",
+    "video.trimTooLongHint": "The video is {duration} long and the maximum is {max}: choose which part to use.",
+    "video.trimNoPreview":
+      "Your phone can't play this video here: you see the frame at the chosen edge. It will still be posted.",
+    "video.trimStartLabel": "Trim start",
+    "video.trimEndLabel": "Trim end",
 
     // Full image viewer (ImageViewer.jsx, point 60)
     "imageViewer.close": "Close",

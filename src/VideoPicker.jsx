@@ -1,14 +1,17 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLanguage } from "./LanguageContext";
 import { MAX_VIDEO_SECONDS } from "./videoCompress";
+import VideoTrimmer from "./VideoTrimmer";
 import { useVideoJob, startVideoJob, retryVideoJob, clearVideoJob } from "./videoJob";
 
 /*
   VideoPicker — punto 101 (videos en el Muro).
 
   Botón "🎥 Video" del editor de posts del Muro. Al elegir un video (de la
-  galería o grabándolo: el selector del teléfono ofrece las dos cosas) lo
-  prepara en el teléfono (videoCompress.js) y después muestra la vista
+  galería o grabándolo: el selector del teléfono ofrece las dos cosas) se
+  abre SIEMPRE el editor de recorte (VideoTrimmer.jsx, punto 102): ahí se
+  elige el tramo (máximo `maxSeconds`). Con "Listo" lo prepara en el
+  teléfono (videoCompress.js, solo ese tramo) y después muestra la vista
   previa del video ya comprimido con su duración, su peso y su resolución.
 
   El trabajo NO vive aquí sino en videoJob.js: si la persona se va a otra
@@ -28,10 +31,14 @@ function formatDuration(seconds) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export default function VideoPicker({ disabled = false }) {
+// maxSeconds (punto 102): el máximo del destino (90 el Muro, 77 Momentos).
+export default function VideoPicker({ disabled = false, maxSeconds = MAX_VIDEO_SECONDS }) {
   const { t } = useLanguage();
   const inputRef = useRef(null);
   const job = useVideoJob();
+  // El video elegido mientras está abierto el editor de recorte (punto 102,
+  // parte 2). Recién al tocar "Listo" se empieza a comprimir.
+  const [trimFile, setTrimFile] = useState(null);
   const result = job.status === "ready" ? job.result : null;
 
   // Object URLs de la vista previa: se crean al tener el resultado y se
@@ -57,8 +64,15 @@ export default function VideoPicker({ disabled = false }) {
   const handleFile = (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
-    if (file) startVideoJob(file);
+    if (file) setTrimFile(file);
   };
+
+  const handleTrimConfirm = ({ start, end }) => {
+    const file = trimFile;
+    setTrimFile(null);
+    if (file) startVideoJob(file, { start, end, maxSeconds });
+  };
+  const handleTrimCancel = useCallback(() => setTrimFile(null), []);
 
   const errorText = () => {
     switch (job.code) {
@@ -67,7 +81,7 @@ export default function VideoPicker({ disabled = false }) {
       case "tooLong":
         return t("video.errorTooLong", {
           duration: formatDuration(job.duration),
-          max: formatDuration(job.max || MAX_VIDEO_SECONDS),
+          max: formatDuration(job.max || maxSeconds),
         });
       case "unsupported":
         return t("video.errorUnsupported");
@@ -268,6 +282,15 @@ export default function VideoPicker({ disabled = false }) {
         onChange={handleFile}
         style={{ display: "none" }}
       />
+
+      {trimFile && (
+        <VideoTrimmer
+          file={trimFile}
+          maxSeconds={maxSeconds}
+          onConfirm={handleTrimConfirm}
+          onCancel={handleTrimCancel}
+        />
+      )}
     </div>
   );
 }

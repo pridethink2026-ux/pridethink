@@ -111,6 +111,93 @@ async function makePoster(mb, blob, duration) {
   }
 }
 
+// ---------------------------------------------------------------------
+// Para el editor de recorte (punto 102, parte 2: VideoTrimmer.jsx)
+// ---------------------------------------------------------------------
+
+const THUMB_LONG_SIDE = 160; // miniaturas de la barra
+const FRAME_LONG_SIDE = 720; // cuadro grande (si la vista previa no funciona)
+
+/*
+  Abre el video elegido para el editor de recorte, SIN comprimir nada:
+    const video = await openVideoForTrim(file);
+    video.duration, video.width, video.height
+    await video.thumbnails(count, (i, url) => ...)  // cuadros repartidos
+    const url = await video.frameAt(seconds)       // un cuadro grande
+    video.dispose()
+  Las miniaturas y los cuadros son URLs de objeto (blob:): quien las pide
+  las libera con URL.revokeObjectURL. Salen del archivo con Mediabunny, no
+  del <video>: así funcionan aunque el navegador no sepa reproducir el
+  archivo (por ejemplo, un .mov HEVC del iPhone en algunos Android).
+  Errores (error.code): "unsupported" | "notVideo", igual que compressVideo.
+*/
+export async function openVideoForTrim(file) {
+  if (typeof window.VideoEncoder !== "function" || typeof window.VideoDecoder !== "function") {
+    throw videoError("unsupported");
+  }
+  const mb = await import("mediabunny");
+  const input = new mb.Input({ formats: mb.ALL_FORMATS, source: new mb.BlobSource(file) });
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    input.dispose();
+  };
+  try {
+    let track;
+    try {
+      track = await input.getPrimaryVideoTrack();
+    } catch (e) {
+      throw videoError("notVideo");
+    }
+    if (!track) throw videoError("notVideo");
+    if (!(await track.canDecode())) throw videoError("unsupported");
+    let duration = await input.getDurationFromMetadata().catch(() => null);
+    if (!duration) duration = await input.computeDuration();
+    if (!duration || !isFinite(duration)) throw videoError("notVideo");
+
+    const thumbSize = fitInside(track.displayWidth, track.displayHeight, THUMB_LONG_SIDE);
+    const frameSize = fitInside(track.displayWidth, track.displayHeight, FRAME_LONG_SIDE);
+    const thumbSink = new mb.CanvasSink(track, { ...thumbSize, fit: "fill" });
+    const frameSink = new mb.CanvasSink(track, { ...frameSize, fit: "fill" });
+    const toUrl = async (wrapped) => (wrapped ? URL.createObjectURL(await canvasToJpeg(wrapped.canvas)) : null);
+
+    return {
+      duration,
+      width: track.displayWidth,
+      height: track.displayHeight,
+      // Un cuadro en el medio de cada tramo: más representativo que el
+      // primero (que suele ser negro).
+      thumbnails: async (count, onThumb) => {
+        const step = duration / count;
+        const times = Array.from({ length: count }, (_, i) => Math.min(duration - 0.05, step * (i + 0.5)));
+        let i = 0;
+        for await (const wrapped of thumbSink.canvasesAtTimestamps(times)) {
+          if (disposed) return;
+          const url = await toUrl(wrapped).catch(() => null);
+          if (disposed) {
+            if (url) URL.revokeObjectURL(url);
+            return;
+          }
+          onThumb(i, url);
+          i += 1;
+        }
+      },
+      frameAt: async (seconds) => {
+        if (disposed) return null;
+        const at = Math.min(Math.max(0, seconds), Math.max(0, duration - 0.05));
+        const wrapped = await frameSink.getCanvas(at);
+        return disposed ? null : toUrl(wrapped);
+      },
+      dispose,
+    };
+  } catch (err) {
+    dispose();
+    if (err && err.code) throw err;
+    throw videoError("notVideo");
+  }
+}
+
 // Elige la pista de audio: la primera que se pueda copiar (algunos iPhone
 // graban más de una, por ejemplo audio espacial además del estéreo); si
 // ninguna, la principal (habrá que recodificarla).
