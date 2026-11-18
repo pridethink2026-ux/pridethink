@@ -18,7 +18,7 @@ import {
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
 import VideoPicker from "./VideoPicker";
-import { useVideoJob, clearVideoJob, publishVideoPost } from "./videoJob";
+import { useVideoJob, clearVideoJob, publishVideo, VIDEO_DEST_FEED } from "./videoJob";
 import PostVideo from "./PostVideo";
 import MomentsStrip from "./MomentsStrip";
 import { useMoments } from "./MomentsContext";
@@ -1057,7 +1057,7 @@ export default function Feed({
   // Punto 101: el video del próximo post vive en videoJob.js (no aquí),
   // para que la compresión siga si la persona se va a otra sección. Un post
   // lleva fotos O un video.
-  const videoJob = useVideoJob();
+  const videoJob = useVideoJob(VIDEO_DEST_FEED);
   const hasVideo = videoJob.status !== "idle";
   const videoBusy =
     videoJob.status === "working" || videoJob.status === "paused" || videoJob.status === "uploading";
@@ -1087,7 +1087,7 @@ export default function Feed({
   // Punto 101: cuando videoJob.js termina de publicar el post de este
   // borrador (aunque haya terminado con el Muro cerrado), se limpia el
   // editor y se rota el id, igual que después de un post normal.
-  const publishedPostId = videoJob.status === "idle" ? videoJob.publishedPostId : null;
+  const publishedPostId = videoJob.status === "idle" ? videoJob.publishedId : null;
   useEffect(() => {
     if (!publishedPostId || publishedPostId !== composerPostId) return;
     setText("");
@@ -1111,7 +1111,8 @@ export default function Feed({
   // Detecta sesión activa y trae tu propio perfil (nombre/identidad para firmar tus posts)
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      setCurrentUid(user ? user.uid : null);    });
+      setCurrentUid(user ? user.uid : null);
+    });
     return unsub;
   }, []);
 
@@ -1123,7 +1124,7 @@ export default function Feed({
       setText("");
       setComposerImages([]);
       setComposerPostId(doc(collection(db, "posts")).id);
-      clearVideoJob();
+      clearVideoJob(VIDEO_DEST_FEED);
     }
     composerDraft.uid = currentUid;
   }, [currentUid]);
@@ -1168,7 +1169,7 @@ export default function Feed({
       }
       if (!currentUid || !myProfile) return;
       postMention.closeMentions();
-      publishVideoPost({
+      publishVideo(VIDEO_DEST_FEED, {
         uid: currentUid,
         postId: composerPostId,
         fields: {

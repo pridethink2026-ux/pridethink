@@ -1,6 +1,6 @@
 import React from "react";
 import { useLanguage } from "./LanguageContext";
-import { useVideoJob } from "./videoJob";
+import { useVideoJob, VIDEO_DEST_FEED } from "./videoJob";
 
 /*
   VideoJobBadge — punto 101 (videos en el Muro).
@@ -19,7 +19,7 @@ import { useVideoJob } from "./videoJob";
 
 export default function VideoJobBadge({ style }) {
   const { t } = useLanguage();
-  const job = useVideoJob();
+  const job = useVideoJob(VIDEO_DEST_FEED);
   if (job.status === "idle") return null;
 
   const percent = Math.round((job.progress || 0) * 100);

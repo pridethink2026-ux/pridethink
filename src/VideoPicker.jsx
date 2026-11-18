@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLanguage } from "./LanguageContext";
 import { MAX_VIDEO_SECONDS } from "./videoCompress";
 import VideoTrimmer from "./VideoTrimmer";
-import { useVideoJob, startVideoJob, retryVideoJob, clearVideoJob } from "./videoJob";
+import { useVideoJob, startVideoJob, retryVideoJob, clearVideoJob, VIDEO_DEST_FEED } from "./videoJob";
 
 /*
   VideoPicker — punto 101 (videos en el Muro).
@@ -20,7 +20,7 @@ import { useVideoJob, startVideoJob, retryVideoJob, clearVideoJob } from "./vide
   sigue; si se interrumpió, "Reintentar" vuelve a empezar con el mismo
   archivo, sin elegirlo otra vez.
 
-  La subida empieza al tocar "Publicar" (Feed.jsx → publishVideoPost), no
+  La subida empieza al tocar "Publicar" (Feed.jsx → publishVideo), no
   al elegir el video, para no dejar archivos huérfanos si la persona se
   arrepiente. Mientras sube: "Publicando video… 45 %"; si falla:
   "Reintentar" (con el mismo video ya comprimido) o "Descartar".
@@ -31,11 +31,19 @@ function formatDuration(seconds) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-// maxSeconds (punto 102): el máximo del destino (90 el Muro, 77 Momentos).
-export default function VideoPicker({ disabled = false, maxSeconds = MAX_VIDEO_SECONDS }) {
+// Punto 102: destination es el trabajo de videoJob.js (VIDEO_DEST_FEED o
+// VIDEO_DEST_MOMENT); maxSeconds, el máximo de ese destino (90 el Muro,
+// 77 Momentos).
+export default function VideoPicker({
+  disabled = false,
+  destination = VIDEO_DEST_FEED,
+  maxSeconds = MAX_VIDEO_SECONDS,
+}) {
   const { t } = useLanguage();
   const inputRef = useRef(null);
-  const job = useVideoJob();
+  const job = useVideoJob(destination);
+  const clear = () => clearVideoJob(destination);
+  const retry = () => retryVideoJob(destination);
   // El video elegido mientras está abierto el editor de recorte (punto 102,
   // parte 2). Recién al tocar "Listo" se empieza a comprimir.
   const [trimFile, setTrimFile] = useState(null);
@@ -70,7 +78,7 @@ export default function VideoPicker({ disabled = false, maxSeconds = MAX_VIDEO_S
   const handleTrimConfirm = ({ start, end }) => {
     const file = trimFile;
     setTrimFile(null);
-    if (file) startVideoJob(file, { start, end, maxSeconds });
+    if (file) startVideoJob(destination, file, { start, end, maxSeconds });
   };
   const handleTrimCancel = useCallback(() => setTrimFile(null), []);
 
@@ -195,7 +203,7 @@ export default function VideoPicker({ disabled = false, maxSeconds = MAX_VIDEO_S
                 ? t("video.paused", { percent })
                 : t("video.preparing", { percent })}
             </span>
-            <button type="button" style={linkBtnStyle} onClick={clearVideoJob}>
+            <button type="button" style={linkBtnStyle} onClick={clear}>
               {t("video.cancel")}
             </button>
           </div>
@@ -224,10 +232,10 @@ export default function VideoPicker({ disabled = false, maxSeconds = MAX_VIDEO_S
         <div>
           <p style={errorStyle}>{t("video.errorUpload")}</p>
           <div style={retryRowStyle}>
-            <button type="button" className="pt-relief" style={addBtnStyle} onClick={retryVideoJob}>
+            <button type="button" className="pt-relief" style={addBtnStyle} onClick={retry}>
               ↻ {t("video.retry")}
             </button>
-            <button type="button" style={linkBtnStyle} onClick={clearVideoJob}>
+            <button type="button" style={linkBtnStyle} onClick={clear}>
               {t("video.discard")}
             </button>
           </div>
@@ -252,7 +260,7 @@ export default function VideoPicker({ disabled = false, maxSeconds = MAX_VIDEO_S
                 resolution: `${result.width}×${result.height}`,
               })}
             </span>
-            <button type="button" style={linkBtnStyle} onClick={clearVideoJob} disabled={disabled}>
+            <button type="button" style={linkBtnStyle} onClick={clear} disabled={disabled}>
               ✕ {t("video.remove")}
             </button>
           </div>
@@ -264,10 +272,10 @@ export default function VideoPicker({ disabled = false, maxSeconds = MAX_VIDEO_S
           <p style={errorStyle}>{errorText()}</p>
           {job.canRetry && (
             <div style={retryRowStyle}>
-              <button type="button" className="pt-relief" style={addBtnStyle} onClick={retryVideoJob}>
+              <button type="button" className="pt-relief" style={addBtnStyle} onClick={retry}>
                 ↻ {t("video.retry")}
               </button>
-              <button type="button" style={linkBtnStyle} onClick={clearVideoJob}>
+              <button type="button" style={linkBtnStyle} onClick={clear}>
                 {t("video.remove")}
               </button>
             </div>

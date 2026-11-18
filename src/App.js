@@ -8,7 +8,7 @@ import Notifications, { useNotifications, NotificationsScreen } from "./Notifica
 import MomentViewer from "./MomentViewer";
 import { StarRainHost } from "./StarRain";
 import VideoJobBadge from "./VideoJobBadge";
-import { getVideoJobState } from "./videoJob";
+import { getVideoJobState, VIDEO_DEST_FEED } from "./videoJob";
 import HomeIcon from "./HomeNavIcon";
 import { lazyWithReload, LoadErrorBoundary, ScreenLoading } from "./lazyLoad";
 import { useIsMobile } from "./utils";
@@ -1085,7 +1085,7 @@ function App() {
     // Punto 101: con un video del próximo post en curso, el Muro abre en
     // una pestaña donde se ve el editor (en Explorar, Grupos y Eventos no
     // está).
-    if (getVideoJobState().status !== "idle" && feedTab !== "todos" && feedTab !== "siguiendo") {
+    if (getVideoJobState(VIDEO_DEST_FEED).status !== "idle" && feedTab !== "todos" && feedTab !== "siguiendo") {
       setFeedTab("todos");
     }
     const alreadyOnWall = view === "feed" && !anyOverlayOpen;
