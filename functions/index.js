@@ -33,6 +33,10 @@
   postVideos/). El lugar para un filtro automático (por ejemplo Google
   Video Intelligence) es moderateVideo().
 
+  Punto 102 — approveMomentVideo: lo mismo para un momento con video
+  (moments/{momentId}); al aprobar escribe además imageURL = la miniatura.
+  Las dos usan reviewVideoDoc().
+
   Punto 101, parte 6 — limpieza de Storage:
   - cleanupDeletedPostFiles: al borrar un post, borra su carpeta de video
     (postVideos/{autor}/{postId}/) y la de fotos (postImages/{autor}/{postId}/).
@@ -293,33 +297,34 @@ const MAX_POSTER_BYTES = 1024 * 1024;
 // Intelligence (explicit content detection) sobre gs://{bucket}/{ruta}: si
 // detecta contenido explícito, devolver { decision: "rejected", reason }.
 // Hoy aprueba todo lo que pasó las comprobaciones de abajo.
-// (paths: las rutas de videoStorage.videoPaths.)
-async function moderateVideo(/* { post, paths } */) {
+// (kind: "post" o "moment"; doc: los datos del documento; paths: las rutas
+// de videoStorage.)
+async function moderateVideo(/* { kind, doc, paths } */) {
   return { decision: "approved" };
 }
 
-exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => {
-  const snap = event.data;
-  if (!snap) return;
-  const post = snap.data();
-  const video = post && post.video;
+// Revisa y aprueba (o rechaza) el video de un documento recién creado.
+// Lo usan approvePostVideo y approveMomentVideo (punto 102): mismo flujo.
+// - kind: "post" | "moment" (para los registros y moderateVideo)
+// - paths: dónde tienen que estar los archivos (videoStorage)
+// - extraOnApprove(urls): campos de más que se escriben al aprobar
+async function reviewVideoDoc({ snap, kind, id, paths, extraOnApprove }) {
+  const data = snap.data();
+  const video = data && data.video;
   if (!video || video.status !== "pending") return;
 
-  const postId = event.params.postId;
-  const paths = videoStorage.videoPaths(post.authorId, postId);
-
   const reject = async (reason) => {
-    logger.warn("video: rechazado", { postId, reason });
+    logger.warn("video: rechazado", { kind, id, reason });
     await videoStorage
       .deleteVideoFiles(paths)
-      .catch((err) => logger.warn("video: no se pudieron borrar los archivos", { postId, err: String(err) }));
+      .catch((err) => logger.warn("video: no se pudieron borrar los archivos", { kind, id, err: String(err) }));
     await snap.ref
       .update({
         "video.status": "rejected",
         "video.reason": reason,
         "video.moderatedAt": FieldValue.serverTimestamp(),
       })
-      .catch(() => {}); // el post pudo haberse borrado
+      .catch(() => {}); // el documento pudo haberse borrado
   };
 
   if (video.path !== paths.video || video.posterPath !== paths.poster) {
@@ -344,25 +349,56 @@ exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => 
     return;
   }
 
-  const { decision, reason } = await moderateVideo({ post, paths });
+  const { decision, reason } = await moderateVideo({ kind, doc: data, paths });
   if (decision !== "approved") {
     await reject(reason || "moderation");
     return;
   }
 
-  const { url, posterUrl } = await videoStorage.getVideoPlaybackUrls(paths);
+  const urls = await videoStorage.getVideoPlaybackUrls(paths);
   try {
     await snap.ref.update({
       "video.status": "approved",
-      "video.url": url,
-      "video.posterUrl": posterUrl,
+      "video.url": urls.url,
+      "video.posterUrl": urls.posterUrl,
       "video.moderatedAt": FieldValue.serverTimestamp(),
+      ...(extraOnApprove ? extraOnApprove(urls) : {}),
     });
-    logger.info("video: aprobado", { postId, bytes: info.video.size });
+    logger.info("video: aprobado", { kind, id, bytes: info.video.size });
   } catch (err) {
-    // El post se borró mientras tanto: no hay nada que aprobar.
-    logger.info("video: el post ya no existe", { postId });
+    // Se borró mientras tanto: no hay nada que aprobar.
+    logger.info("video: el documento ya no existe", { kind, id });
   }
+}
+
+exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const postId = event.params.postId;
+  await reviewVideoDoc({
+    snap,
+    kind: "post",
+    id: postId,
+    paths: videoStorage.videoPaths(snap.get("authorId"), postId),
+  });
+});
+
+// Punto 102 — approveMomentVideo: lo mismo para un momento con video
+// (moments/{momentId}, creado por src/videoJob.js en "pending"). Al
+// aprobarlo escribe además imageURL = la miniatura, así la tira, las
+// respuestas por chat y los reportes (que usan imageURL) funcionan igual
+// que con una foto.
+exports.approveMomentVideo = onDocumentCreated("moments/{momentId}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const momentId = event.params.momentId;
+  await reviewVideoDoc({
+    snap,
+    kind: "moment",
+    id: momentId,
+    paths: videoStorage.momentVideoPaths(snap.get("authorId"), momentId),
+    extraOnApprove: (urls) => ({ imageURL: urls.posterUrl }),
+  });
 });
 
 // ---------------------------------------------------------------------------

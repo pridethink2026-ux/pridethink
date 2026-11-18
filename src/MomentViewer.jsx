@@ -438,6 +438,10 @@ export default function MomentViewer({
   const currentId = current ? current.id : null;
   const isMine = authorUid === currentUid;
   const imgLoaded = !!currentId && loadedId === currentId;
+  // Punto 102: momento con video todavía sin aprobar (o rechazado). Uno
+  // aprobado se ve, por ahora, con su miniatura (imageURL) como una foto;
+  // la parte 5 lo reproduce.
+  const videoNotReady = !!current?.video && current.video.status !== "approved";
   const me = allUsers.find((u) => u.uid === currentUid);
   // Con la confirmación de borrar, el reporte, la lista de quién vio, el
   // aviso abiertos, o mientras escribes una respuesta, todo se detiene.
@@ -645,8 +649,14 @@ export default function MomentViewer({
   // Precarga la foto siguiente para que no haya espera al avanzar.
   useEffect(() => {
     const following = moments && moments[momentPos + 1];
-    if (following) new Image().src = following.imageURL;
+    if (following && following.imageURL) new Image().src = following.imageURL;
   }, [moments, momentPos]);
+
+  // Punto 102: un momento con video sin aprobar no tiene foto que esperar;
+  // el aviso cuenta como "cargado" para que el tiempo corra igual.
+  useEffect(() => {
+    if (current && videoNotReady) setLoadedId(current.id);
+  }, [current, videoNotReady]);
 
   // Temporizador: corre solo con la foto cargada y sin pausa.
   useEffect(() => {
@@ -916,7 +926,13 @@ export default function MomentViewer({
             e.preventDefault();
           }}
         >
-          {current ? (
+          {current && videoNotReady ? (
+            // Punto 102: un momento con video pendiente o rechazado (solo lo
+            // lee su autor): aviso en lugar de la foto.
+            <span style={styles.status} role="status">
+              🎥 {current.video.status === "rejected" ? t("video.rejected") : t("video.processing")}
+            </span>
+          ) : current ? (
             <img
               key={current.id}
               ref={imgRef}

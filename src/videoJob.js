@@ -5,7 +5,8 @@ import { notify } from "./utils";
 import { compressVideo } from "./videoCompress";
 // Subir y borrar los archivos del video: SIEMPRE por videoStorage.js (ahí
 // está todo lo que depende de dónde se guardan los videos).
-import { videoPaths, uploadVideoFiles, deleteVideoFiles } from "./videoStorage";
+import { videoPaths, momentVideoPaths, uploadVideoFiles, deleteVideoFiles } from "./videoStorage";
+import { createVideoMoment, MomentLimitError } from "./moments";
 
 /*
   videoJob.js — puntos 101 y 102 (videos en el Muro y en Momentos).
@@ -56,7 +57,13 @@ import { videoPaths, uploadVideoFiles, deleteVideoFiles } from "./videoStorage";
   - { status: "error", code, duration, max, canRetry } falló la compresión
     (en "tooLong": duration = segundos del tramo pedido, max = el máximo)
   - { status: "uploading", result, progress }    subiendo y publicando
-  - { status: "uploadError", result }            falló la subida o el documento
+  - { status: "uploadError", result, reason }    falló la subida o el documento
+    (reason: un motivo conocido, por ejemplo "limit" en Momentos, o null)
+
+  PUBLICAR SOLO (punto 102): startVideoJob(dest, file, options,
+  { publishWhenReady: payload }) publica apenas termina la compresión, sin
+  esperar un toque. Lo usa Momentos (el momento se publica al terminar de
+  prepararse, aunque la persona se haya ido a otra sección).
 */
 
 export const VIDEO_DEST_FEED = "feed";
@@ -70,7 +77,10 @@ export const VIDEO_DEST_MOMENT = "moment";
 // - id(payload): el id del documento (y de la carpeta del video);
 // - paths(payload): dónde van los archivos (videoStorage.js);
 // - create(payload, res, paths): crea el documento en "pending". Lo que
-//   pase después de crearlo (avisos) no debe hacer fallar la publicación.
+//   pase después de crearlo (afterCreate: avisos) no debe hacer fallar la
+//   publicación.
+// - errorReason(err) (opcional): un motivo conocido para el aviso de error
+//   (queda en el estado "uploadError" como `reason`).
 
 const PUBLISHERS = {
   /*
@@ -126,7 +136,18 @@ const PUBLISHERS = {
       );
     },
   },
-  // [VIDEO_DEST_MOMENT]: se agrega en la parte 4 (publicar en Momentos).
+  /*
+    Momentos (punto 102, parte 4). payload: { uid, momentId, caption }.
+    Crea moments/{momentId} en "pending" junto con el índice del autor
+    (moments.js, createVideoMoment). Sin avisos después.
+  */
+  [VIDEO_DEST_MOMENT]: {
+    id: (payload) => payload.momentId,
+    paths: (payload) => momentVideoPaths(payload.uid, payload.momentId),
+    create: (payload, res, paths) => createVideoMoment(payload.uid, payload.momentId, payload.caption, res, paths),
+    // Con 30 momentos activos no se puede: lo dice el aviso del error.
+    errorReason: (err) => (err instanceof MomentLimitError ? "limit" : null),
+  },
 };
 
 // ---------------------------------------------------------------------
@@ -198,6 +219,7 @@ function createJob(dest) {
   let publishRun = 0; // para ignorar una subida que se canceló
   let createdId = null; // el último documento que sí llegó a crearse
   let currentUpload = null; // la subida en curso (uploadVideoFiles)
+  let autoPublish = null; // payload para publicar apenas esté listo (publishWhenReady)
   const listeners = new Set();
 
   const setState = (next) => {
@@ -240,6 +262,12 @@ function createJob(dest) {
         job = null;
         result = res;
         setState({ status: "ready", result: res });
+        if (autoPublish && PUBLISHERS[dest]) {
+          // Publicar solo (Momentos): sin esperar un toque.
+          publishPayload = autoPublish;
+          runPublish();
+          return;
+        }
         syncWakeLock();
       },
       (err) => {
@@ -323,7 +351,8 @@ function createJob(dest) {
       if (run !== publishRun) return;
       // eslint-disable-next-line no-console
       console.warn(`publishVideo (${dest}):`, err);
-      setState({ status: "uploadError", result: res });
+      const reason = (publisher.errorReason && publisher.errorReason(err)) || null;
+      setState({ status: "uploadError", result: res, reason });
       syncWakeLock();
     }
   };
@@ -346,6 +375,7 @@ function createJob(dest) {
       deleteVideoFiles(publisher.paths(publishPayload));
     }
     publishPayload = null;
+    autoPublish = null;
     file = null;
     result = null;
     setState({ status: "idle" });
@@ -375,10 +405,11 @@ function createJob(dest) {
         else currentUpload.resume();
       }
     },
-    start: (pickedFile, options) => {
+    start: (pickedFile, options, extra) => {
       clear();
       file = pickedFile;
       compressOptions = { ...options };
+      autoPublish = (extra && extra.publishWhenReady) || null;
       runCompression();
     },
     retry: () => {
@@ -426,8 +457,10 @@ export function getVideoJobState(dest) {
 
 // options (punto 102, opcional): { start, end, maxSeconds }, ver
 // videoCompress.js. Sin options, el video entero con el máximo del Muro.
-export function startVideoJob(dest, pickedFile, options = {}) {
-  jobFor(dest).start(pickedFile, options);
+// extra (opcional): { publishWhenReady: payload } para publicar apenas
+// termine la compresión (Momentos).
+export function startVideoJob(dest, pickedFile, options = {}, extra = null) {
+  jobFor(dest).start(pickedFile, options, extra);
 }
 
 export function retryVideoJob(dest) {

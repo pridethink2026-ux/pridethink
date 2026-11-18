@@ -1,8 +1,9 @@
-import { Timestamp, collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { Timestamp, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { db } from "./firebase";
 import { storage } from "./firebaseStorage";
 import { sendChatMessage } from "./chatMessages";
+import { deleteVideoFiles, momentVideoPaths } from "./videoStorage";
 
 /*
   moments.js
@@ -17,6 +18,10 @@ import { sendChatMessage } from "./chatMessages";
     MomentTextEditor.jsx; vacío si no se escribió nada. "music" (punto 79,
     opcional) es { trackId, startSec }: qué pista de musicLibrary.json y
     desde qué segundo suena; lo elige MomentMusicStep.jsx.
+    Momento con VIDEO (punto 102): { authorId, imageURL ("" hasta que se
+    aprueba, después la miniatura), caption, createdAt, expireAt, video:
+    { status, path, posterPath, duration, width, height, size, url?,
+    posterUrl? } }, sin storagePath ni music. Ver createVideoMoment.
   - momentIndex/{authorUid} → { ids, times: { [id]: { createdAt,
     expireAt } } en milisegundos, expireAt }. Es lo que escucha
     MomentsContext.jsx para saber quién tiene momentos activos sin hacer
@@ -227,6 +232,55 @@ export async function publishMoment(uid, blob, myIndex, caption = "", music = nu
   }
 }
 
+// Crea un momento con VIDEO (punto 102) cuando el video y su miniatura ya
+// se subieron (videoJob.js → videoStorage.js). Nace en "pending" y sin
+// links; la Cloud Function approveMomentVideo lo aprueba y escribe
+// video.url, video.posterUrl e imageURL (la miniatura). Hasta entonces solo
+// lo ve su autor (firestore.rules, momentoVisibleParaOtros).
+// El índice se lee DE NUEVO aquí (no se usa el de MomentsContext): la
+// subida puede tardar un minuto y mientras tanto se pudo publicar otro
+// momento; reescribir un índice viejo lo borraría de la lista.
+// res: el video comprimido (videoCompress.js); paths: momentVideoPaths.
+export async function createVideoMoment(uid, momentId, caption, res, paths) {
+  // Sin tiempo límite a propósito (a diferencia de publishMoment): si el
+  // guardado terminara después de avisar el error, "Descartar" borraría
+  // los archivos de un momento que sí se creó. Igual que el post con video.
+  const indexSnap = await getDoc(doc(db, "momentIndex", uid));
+  const now = Date.now();
+  const active = getActiveEntries(indexSnap.exists() ? indexSnap.data() : null, now);
+  if (active.length >= MAX_ACTIVE_MOMENTS) throw new MomentLimitError();
+  const expireAt = now + MOMENT_TTL_MS;
+  const entries = [...active, { id: momentId, createdAt: now, expireAt }];
+  const times = {};
+  entries.forEach((e) => {
+    times[e.id] = { createdAt: e.createdAt, expireAt: e.expireAt };
+  });
+  // Mismo batch a propósito, igual que publishMoment.
+  const batch = writeBatch(db);
+  batch.set(doc(db, "moments", momentId), {
+    authorId: uid,
+    imageURL: "",
+    caption: (caption || "").slice(0, MAX_CAPTION_LENGTH),
+    createdAt: serverTimestamp(),
+    expireAt: Timestamp.fromMillis(expireAt),
+    video: {
+      status: "pending",
+      path: paths.video,
+      posterPath: paths.poster,
+      duration: Math.round(res.duration * 10) / 10,
+      width: res.width,
+      height: res.height,
+      size: res.blob.size,
+    },
+  });
+  batch.set(doc(db, "momentIndex", uid), {
+    ids: entries.map((e) => e.id),
+    times,
+    expireAt: Timestamp.fromMillis(expireAt),
+  });
+  await batch.commit();
+}
+
 // Responde un momento ajeno por chat (commit 7): mensaje tipo
 // "moment_reply" en la conversación con el autor (mismo chatId y mismo
 // esqueleto que SharePostModal.jsx). Guarda una copia de la miniatura y
@@ -268,5 +322,10 @@ export async function deleteMoment(uid, moment, myIndex) {
     });
   }
   await batch.commit();
-  deleteObject(ref(storage, moment.storagePath)).catch(() => {});
+  if (moment.video) {
+    // Momento con video (punto 102): siempre por videoStorage.js.
+    deleteVideoFiles(momentVideoPaths(uid, moment.id));
+  } else {
+    deleteObject(ref(storage, moment.storagePath)).catch(() => {});
+  }
 }

@@ -594,6 +594,12 @@ export const translations = {
     "moments.viewMine": "Ver tus momentos",
     "moments.publishing": "Publicando...",
     "moments.published": "¡Listo! Tu momento se ve durante 24 horas.",
+    // Momento con video (MomentsStrip.jsx / MomentVideoStatus.jsx, punto 102)
+    "moments.videoPreparing": "Preparando tu momento… {percent} %",
+    "moments.videoUploading": "Publicando tu momento… {percent} %",
+    "moments.videoPublished": "¡Listo! Tu momento con video se verá en cuanto esté procesado, durante 24 horas.",
+    "moments.videoErrorUpload": "No se pudo publicar tu momento. Revisa tu conexión y toca Reintentar.",
+    "moments.videoBusy": "Ya se está preparando un momento con video. Espera a que termine.",
     "moments.privateNotice": "Tu perfil es privado: solo tú verás este momento.",
     "moments.limitReached": "Ya tienes {max} momentos activos, que es el máximo. Espera a que venza alguno para publicar otro.",
     "moments.errorPublish":
@@ -1385,6 +1391,12 @@ export const translations = {
     "moments.viewMine": "View your moments",
     "moments.publishing": "Posting...",
     "moments.published": "Done! Your moment is visible for 24 hours.",
+    // Moment with video (MomentsStrip.jsx / MomentVideoStatus.jsx, point 102)
+    "moments.videoPreparing": "Preparing your moment… {percent}%",
+    "moments.videoUploading": "Posting your moment… {percent}%",
+    "moments.videoPublished": "Done! Your video moment will show as soon as it's processed, for 24 hours.",
+    "moments.videoErrorUpload": "Your moment could not be posted. Check your connection and tap Retry.",
+    "moments.videoBusy": "A video moment is already being prepared. Wait until it finishes.",
     "moments.privateNotice": "Your profile is private: only you will see this moment.",
     "moments.limitReached": "You already have {max} active moments, which is the maximum. Wait for one to expire to post another.",
     "moments.errorPublish":

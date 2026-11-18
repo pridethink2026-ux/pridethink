@@ -397,7 +397,15 @@ service cloud.firestore {
     function puedeInteractuarConMomento(momento) {
       return momento.authorId != request.auth.uid
         && momento.expireAt > request.time
+        && momentoVisibleParaOtros(momento)
         && puedeVerMomentosDe(momento.authorId);
+    }
+
+    // Punto 102: un momento con video solo lo ven los demás (y solo se
+    // puede ver, responder o darle estrella) cuando la Cloud Function
+    // approveMomentVideo lo aprobó. Un momento de foto, siempre.
+    function momentoVisibleParaOtros(momento) {
+      return !('video' in momento) || momento.video.status == 'approved';
     }
 
     // Respuesta a un momento (commit 7): mensaje de chat
@@ -1275,27 +1283,60 @@ service cloud.firestore {
       );
     }
 
+    // Momento con VIDEO (punto 102): nace en "pending", con las rutas de su
+    // propia carpeta (momentVideos/{autor}/{momentId}/), sin links
+    // (imageURL vacío; la Cloud Function approveMomentVideo escribe
+    // video.url, video.posterUrl e imageURL = la miniatura al aprobarlo),
+    // sin storagePath y sin música (decisión del punto 102). Duración hasta
+    // 77 s (+ margen), medidas hasta 1280, peso hasta 40 MB, igual que el
+    // video de un post.
+    function momentoConVideoValido(momentId) {
+      let d = request.resource.data;
+      let base = 'momentVideos/' + request.auth.uid + '/' + momentId + '/';
+      return d.keys().hasOnly(['authorId', 'imageURL', 'caption', 'createdAt', 'expireAt', 'video'])
+        && d.imageURL == ''
+        && d.video is map
+        && d.video.keys().hasOnly(['status', 'path', 'posterPath', 'duration', 'width', 'height', 'size'])
+        && d.video.keys().hasAll(['status', 'path', 'posterPath', 'duration', 'width', 'height', 'size'])
+        && d.video.status == 'pending'
+        && d.video.path == base + 'video.mp4'
+        && d.video.posterPath == base + 'poster.jpg'
+        && d.video.duration is number && d.video.duration > 0 && d.video.duration <= 80
+        && d.video.width is int && d.video.width > 0 && d.video.width <= 1280
+        && d.video.height is int && d.video.height > 0 && d.video.height <= 1280
+        && d.video.size is int && d.video.size > 0 && d.video.size < 40 * 1024 * 1024;
+    }
+
+    // Momento con FOTO (punto 66): la foto en momentImages/ con el nombre
+    // del momento; "music" opcional (punto 79).
+    function momentoConFotoValido(momentId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['authorId', 'imageURL', 'storagePath', 'caption', 'createdAt', 'expireAt', 'music'])
+        && textoValido(d.imageURL, 2000)
+        && d.storagePath == 'momentImages/' + request.auth.uid + '/' + momentId + '.jpg'
+        && musicaDeMomentoValida(d);
+    }
+
     match /moments/{momentId} {
+      // Un momento con video pendiente (o rechazado) solo lo lee su autor
+      // (punto 102, momentoVisibleParaOtros).
       allow read: if estaAutenticado()
         && resource.data.expireAt > request.time
-        && puedeVerMomentosDe(resource.data.authorId);
+        && puedeVerMomentosDe(resource.data.authorId)
+        && (resource.data.authorId == request.auth.uid || momentoVisibleParaOtros(resource.data));
 
       // Se crea en el MISMO writeBatch que actualiza el índice del autor
       // (publishMoment en moments.js), y se exige que el índice, tal como
       // queda al terminar el batch, ya lo incluya: así no puede existir un
       // momento fuera del índice, y el tope de 30 del índice es también el
-      // tope de momentos activos. La foto tiene que estar en la carpeta
-      // del autor con el nombre del momento. "music" es opcional (punto
-      // 79), ver musicaDeMomentoValida.
+      // tope de momentos activos. Es de foto (momentoConFotoValido) o de
+      // video (momentoConVideoValido, punto 102), nunca las dos cosas.
       allow create: if estaAutenticado()
-        && request.resource.data.keys().hasOnly(['authorId', 'imageURL', 'storagePath', 'caption', 'createdAt', 'expireAt', 'music'])
         && request.resource.data.authorId == request.auth.uid
-        && textoValido(request.resource.data.imageURL, 2000)
-        && request.resource.data.storagePath == 'momentImages/' + request.auth.uid + '/' + momentId + '.jpg'
         && textoValido(request.resource.data.caption, 600)
         && request.resource.data.createdAt == request.time
         && venceDentroDe24h(request.resource.data.expireAt)
-        && musicaDeMomentoValida(request.resource.data)
+        && (momentoConFotoValido(momentId) || momentoConVideoValido(momentId))
         && momentId in getAfter(/databases/$(database)/documents/momentIndex/$(request.auth.uid)).data.ids;
 
       // Un momento no se edita: se borra y se publica otro.

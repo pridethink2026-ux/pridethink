@@ -14,7 +14,8 @@
   - firestore.rules (videoDePostValido), que exige que `path` y
     `posterPath` tengan la forma de videoPaths().
 
-  Hoy: Firebase Storage, en postVideos/{uid}/{postId}/video.mp4 y
+  Hoy: Firebase Storage, en postVideos/{uid}/{postId}/ (posts) y
+  momentVideos/{uid}/{momentId}/ (momentos, punto 102), con video.mp4 y
   poster.jpg. Firebase y Storage se cargan aparte (import()), igual que
   antes en videoJob.js, para no sumar peso a la app de quien no sube videos.
 */
@@ -24,6 +25,13 @@
 // Function: si se cambia la forma, hay que cambiarla en los tres lados.
 export function videoPaths(uid, postId) {
   const base = `postVideos/${uid}/${postId}`;
+  return { video: `${base}/video.mp4`, poster: `${base}/poster.jpg` };
+}
+
+// Video de un momento (punto 102): momentVideos/{uid}/{momentId}/. Misma
+// forma que en firestore.rules (momentoConVideoValido) y en el servidor.
+export function momentVideoPaths(uid, momentId) {
+  const base = `momentVideos/${uid}/${momentId}`;
   return { video: `${base}/video.mp4`, poster: `${base}/poster.jpg` };
 }
 

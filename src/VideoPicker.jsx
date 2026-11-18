@@ -31,6 +31,26 @@ function formatDuration(seconds) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+// El aviso de un error de compresión (estado "error" de videoJob.js).
+// Exportada: la usa también MomentsStrip.jsx (punto 102).
+export function videoErrorText(t, job, maxSeconds) {
+  switch (job.code) {
+    case "notVideo":
+      return t("video.errorNotVideo");
+    case "tooLong":
+      return t("video.errorTooLong", {
+        duration: formatDuration(job.duration),
+        max: formatDuration(job.max || maxSeconds),
+      });
+    case "unsupported":
+      return t("video.errorUnsupported");
+    case "audioFailed":
+      return t("video.errorAudio");
+    default:
+      return t("video.errorInterrupted");
+  }
+}
+
 // Punto 102: destination es el trabajo de videoJob.js (VIDEO_DEST_FEED o
 // VIDEO_DEST_MOMENT); maxSeconds, el máximo de ese destino (90 el Muro,
 // 77 Momentos).
@@ -82,23 +102,7 @@ export default function VideoPicker({
   };
   const handleTrimCancel = useCallback(() => setTrimFile(null), []);
 
-  const errorText = () => {
-    switch (job.code) {
-      case "notVideo":
-        return t("video.errorNotVideo");
-      case "tooLong":
-        return t("video.errorTooLong", {
-          duration: formatDuration(job.duration),
-          max: formatDuration(job.max || maxSeconds),
-        });
-      case "unsupported":
-        return t("video.errorUnsupported");
-      case "audioFailed":
-        return t("video.errorAudio");
-      default:
-        return t("video.errorInterrupted");
-    }
-  };
+  const errorText = () => videoErrorText(t, job, maxSeconds);
 
   const busy = job.status === "working" || job.status === "paused";
   const uploading = job.status === "uploading";

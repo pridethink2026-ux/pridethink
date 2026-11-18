@@ -1,13 +1,19 @@
-import React, { Suspense, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { collection, doc } from "firebase/firestore";
+import { db } from "./firebase";
 import Avatar from "./Avatar";
 import ImageEditor from "./ImageEditor";
 import MomentTextEditor from "./MomentTextEditor";
 import MomentViewer from "./MomentViewer";
+import MomentVideoStatus from "./MomentVideoStatus";
+import VideoTrimmer from "./VideoTrimmer";
 import { useAllUsersContext } from "./AllUsersContext";
 import { useLanguage } from "./LanguageContext";
 import { lazyWithReload } from "./lazyLoad";
 import { useMoments } from "./MomentsContext";
 import { MAX_ACTIVE_MOMENTS, MomentLimitError, MomentTimeoutError, publishMoment } from "./moments";
+import { MAX_MOMENT_VIDEO_SECONDS } from "./videoCompress";
+import { useVideoJob, startVideoJob, clearVideoJob, VIDEO_DEST_MOMENT } from "./videoJob";
 
 const MomentMusicStep = lazyWithReload(() => import(/* webpackChunkName: "moment-music" */ "./MomentMusicStep"));
 
@@ -32,9 +38,24 @@ const MomentMusicStep = lazyWithReload(() => import(/* webpackChunkName: "moment
   de fondo opcional, punto 79; en su propio archivo) → publishMoment
   (moments.js). Con 30 momentos activos se
   avisa en vez de intentar.
+
+  Video (punto 102, parte 4): el mismo "+" acepta foto o video. Un video
+  abre el editor de recorte (VideoTrimmer.jsx, máximo 77 s) y con "Listo"
+  se prepara y se publica SOLO (videoJob.js, destino VIDEO_DEST_MOMENT,
+  publishWhenReady), aunque la persona se vaya a otra sección. El avance
+  se ve debajo de la tira (MomentVideoStatus.jsx). Sin música (decisión
+  del punto 102); el texto encima del video llega en la parte 6. Mientras
+  hay un video en curso no se puede elegir otro (sí publicar fotos).
 */
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+// De qué cuenta es el video de momento en curso: si entra otra cuenta en
+// la misma pestaña, se descarta (igual que el borrador del Muro).
+let momentVideoUid = null;
+// El último momento con video del que ya se avisó "se publicó" (para no
+// repetir el aviso cada vez que se vuelve al Muro).
+let announcedVideoId = null;
 const MAX_INPUT_MB = 10;
 const MOMENT_MAX_SIZE = 1080;
 
@@ -136,6 +157,30 @@ export default function MomentsStrip({ currentUid, myProfile }) {
   const [message, setMessage] = useState(null); // { text, isError }
   const [viewer, setViewer] = useState(null); // { authorUids, startIndex }
   const [addHover, setAddHover] = useState(false);
+  const [trimVideo, setTrimVideo] = useState(null); // video elegido, en el editor de recorte
+  const videoJob = useVideoJob(VIDEO_DEST_MOMENT);
+  const videoBusy = videoJob.status !== "idle";
+
+  // Otra cuenta en esta pestaña: el video de la anterior se descarta.
+  useEffect(() => {
+    if (!currentUid) return;
+    if (momentVideoUid && momentVideoUid !== currentUid) clearVideoJob(VIDEO_DEST_MOMENT);
+    momentVideoUid = currentUid;
+  }, [currentUid]);
+
+  // Cuando el momento con video se publicó, el mismo aviso que con una foto.
+  const publishedVideoId = videoJob.status === "idle" ? videoJob.publishedId : null;
+  useEffect(() => {
+    if (!publishedVideoId || publishedVideoId === announcedVideoId) return;
+    announcedVideoId = publishedVideoId;
+    setMessage({
+      text: myProfile?.isPrivate ? t("moments.privateNotice") : t("moments.videoPublished"),
+      isError: !!myProfile?.isPrivate,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishedVideoId]);
+
+  const handleTrimCancel = useCallback(() => setTrimVideo(null), []);
 
   if (!currentUid) return null;
 
@@ -156,6 +201,15 @@ export default function MomentsStrip({ currentUid, myProfile }) {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
     if (!file) return;
+    if (file.type.startsWith("video/")) {
+      // Punto 102: un video a la vez (elegir otro cancelaría el anterior).
+      if (videoBusy) {
+        setMessage({ text: t("moments.videoBusy"), isError: true });
+        return;
+      }
+      setTrimVideo(file);
+      return;
+    }
     if (!TYPES.includes(file.type)) {
       setMessage({ text: t("image.errorType"), isError: true });
     } else if (file.size > MAX_INPUT_MB * 1024 * 1024) {
@@ -202,6 +256,26 @@ export default function MomentsStrip({ currentUid, myProfile }) {
     }
   };
 
+  // Recorte listo: se prepara y se publica solo (videoJob.js). El id del
+  // momento se elige aquí, como el del post del Muro.
+  const handleTrimConfirm = ({ start, end }) => {
+    const file = trimVideo;
+    setTrimVideo(null);
+    if (!file) return;
+    if (myMoments.length >= MAX_ACTIVE_MOMENTS) {
+      setMessage({ text: t("moments.limitReached", { max: MAX_ACTIVE_MOMENTS }), isError: true });
+      return;
+    }
+    setMessage(null);
+    momentVideoUid = currentUid;
+    startVideoJob(
+      VIDEO_DEST_MOMENT,
+      file,
+      { start, end, maxSeconds: MAX_MOMENT_VIDEO_SECONDS },
+      { publishWhenReady: { uid: currentUid, momentId: doc(collection(db, "moments")).id, caption: "" } }
+    );
+  };
+
   const openViewer = (uid) => setViewer({ authorUids: queue, startIndex: queue.indexOf(uid) });
 
   return (
@@ -237,7 +311,9 @@ export default function MomentsStrip({ currentUid, myProfile }) {
               +
             </button>
           </div>
-          <span style={styles.label}>{publishing ? t("moments.publishing") : t("moments.yours")}</span>
+          <span style={styles.label}>
+            {publishing || videoJob.status === "uploading" ? t("moments.publishing") : t("moments.yours")}
+          </span>
         </div>
 
         {authors.map((a) => {
@@ -260,15 +336,26 @@ export default function MomentsStrip({ currentUid, myProfile }) {
         })}
       </div>
 
+      <MomentVideoStatus />
+
       {message && <p style={styles.message(message.isError)}>{message.text}</p>}
 
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         style={{ display: "none" }}
         onChange={handleFile}
       />
+
+      {trimVideo && (
+        <VideoTrimmer
+          file={trimVideo}
+          maxSeconds={MAX_MOMENT_VIDEO_SECONDS}
+          onConfirm={handleTrimConfirm}
+          onCancel={handleTrimCancel}
+        />
+      )}
 
       {editingFile && (
         <ImageEditor

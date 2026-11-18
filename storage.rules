@@ -16,7 +16,9 @@ rules_version = '2';
 // la imagen de un mensaje de chat (`chatImages/{chatId}/{messageId}/
 // {fileName}`, ver Chat.jsx, punto 61), la foto de un momento
 // (`momentImages/`, punto 66) y el video de un post del muro con su
-// miniatura (`postVideos/{userId}/{postId}/`, punto 101). Todo lo demás está cerrado con
+// miniatura (`postVideos/{userId}/{postId}/`, punto 101) y el video de un
+// momento con su miniatura (`momentVideos/{userId}/{momentId}/`, punto
+// 102). Todo lo demás está cerrado con
 // llave: si más adelante se agregan portadas de grupo/evento, hay que
 // abrirles su propio bloque acá, a propósito — el catch-all del final no
 // las va a dejar pasar solas.
@@ -188,6 +190,35 @@ service firebase.storage {
       allow create, update: if request.auth != null
         && request.auth.uid == userId
         && !firestore.exists(/databases/(default)/documents/posts/$(postId))
+        && (
+          (fileName == 'video.mp4'
+            && request.resource.contentType == 'video/mp4'
+            && request.resource.size < 40 * 1024 * 1024)
+          || (fileName == 'poster.jpg'
+            && request.resource.contentType == 'image/jpeg'
+            && request.resource.size < 1024 * 1024)
+        );
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ------------------------------------------------------------------
+    // momentVideos/{userId}/{momentId}/{fileName} — video de un momento
+    // (punto 102)
+    // ------------------------------------------------------------------
+    // Igual que postVideos/: "video.mp4" (hasta 77 s, ~20 MB) y
+    // "poster.jpg". Leer por ruta, solo el dueño (los demás usan la URL
+    // con token que escribe la Cloud Function approveMomentVideo en
+    // moments/{momentId} al aprobarlo). Escribir, solo el dueño y solo
+    // MIENTRAS EL MOMENTO NO EXISTE (después no se puede reemplazar).
+    // Una regla de ciclo de vida del bucket (prefijo momentVideos/, 2 días)
+    // borra los videos solos, igual que momentImages/.
+    match /momentVideos/{userId}/{momentId}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && !firestore.exists(/databases/(default)/documents/moments/$(momentId))
         && (
           (fileName == 'video.mp4'
             && request.resource.contentType == 'video/mp4'

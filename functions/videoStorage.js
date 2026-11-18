@@ -13,18 +13,27 @@
   revisar storage.rules (bloque postVideos/, propio de Firebase) y
   firestore.rules (videoDePostValido, que exige la forma de videoPaths()).
 
-  Hoy: Firebase Storage, en postVideos/{autor}/{postId}/video.mp4 y
+  Hoy: Firebase Storage, en postVideos/{autor}/{postId}/ (posts) y
+  momentVideos/{autor}/{momentId}/ (momentos, punto 102), con video.mp4 y
   poster.jpg. Usa firebase-admin (no pasa por storage.rules).
 */
 
 const { getStorage, getDownloadURL } = require("firebase-admin/storage");
 
 const VIDEO_ROOT = "postVideos/";
+const MOMENT_VIDEO_ROOT = "momentVideos/"; // punto 102
 
 // Rutas de los archivos de un video. Tienen que coincidir con
-// src/videoStorage.js (videoPaths) y con firestore.rules.
+// src/videoStorage.js (videoPaths / momentVideoPaths) y con firestore.rules.
 function videoPaths(authorId, postId) {
   const base = `${VIDEO_ROOT}${authorId}/${postId}`;
+  return { video: `${base}/video.mp4`, poster: `${base}/poster.jpg` };
+}
+
+// Video de un momento (punto 102). Los momentos vencidos los borra una
+// regla de ciclo de vida del bucket (prefijo momentVideos/, 2 días).
+function momentVideoPaths(authorId, momentId) {
+  const base = `${MOMENT_VIDEO_ROOT}${authorId}/${momentId}`;
   return { video: `${base}/video.mp4`, poster: `${base}/poster.jpg` };
 }
 
@@ -105,6 +114,7 @@ async function listPostVideoFolders() {
 
 module.exports = {
   videoPaths,
+  momentVideoPaths,
   getVideoFilesInfo,
   getVideoPlaybackUrls,
   deleteVideoFiles,
