@@ -4,8 +4,8 @@ import { useSyncExternalStore } from "react";
   feedVideo.js — punto 101 (videos en el Muro), parte 4.
 
   UN SOLO reproductor (<video>) para toda la app, que salta de post en
-  post. Por qué (probado en iPhone el 2026-11-16, ver
-  public/pruebas/video-ios.html): en Safari el permiso para sonar es de
+  post. Por qué (probado en iPhone el 2026-11-16, ver CONTEXTO.md, punto
+  101, parte 1): en Safari el permiso para sonar es de
   cada elemento <video>; si cada post tuviera el suyo, el siguiente video
   no podría sonar solo aunque la persona ya hubiera activado el sonido.
   Reusando el mismo elemento, una vez que la persona toca la bocina, los
