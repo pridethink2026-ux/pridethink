@@ -215,6 +215,7 @@ export const translations = {
     "profile.unblock": "Desbloquear",
     "profile.changeIdentity": "Cambiar mi identidad",
     "profile.logout": "Cerrar sesión",
+    "profile.appVersion": "Versión de la app: {page} · servicio {worker}",
     "profile.defaultUser": "Usuario",
 
     // Foto de perfil (ProfilePhotoUploader.jsx, punto 58)
@@ -1029,6 +1030,7 @@ export const translations = {
     "profile.datingPreferenceField": "Looking to meet",
     "profile.changeIdentity": "Change my identity",
     "profile.logout": "Log out",
+    "profile.appVersion": "App version: {page} · service {worker}",
     "profile.defaultUser": "User",
 
     // Profile photo (ProfilePhotoUploader.jsx, point 58)

@@ -31,6 +31,7 @@ import { formatMonthYear, formatLongDate } from "./utils";
 import { authStyles as styles, IdentityForm } from "./AuthForms";
 import { lazyWithReload } from "./lazyLoad";
 import { usePushStatus, disablePushOnLogout } from "./push";
+import { getAppVersion } from "./serviceWorkerRegistration";
 
 const MusicCredits = lazyWithReload(() => import(/* webpackChunkName: "music-credits" */ "./MusicCredits"));
 
@@ -417,6 +418,8 @@ function ProfileView({
           >
             {t("profile.logout")}
           </button>
+
+          <AppVersionNote />
         </>
       )}
 
@@ -438,6 +441,41 @@ function ProfileView({
         </>
       )}
     </div>
+  );
+}
+
+// Versión de la app al final de Perfil (punto 102, diagnóstico): sirve
+// para saber si el teléfono ya tiene la última versión publicada. "page"
+// es el código en pantalla; si el service worker ("worker") ya tiene una
+// más nueva, se avisa que se aplica al salir de la app. Ver getAppVersion
+// en serviceWorkerRegistration.js.
+function AppVersionNote() {
+  const { t } = useLanguage();
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    getAppVersion()
+      .then((v) => {
+        if (alive) setInfo(v);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!info || (!info.page && !info.worker)) return null;
+  const style = {
+    margin: "18px 0 0",
+    textAlign: "center",
+    fontSize: "11px",
+    color: "var(--text-muted)",
+    fontFamily: "var(--font-body)",
+    fontVariantNumeric: "tabular-nums",
+  };
+  return (
+    <p style={style}>
+      {t("profile.appVersion", { page: info.page || "—", worker: info.worker || "—" })}
+    </p>
   );
 }
 

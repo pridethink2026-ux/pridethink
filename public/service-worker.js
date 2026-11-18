@@ -47,6 +47,15 @@ self.addEventListener("install", (event) => {
   );
 });
 
+// Punto 102 (diagnóstico): la página pregunta qué versión tiene este
+// service worker (getAppVersion en src/serviceWorkerRegistration.js, se
+// muestra en Perfil). Responde por el MessageChannel que le pasan.
+self.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "PT_GET_VERSION") return;
+  const port = event.ports && event.ports[0];
+  if (port) port.postMessage({ version: VERSION });
+});
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
