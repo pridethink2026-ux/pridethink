@@ -870,9 +870,9 @@ categorías fijas. Prototipo funcional en fase de prueba con un socio.
             5. **Parte 6**: borrar un post con video y comprobar en la consola (Storage → `postVideos/`) que su carpeta desapareció.
             6. **Limpieza diaria**: revisar en Functions → Registros los mensajes de `cleanupOrphanPostFiles` ("limpieza (prueba): se borraría" y "limpieza: resumen"). Si solo aparecen carpetas que de verdad sobran, cambiar `ORPHAN_CLEANUP_DRY_RUN` a `false` y volver a subir las funciones.
             7. iPhone con Ahorro de batería: el video muestra ▶ y arranca al tocarlo (no probado todavía).
-        - **Al terminar las pruebas**: quitar el modo de prueba (el botón 🎥 solo aparece donde se activó `pt-video-beta`: quitar `videoBetaEnabled` de `VideoPicker.jsx` y `Feed.jsx`), borrar `public/pruebas/video-ios.html`, y marcar el punto 101 como HECHO.
+        - **Al terminar las pruebas**: borrar `public/pruebas/video-ios.html`, y marcar el punto 101 como HECHO.
         - Sigue pendiente (no es de este punto, ya pasaba): al borrar un post, sus comentarios (`posts/{postId}/comments`) quedan en Firestore. Si hay fotos, en su lugar dice "Un post lleva fotos o un video, no las dos cosas"; si hay video, se ocultan las fotos. "Publicar" queda deshabilitado mientras se comprime, y con un video listo muestra "Publicar videos todavía no está listo" (llega en la parte 3).
-        - **Solo para quien prueba**: el botón aparece únicamente en el navegador donde se tocó "Activar" en la sección 5 de la página de prueba (`localStorage` `pt-video-beta`). Ojo: la app instalada en la pantalla de inicio del iPhone tiene su propio almacenamiento, distinto del de Safari; para probar, usar Safari. Se quita al terminar el punto.
+        - **Modo prueba QUITADO (2026-11-17)**: el botón 🎥 aparece para todos los usuarios, en cualquier navegador y en la app instalada. Antes solo aparecía donde se había activado `localStorage` `pt-video-beta` desde la sección 5 de la página de prueba (`videoBetaEnabled`, ya borrado); ese botón "Activar" de la página de prueba ya no hace nada.
         - Sin cambios de reglas.
 
 ## Pendientes / ideas para seguir

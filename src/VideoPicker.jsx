@@ -21,21 +21,7 @@ import { useVideoJob, startVideoJob, retryVideoJob, clearVideoJob } from "./vide
   al elegir el video, para no dejar archivos huérfanos si la persona se
   arrepiente. Mientras sube: "Publicando video… 45 %"; si falla:
   "Reintentar" (con el mismo video ya comprimido) o "Descartar".
-
-  Mientras dure la prueba, solo aparece en los teléfonos donde se activó
-  desde https://pridethink.vercel.app/pruebas/video-ios.html
-  (videoBetaEnabled). Se quita al terminar el punto 101.
 */
-
-const BETA_KEY = "pt-video-beta";
-
-export function videoBetaEnabled() {
-  try {
-    return window.localStorage.getItem(BETA_KEY) === "1";
-  } catch (e) {
-    return false;
-  }
-}
 
 function formatDuration(seconds) {
   const s = Math.max(1, Math.round(seconds || 0));

@@ -17,7 +17,7 @@ import {
 } from "firebase/firestore";
 import Avatar from "./Avatar";
 import MultiImageUploader from "./MultiImageUploader";
-import VideoPicker, { videoBetaEnabled } from "./VideoPicker";
+import VideoPicker from "./VideoPicker";
 import { useVideoJob, clearVideoJob, publishVideoPost } from "./videoJob";
 import PostVideo from "./PostVideo";
 import MomentsStrip from "./MomentsStrip";
@@ -1056,14 +1056,12 @@ export default function Feed({
   const [composerImages, setComposerImages] = useState(() => composerDraft.images);
   // Punto 101: el video del próximo post vive en videoJob.js (no aquí),
   // para que la compresión siga si la persona se va a otra sección. Un post
-  // lleva fotos O un video. Mientras dure la prueba, el botón solo aparece
-  // donde se activó desde la página de prueba (videoBetaEnabled).
+  // lleva fotos O un video.
   const videoJob = useVideoJob();
   const hasVideo = videoJob.status !== "idle";
   const videoBusy =
     videoJob.status === "working" || videoJob.status === "paused" || videoJob.status === "uploading";
   const [composerNotice, setComposerNotice] = useState("");
-  const [videoBeta] = useState(videoBetaEnabled);
   useEffect(() => {
     if (!hasVideo) setComposerNotice("");
   }, [hasVideo]);
@@ -1113,8 +1111,7 @@ export default function Feed({
   // Detecta sesión activa y trae tu propio perfil (nombre/identidad para firmar tus posts)
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      setCurrentUid(user ? user.uid : null);
-    });
+      setCurrentUid(user ? user.uid : null);    });
     return unsub;
   }, []);
 
@@ -1396,14 +1393,13 @@ export default function Feed({
                   maxSize={1024}
                 />
               )}
-              {videoBeta &&
-                (composerImages.length === 0 ? (
-                  <div style={hasVideo ? undefined : styles.composerVideoWrap}>
-                    <VideoPicker disabled={posting} />
-                  </div>
-                ) : (
-                  <p style={styles.composerHint}>{t("video.photosOrVideo")}</p>
-                ))}
+              {composerImages.length === 0 ? (
+                <div style={hasVideo ? undefined : styles.composerVideoWrap}>
+                  <VideoPicker disabled={posting} />
+                </div>
+              ) : (
+                <p style={styles.composerHint}>{t("video.photosOrVideo")}</p>
+              )}
               {composerNotice && <p style={styles.composerNotice}>{composerNotice}</p>}
             </div>
             <button
