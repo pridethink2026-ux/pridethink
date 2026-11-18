@@ -3,6 +3,9 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import { notify } from "./utils";
 import { compressVideo } from "./videoCompress";
+// Subir y borrar los archivos del video: SIEMPRE por videoStorage.js (ahí
+// está todo lo que depende de dónde se guardan los videos).
+import { videoPaths, uploadVideoFiles, deleteVideoFiles } from "./videoStorage";
 
 /*
   videoJob.js — punto 101 (videos en el Muro).
@@ -55,7 +58,7 @@ let result = null; // el video ya comprimido
 let publishPayload = null; // datos del post, para "Reintentar" la subida
 let publishRun = 0; // para ignorar una subida que se canceló
 let createdPostId = null; // el último post que sí llegó a crearse
-const uploadTasks = new Set();
+let currentUpload = null; // la subida en curso (uploadVideoFiles)
 let wakeLock = null;
 const listeners = new Set();
 
@@ -127,10 +130,10 @@ if (typeof document !== "undefined") {
         if (state.status === "paused") setState({ ...state, status: "working" });
       }
     }
-    uploadTasks.forEach((task) => {
-      if (hidden) task.pause();
-      else task.resume();
-    });
+    if (currentUpload) {
+      if (hidden) currentUpload.pause();
+      else currentUpload.resume();
+    }
     if (!hidden && isBusy()) acquireWakeLock();
   });
 }
@@ -212,11 +215,6 @@ export function retryVideoJob() {
 // Publicar (parte 3)
 // ---------------------------------------------------------------------
 
-function videoPaths(uid, postId) {
-  const base = `postVideos/${uid}/${postId}`;
-  return { base, video: `${base}/video.mp4`, poster: `${base}/poster.jpg` };
-}
-
 /*
   payload: {
     uid, postId,
@@ -245,50 +243,26 @@ async function runPublish() {
   acquireWakeLock();
 
   try {
-    // Storage se carga aparte (mismo criterio que chatMessages.js).
-    const [{ ref, uploadBytesResumable }, { storage }] = await Promise.all([
-      import("firebase/storage"),
-      import("./firebaseStorage"),
-    ]);
-    const total = res.blob.size + res.posterBlob.size;
-    const loaded = { video: 0, poster: 0 };
     let lastPercent = -1;
-    const report = () => {
-      if (!stillCurrent()) return;
-      const progress = Math.min(1, (loaded.video + loaded.poster) / total);
-      const percent = Math.floor(progress * 100);
-      if (percent === lastPercent) return;
-      lastPercent = percent;
-      setState({ ...state, progress });
-    };
-    const upload = (key, path, blob, contentType) =>
-      new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(ref(storage, path), blob, { contentType });
-        uploadTasks.add(task);
-        if (isHidden()) task.pause();
-        task.on(
-          "state_changed",
-          (snap) => {
-            loaded[key] = snap.bytesTransferred;
-            report();
-          },
-          (err) => {
-            uploadTasks.delete(task);
-            reject(err);
-          },
-          () => {
-            uploadTasks.delete(task);
-            loaded[key] = blob.size;
-            report();
-            resolve();
-          }
-        );
-      });
-
-    await Promise.all([
-      upload("poster", paths.poster, res.posterBlob, "image/jpeg"),
-      upload("video", paths.video, res.blob, "video/mp4"),
-    ]);
+    const upload = uploadVideoFiles({
+      paths,
+      blob: res.blob,
+      posterBlob: res.posterBlob,
+      startPaused: isHidden(),
+      onProgress: (progress) => {
+        if (!stillCurrent()) return;
+        const percent = Math.floor(progress * 100);
+        if (percent === lastPercent) return;
+        lastPercent = percent;
+        setState({ ...state, progress });
+      },
+    });
+    currentUpload = upload;
+    try {
+      await upload.promise;
+    } finally {
+      if (currentUpload === upload) currentUpload = null;
+    }
     if (run !== publishRun) return;
 
     // El post nace en "pending" y SIN links: los escribe la Cloud Function
@@ -348,20 +322,8 @@ async function runPublish() {
 // Borra los archivos de una subida que no llegó a ser post (al descartar
 // después de un error). Si el post sí se creó, storage.rules igual deja al
 // dueño borrar; pero aquí solo se llama cuando no se creó.
-async function deleteUploadedFiles(payload) {
-  try {
-    const [{ ref, deleteObject }, { storage }] = await Promise.all([
-      import("firebase/storage"),
-      import("./firebaseStorage"),
-    ]);
-    const paths = videoPaths(payload.uid, payload.postId);
-    await Promise.all([
-      deleteObject(ref(storage, paths.video)).catch(() => {}),
-      deleteObject(ref(storage, paths.poster)).catch(() => {}),
-    ]);
-  } catch (e) {
-    /* al mejor esfuerzo */
-  }
+function deleteUploadedFiles(payload) {
+  deleteVideoFiles(videoPaths(payload.uid, payload.postId));
 }
 
 export function clearVideoJob() {
@@ -370,9 +332,9 @@ export function clearVideoJob() {
     job = null;
     current.cancel();
   }
-  if (uploadTasks.size > 0) {
-    uploadTasks.forEach((task) => task.cancel());
-    uploadTasks.clear();
+  if (currentUpload) {
+    currentUpload.cancel();
+    currentUpload = null;
   }
   publishRun += 1; // cualquier subida en curso queda descartada
   // Nunca se borran los archivos de un post que ya se creó.

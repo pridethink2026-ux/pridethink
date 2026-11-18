@@ -8,6 +8,7 @@ import {
   toggleSound,
   enterFullscreen,
 } from "./feedVideo";
+import { videoPlaybackUrls } from "./videoStorage";
 
 /*
   PostVideo — punto 101 (videos en el Muro).
@@ -55,7 +56,8 @@ const chipBase = {
 
 let instanceCounter = 0;
 
-function ApprovedVideo({ postId, video }) {
+// urls: { url, posterUrl } de videoStorage.js (videoPlaybackUrls).
+function ApprovedVideo({ postId, video, urls }) {
   const { t } = useLanguage();
   const frameRef = useRef(null);
   const mountRef = useRef(null);
@@ -76,10 +78,10 @@ function ApprovedVideo({ postId, video }) {
     return registerSlot(slotId, {
       observeEl: frameRef.current,
       mount: mountRef.current,
-      url: video.url,
+      url: urls.url,
       duration: video.duration || 0,
     });
-  }, [slotId, video.url, video.duration]);
+  }, [slotId, urls.url, video.duration]);
 
   const remaining = isActive ? player.remaining : Math.ceil(video.duration || 0);
   const soundOn = isActive ? !player.muted : player.soundOn;
@@ -163,7 +165,7 @@ function ApprovedVideo({ postId, video }) {
 
   return (
     <div ref={frameRef} style={frameStyle}>
-      {video.posterUrl && <img src={video.posterUrl} alt="" loading="lazy" style={posterStyle} />}
+      {urls.posterUrl && <img src={urls.posterUrl} alt="" loading="lazy" style={posterStyle} />}
       {/* Aquí feedVideo.js pone el <video> compartido; React no lo toca. */}
       <div ref={mountRef} style={fillStyle} />
       <button
@@ -204,8 +206,9 @@ function ApprovedVideo({ postId, video }) {
 export default function PostVideo({ postId, video }) {
   const { t } = useLanguage();
 
-  if (video.status === "approved" && video.url) {
-    return <ApprovedVideo postId={postId} video={video} />;
+  const urls = video.status === "approved" ? videoPlaybackUrls(video) : null;
+  if (urls) {
+    return <ApprovedVideo postId={postId} video={video} urls={urls} />;
   }
 
   const noticeStyle = {

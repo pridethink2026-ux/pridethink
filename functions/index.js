@@ -49,7 +49,10 @@
 
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
-const { getStorage, getDownloadURL } = require("firebase-admin/storage");
+const { getStorage } = require("firebase-admin/storage");
+// Archivos de VIDEO: siempre por videoStorage.js (ahí está todo lo que
+// depende de dónde se guardan los videos). Las fotos siguen aquí.
+const videoStorage = require("./videoStorage");
 const { getMessaging } = require("firebase-admin/messaging");
 const { onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
@@ -290,7 +293,8 @@ const MAX_POSTER_BYTES = 1024 * 1024;
 // Intelligence (explicit content detection) sobre gs://{bucket}/{ruta}: si
 // detecta contenido explícito, devolver { decision: "rejected", reason }.
 // Hoy aprueba todo lo que pasó las comprobaciones de abajo.
-async function moderateVideo(/* { post, videoFile, posterFile } */) {
+// (paths: las rutas de videoStorage.videoPaths.)
+async function moderateVideo(/* { post, paths } */) {
   return { decision: "approved" };
 }
 
@@ -302,15 +306,13 @@ exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => 
   if (!video || video.status !== "pending") return;
 
   const postId = event.params.postId;
-  const base = `postVideos/${post.authorId}/${postId}/`;
-  const bucket = getStorage().bucket();
+  const paths = videoStorage.videoPaths(post.authorId, postId);
 
   const reject = async (reason) => {
     logger.warn("video: rechazado", { postId, reason });
-    await Promise.all([
-      bucket.file(base + "video.mp4").delete({ ignoreNotFound: true }),
-      bucket.file(base + "poster.jpg").delete({ ignoreNotFound: true }),
-    ]).catch((err) => logger.warn("video: no se pudieron borrar los archivos", { postId, err: String(err) }));
+    await videoStorage
+      .deleteVideoFiles(paths)
+      .catch((err) => logger.warn("video: no se pudieron borrar los archivos", { postId, err: String(err) }));
     await snap.ref
       .update({
         "video.status": "rejected",
@@ -320,38 +322,35 @@ exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => 
       .catch(() => {}); // el post pudo haberse borrado
   };
 
-  if (video.path !== base + "video.mp4" || video.posterPath !== base + "poster.jpg") {
+  if (video.path !== paths.video || video.posterPath !== paths.poster) {
     await reject("bad_path");
     return;
   }
 
-  const videoFile = bucket.file(video.path);
-  const posterFile = bucket.file(video.posterPath);
-  let videoMeta;
-  let posterMeta;
+  let info;
   try {
-    [[videoMeta], [posterMeta]] = await Promise.all([videoFile.getMetadata(), posterFile.getMetadata()]);
+    info = await videoStorage.getVideoFilesInfo(paths);
   } catch (err) {
     await reject("missing_file");
     return;
   }
   if (
-    videoMeta.contentType !== "video/mp4" ||
-    Number(videoMeta.size) > MAX_VIDEO_BYTES ||
-    posterMeta.contentType !== "image/jpeg" ||
-    Number(posterMeta.size) > MAX_POSTER_BYTES
+    info.video.contentType !== "video/mp4" ||
+    info.video.size > MAX_VIDEO_BYTES ||
+    info.poster.contentType !== "image/jpeg" ||
+    info.poster.size > MAX_POSTER_BYTES
   ) {
     await reject("bad_file");
     return;
   }
 
-  const { decision, reason } = await moderateVideo({ post, videoFile, posterFile });
+  const { decision, reason } = await moderateVideo({ post, paths });
   if (decision !== "approved") {
     await reject(reason || "moderation");
     return;
   }
 
-  const [url, posterUrl] = await Promise.all([getDownloadURL(videoFile), getDownloadURL(posterFile)]);
+  const { url, posterUrl } = await videoStorage.getVideoPlaybackUrls(paths);
   try {
     await snap.ref.update({
       "video.status": "approved",
@@ -359,7 +358,7 @@ exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => 
       "video.posterUrl": posterUrl,
       "video.moderatedAt": FieldValue.serverTimestamp(),
     });
-    logger.info("video: aprobado", { postId, bytes: Number(videoMeta.size) });
+    logger.info("video: aprobado", { postId, bytes: info.video.size });
   } catch (err) {
     // El post se borró mientras tanto: no hay nada que aprobar.
     logger.info("video: el post ya no existe", { postId });
@@ -370,9 +369,45 @@ exports.approvePostVideo = onDocumentCreated("posts/{postId}", async (event) => 
 // Punto 101, parte 6 — limpieza de Storage de los posts
 // ---------------------------------------------------------------------------
 
-// Carpetas de Storage de un post (las dos con el mismo formato:
-// {raíz}/{autor}/{postId}/...). productImages/ y chatImages/ no se tocan.
-const POST_FILE_ROOTS = ["postVideos/", "postImages/"];
+// Carpeta de Storage de las FOTOS de un post: postImages/{autor}/{postId}/.
+// La del video la maneja videoStorage.js. productImages/ y chatImages/ no
+// se tocan.
+const POST_IMAGES_ROOT = "postImages/";
+
+// Carpetas de fotos de posts, con la misma forma que
+// videoStorage.listPostVideoFolders(): [{ key, authorId, postId, newest,
+// count, bytes, remove() }].
+async function listPostImageFolders() {
+  const [files] = await getStorage().bucket().getFiles({ prefix: POST_IMAGES_ROOT });
+  const now = Date.now();
+  const folders = new Map();
+  for (const file of files) {
+    const parts = file.name.split("/"); // [raíz, autor, postId, nombre]
+    if (parts.length < 4 || !parts[1] || !parts[2]) continue;
+    const key = `${parts[0]}/${parts[1]}/${parts[2]}/`;
+    const updated = Date.parse(file.metadata.updated || file.metadata.timeCreated) || now;
+    let folder = folders.get(key);
+    if (!folder) {
+      const list = [];
+      folder = {
+        key,
+        authorId: parts[1],
+        postId: parts[2],
+        newest: 0,
+        count: 0,
+        bytes: 0,
+        remove: () => Promise.all(list.map((f) => f.delete({ ignoreNotFound: true }))),
+        _files: list,
+      };
+      folders.set(key, folder);
+    }
+    folder._files.push(file);
+    folder.count += 1;
+    folder.bytes += Number(file.metadata.size || 0);
+    folder.newest = Math.max(folder.newest, updated);
+  }
+  return [...folders.values()];
+}
 
 // Al borrar un post (desde la app, la consola o cualquier otro lado), se
 // borran su video, su miniatura y sus fotos. Sin esto quedaban en Storage
@@ -382,14 +417,15 @@ exports.cleanupDeletedPostFiles = onDocumentDeleted("posts/{postId}", async (eve
   const authorId = post && post.authorId;
   if (!authorId) return;
   const postId = event.params.postId;
-  const bucket = getStorage().bucket();
-  await Promise.all(
-    POST_FILE_ROOTS.map((root) =>
-      bucket
-        .deleteFiles({ prefix: `${root}${authorId}/${postId}/`, force: true })
-        .catch((err) => logger.warn("limpieza: no se pudo borrar", { root, postId, err: String(err) }))
-    )
-  );
+  await Promise.all([
+    videoStorage
+      .deletePostVideoFolder(authorId, postId)
+      .catch((err) => logger.warn("limpieza: no se pudo borrar", { what: "video", postId, err: String(err) })),
+    getStorage()
+      .bucket()
+      .deleteFiles({ prefix: `${POST_IMAGES_ROOT}${authorId}/${postId}/`, force: true })
+      .catch((err) => logger.warn("limpieza: no se pudo borrar", { what: "fotos", postId, err: String(err) })),
+  ]);
   logger.info("limpieza: archivos del post borrados", { postId, video: !!post.video });
 });
 
@@ -404,30 +440,16 @@ const ORPHAN_MAX_FOLDERS = 200; // tope por pasada
 exports.cleanupOrphanPostFiles = onSchedule(
   { schedule: "every 24 hours" },
   async () => {
-    const bucket = getStorage().bucket();
     const db = getFirestore();
     const now = Date.now();
-    // carpeta -> { root, authorId, postId, newest (ms), files: [File] }
-    const folders = new Map();
-
-    for (const root of POST_FILE_ROOTS) {
-      const [files] = await bucket.getFiles({ prefix: root });
-      for (const file of files) {
-        const parts = file.name.split("/"); // [root, authorId, postId, nombre]
-        if (parts.length < 4 || !parts[1] || !parts[2]) continue;
-        const key = `${parts[0]}/${parts[1]}/${parts[2]}/`;
-        const updated = Date.parse(file.metadata.updated || file.metadata.timeCreated) || now;
-        const folder = folders.get(key) || { root, authorId: parts[1], postId: parts[2], newest: 0, files: [] };
-        folder.newest = Math.max(folder.newest, updated);
-        folder.files.push(file);
-        folders.set(key, folder);
-      }
-    }
+    // Videos (videoStorage.js) y fotos, con la misma forma:
+    // { key, authorId, postId, newest (ms), count, bytes, remove() }.
+    const folders = [...(await videoStorage.listPostVideoFolders()), ...(await listPostImageFolders())];
 
     let checked = 0;
     let orphans = 0;
     let bytes = 0;
-    for (const [key, folder] of folders) {
+    for (const folder of folders) {
       if (checked >= ORPHAN_MAX_FOLDERS) break;
       if (now - folder.newest < ORPHAN_MIN_AGE_MS) continue; // puede ser un borrador en curso
       checked += 1;
@@ -435,20 +457,23 @@ exports.cleanupOrphanPostFiles = onSchedule(
       // Si el post existe y es de ese autor, la carpeta es suya: no se toca.
       if (postSnap.exists && postSnap.get("authorId") === folder.authorId) continue;
       orphans += 1;
-      const size = folder.files.reduce((sum, f) => sum + Number(f.metadata.size || 0), 0);
-      bytes += size;
+      bytes += folder.bytes;
       if (ORPHAN_CLEANUP_DRY_RUN) {
-        logger.info("limpieza (prueba): se borraría", { folder: key, files: folder.files.length, bytes: size });
+        logger.info("limpieza (prueba): se borraría", { folder: folder.key, files: folder.count, bytes: folder.bytes });
       } else {
-        await Promise.all(folder.files.map((f) => f.delete({ ignoreNotFound: true }))).catch((err) =>
-          logger.warn("limpieza: no se pudo borrar", { folder: key, err: String(err) })
+        await folder.remove().catch((err) =>
+          logger.warn("limpieza: no se pudo borrar", { folder: folder.key, err: String(err) })
         );
-        logger.info("limpieza: carpeta sin post borrada", { folder: key, files: folder.files.length, bytes: size });
+        logger.info("limpieza: carpeta sin post borrada", {
+          folder: folder.key,
+          files: folder.count,
+          bytes: folder.bytes,
+        });
       }
     }
     logger.info("limpieza: resumen", {
       dryRun: ORPHAN_CLEANUP_DRY_RUN,
-      folders: folders.size,
+      folders: folders.length,
       checked,
       orphans,
       megabytes: Math.round((bytes / 1048576) * 10) / 10,
