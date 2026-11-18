@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "./firebase";
 import Avatar from "./Avatar";
@@ -24,6 +24,8 @@ import {
 } from "./moments";
 import { notify, timeAgo } from "./utils";
 import { triggerStarRain } from "./StarRain";
+import { videoPlaybackUrls } from "./videoStorage";
+import { setFeedVideoSuspended } from "./feedVideo";
 
 /*
   MomentViewer
@@ -245,6 +247,7 @@ const styles = {
     pointerEvents: "none",
   },
   status: { color: "rgba(255,255,255,0.7)", fontSize: "14px" },
+  hiddenVideo: { display: "none" },
   reportBtn: {
     width: "40px",
     height: "40px",
@@ -412,6 +415,11 @@ export default function MomentViewer({
   const [musicMuted, setMusicMuted] = useState(() => isSoundMuted());
   const [muteHover, setMuteHover] = useState(false);
   const [tapHover, setTapHover] = useState(false);
+  // Video (punto 102, parte 5): sonido del video, igual que la música
+  // (arranca como "Silenciar sonidos"). videoNeedsTap: el navegador no dejó
+  // sonar (o ni siquiera arrancar) sin un toque.
+  const [videoMuted, setVideoMuted] = useState(() => isSoundMuted());
+  const [videoNeedsTap, setVideoNeedsTap] = useState(null); // null | "sound" | "play"
 
   const elapsedRef = useRef(0);
   const holdTimerRef = useRef(null);
@@ -422,6 +430,11 @@ export default function MomentViewer({
   // Punto 86: lluvia pendiente para el momento de la notificación (una vez).
   const starRainPendingRef = useRef(starRainOnOpen && !!startMomentId);
   const imgRef = useRef(null); // la foto actual (para img.complete)
+  // UN solo <video> para todo el visor (punto 102, parte 5): se le cambia
+  // el src al pasar de momento. En Safari el permiso de sonar es de cada
+  // elemento (punto 101, parte 1): reusándolo, una vez que suena, los
+  // siguientes momentos con video también suenan solos.
+  const videoRef = useRef(null);
   // Solo diagnóstico (?debug=1).
   const debugRef = useRef({ rescuedAtMount: 0, rescuedLater: 0, gaveUp: 0, events: [] });
   const timerRunningRef = useRef(false);
@@ -438,10 +451,12 @@ export default function MomentViewer({
   const currentId = current ? current.id : null;
   const isMine = authorUid === currentUid;
   const imgLoaded = !!currentId && loadedId === currentId;
-  // Punto 102: momento con video todavía sin aprobar (o rechazado). Uno
-  // aprobado se ve, por ahora, con su miniatura (imageURL) como una foto;
-  // la parte 5 lo reproduce.
+  // Punto 102: momento con video todavía sin aprobar (o rechazado): un
+  // aviso (solo lo ve su autor). Aprobado: se reproduce (parte 5) y el
+  // tiempo lo marca el video, no el temporizador de 17 s.
   const videoNotReady = !!current?.video && current.video.status !== "approved";
+  const videoUrls = current?.video && !videoNotReady ? videoPlaybackUrls(current.video) : null;
+  const isVideoMoment = !!videoUrls;
   const me = allUsers.find((u) => u.uid === currentUid);
   // Con la confirmación de borrar, el reporte, la lista de quién vio, el
   // aviso abiertos, o mientras escribes una respuesta, todo se detiene.
@@ -481,6 +496,8 @@ export default function MomentViewer({
     else {
       elapsedRef.current = 0;
       setProgress(0);
+      // Momento con video (punto 102): vuelve al principio.
+      if (videoRef.current && videoRef.current.getAttribute("src")) videoRef.current.currentTime = 0;
     }
   };
 
@@ -583,7 +600,10 @@ export default function MomentViewer({
     const id = setInterval(() => {
       const waited = performance.now() - shownAt;
       const img = imgRef.current;
-      if (waited >= LOAD_RESCUE_MS && img && img.complete && img.naturalWidth > 0) {
+      const video = videoRef.current;
+      // Video (punto 102): con datos para mostrar el primer cuadro.
+      const videoReady = isVideoMoment && video && video.readyState >= 2;
+      if (waited >= LOAD_RESCUE_MS && (videoReady || (img && img.complete && img.naturalWidth > 0))) {
         debugRef.current.rescuedLater++;
         debugLog("red de seguridad: foto completa → arranca");
         setLoadedId(currentId);
@@ -595,7 +615,7 @@ export default function MomentViewer({
       }
     }, LOAD_CHECK_MS);
     return () => clearInterval(id);
-  }, [currentId, imgLoaded, debugLog]);
+  }, [currentId, imgLoaded, isVideoMoment, debugLog]);
 
   // En mis momentos: quién lo vio, en vivo, el más reciente primero.
   useEffect(() => {
@@ -658,9 +678,10 @@ export default function MomentViewer({
     if (current && videoNotReady) setLoadedId(current.id);
   }, [current, videoNotReady]);
 
-  // Temporizador: corre solo con la foto cargada y sin pausa.
+  // Temporizador: corre solo con la foto cargada y sin pausa. En un momento
+  // con video no se usa: el tiempo lo marca el video (ver abajo).
   useEffect(() => {
-    if (!current || !imgLoaded || paused || dialogOpen) return;
+    if (!current || !imgLoaded || paused || dialogOpen || isVideoMoment) return;
     if (DEBUG) {
       timerRunningRef.current = true;
       debugLog("temporizador arranca");
@@ -684,7 +705,170 @@ export default function MomentViewer({
         debugLog("temporizador se detiene");
       }
     };
-  }, [current, imgLoaded, paused, dialogOpen, debugLog]);
+  }, [current, imgLoaded, paused, dialogOpen, isVideoMoment, debugLog]);
+
+  // ---------------------------------------------------------------------
+  // Video (punto 102, parte 5)
+  // ---------------------------------------------------------------------
+
+  // Mientras el visor está abierto, el Muro de abajo no reproduce nada.
+  useEffect(() => {
+    setFeedVideoSuspended(true);
+    return () => setFeedVideoSuspended(false);
+  }, []);
+
+  // Intento de "habilitar" el reproductor dentro del mismo toque que abrió
+  // el visor (Safari guarda el permiso de sonar en cada elemento y lo da
+  // con un play() dentro de un toque). Si no llega a tiempo, queda el
+  // botón "Toca para escuchar".
+  useLayoutEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      const attempt = video.play();
+      if (attempt && attempt.catch) attempt.catch(() => {});
+      video.pause();
+    } catch {
+      /* sin efecto */
+    }
+  }, []);
+
+  // Al cambiar de momento: cargar su video (o vaciar el reproductor).
+  const videoSrc = videoUrls ? videoUrls.url : null;
+  const videoPoster = videoUrls ? videoUrls.posterUrl : null;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    setVideoNeedsTap(null);
+    if (!videoSrc) {
+      if (video.getAttribute("src")) {
+        video.pause();
+        video.removeAttribute("src");
+        video.load(); // corta la descarga
+      }
+      return;
+    }
+    video.poster = videoPoster || "";
+    video.src = videoSrc;
+    video.load();
+  }, [currentId, videoSrc, videoPoster]);
+
+  // Al cerrar el visor: cortar la descarga.
+  useEffect(
+    () => () => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    },
+    []
+  );
+
+  // Reproducir con sonido (salvo silenciado); si el navegador no deja,
+  // en silencio y "Toca para escuchar"; si ni así, "Toca para reproducir"
+  // (por ejemplo, el Ahorro de batería del iPhone).
+  const videoNeedsTapRef = useRef(null);
+  videoNeedsTapRef.current = videoNeedsTap;
+  const tryPlayVideo = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !video.getAttribute("src")) return;
+    // Si ya se sabe que no deja sonar sin un toque, sigue en silencio (en
+    // iPhone, quitarle el silencio a un video que corre sin permiso lo pausa).
+    video.muted = videoMuted || videoNeedsTapRef.current === "sound";
+    const attempt = video.play();
+    if (!attempt || !attempt.catch) return;
+    attempt.catch((err) => {
+      if (err && err.name === "AbortError") return; // se cambió de momento
+      if (!video.muted) {
+        video.muted = true;
+        setVideoNeedsTap("sound");
+        video.play().catch((err2) => {
+          if (!err2 || err2.name !== "AbortError") setVideoNeedsTap("play");
+        });
+      } else {
+        setVideoNeedsTap("play");
+      }
+    });
+  }, [videoMuted]);
+
+  // Corre con todo lo que corre el tiempo de una foto: sin pausa, sin
+  // diálogos abiertos y con la app a la vista.
+  const videoShouldPlay = isVideoMoment && !paused && !dialogOpen;
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isVideoMoment) return undefined;
+    if (!videoShouldPlay) {
+      video.pause();
+      return undefined;
+    }
+    if (videoNeedsTap !== "play") tryPlayVideo();
+    // Al volver a la app, sigue (el navegador lo pausa al salir).
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && videoNeedsTap !== "play") tryPlayVideo();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [currentId, isVideoMoment, videoShouldPlay, videoNeedsTap, tryPlayVideo]);
+
+  // Barra de arriba: avanza con el video (si se queda cargando, se detiene
+  // sola). Al terminar, el siguiente momento.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isVideoMoment) return undefined;
+    const fallbackDuration = (current && current.video && current.video.duration) || 0;
+    let frame;
+    const tick = () => {
+      const duration = isFinite(video.duration) && video.duration > 0 ? video.duration : fallbackDuration;
+      if (duration > 0) setProgress(Math.min(1, (video.currentTime || 0) / duration));
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    const onLoaded = () => setLoadedId(currentId);
+    const onEnded = () => actionsRef.current.next();
+    // No se pudo cargar (igual que una foto que falla): el siguiente.
+    const onError = () => {
+      if (!video.getAttribute("src")) return; // fue el vaciado al cambiar de momento
+      debugLog("video: error → siguiente");
+      actionsRef.current.next();
+    };
+    video.addEventListener("loadeddata", onLoaded);
+    video.addEventListener("playing", onLoaded);
+    video.addEventListener("ended", onEnded);
+    video.addEventListener("error", onError);
+    return () => {
+      cancelAnimationFrame(frame);
+      video.removeEventListener("loadeddata", onLoaded);
+      video.removeEventListener("playing", onLoaded);
+      video.removeEventListener("ended", onEnded);
+      video.removeEventListener("error", onError);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId, isVideoMoment]);
+
+  // 🔇/🔊 del video (o "Toca para escuchar"): es un toque, así que aquí
+  // el navegador sí deja sonar, y desde entonces este reproductor suena
+  // solo en los momentos siguientes.
+  const toggleVideoSound = () => {
+    const video = videoRef.current;
+    const nextMuted = videoNeedsTap === "sound" ? false : !videoMuted;
+    setVideoMuted(nextMuted);
+    setVideoNeedsTap(null);
+    if (!video) return;
+    video.muted = nextMuted;
+    if (videoShouldPlay) video.play().catch(() => {});
+  };
+
+  const tapToPlayVideo = () => {
+    const video = videoRef.current;
+    setVideoNeedsTap(null);
+    if (!video) return;
+    video.muted = videoMuted;
+    video.play().catch(() => {
+      video.muted = true;
+      video.play().catch(() => setVideoNeedsTap("play"));
+    });
+  };
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -862,6 +1046,22 @@ export default function MomentViewer({
               {musicMuted ? "🔇" : "🔊"}
             </button>
           )}
+          {current && isVideoMoment && (
+            // Sonido del video (punto 102). Si el navegador obligó a
+            // silenciarlo, se ve 🔇 y tocarlo lo activa.
+            <button
+              type="button"
+              style={styles.iconBtn(muteHover)}
+              onClick={toggleVideoSound}
+              onMouseEnter={() => setMuteHover(true)}
+              onMouseLeave={() => setMuteHover(false)}
+              aria-pressed={videoMuted || videoNeedsTap === "sound"}
+              aria-label={videoMuted || videoNeedsTap === "sound" ? t("video.soundOn") : t("video.soundOff")}
+              title={videoMuted || videoNeedsTap === "sound" ? t("video.soundOn") : t("video.soundOff")}
+            >
+              {videoMuted || videoNeedsTap === "sound" ? "🔇" : "🔊"}
+            </button>
+          )}
           {current && isMine && (
             <button
               type="button"
@@ -915,6 +1115,18 @@ export default function MomentViewer({
           </button>
         )}
 
+        {current && isVideoMoment && (videoNeedsTap === "play" || (videoNeedsTap === "sound" && !videoMuted)) && (
+          <button
+            type="button"
+            style={styles.tapToListen(tapHover)}
+            onClick={videoNeedsTap === "play" ? tapToPlayVideo : toggleVideoSound}
+            onMouseEnter={() => setTapHover(true)}
+            onMouseLeave={() => setTapHover(false)}
+          >
+            {videoNeedsTap === "play" ? t("moments.tapToPlay") : t("moments.tapToListen")}
+          </button>
+        )}
+
         <div
           style={styles.stage}
           onPointerDown={handlePointerDown}
@@ -926,7 +1138,18 @@ export default function MomentViewer({
             e.preventDefault();
           }}
         >
-          {current && videoNotReady ? (
+          {/* El reproductor del visor (punto 102): siempre montado, oculto
+              si el momento no es de video, para que sea SIEMPRE el mismo
+              elemento (permiso de sonar en Safari). */}
+          <video
+            ref={videoRef}
+            playsInline
+            preload="auto"
+            disablePictureInPicture
+            aria-label={current ? t("moments.videoAlt", { name: author?.displayName || "" }) : undefined}
+            style={isVideoMoment ? styles.image : styles.hiddenVideo}
+          />
+          {current && isVideoMoment ? null : current && videoNotReady ? (
             // Punto 102: un momento con video pendiente o rechazado (solo lo
             // lee su autor): aviso en lugar de la foto.
             <span style={styles.status} role="status">

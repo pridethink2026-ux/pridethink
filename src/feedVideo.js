@@ -166,7 +166,7 @@ function ensureElement() {
 }
 
 function tryPlay() {
-  if (!el || !activeId) return;
+  if (!el || !activeId || suspended) return;
   el.muted = !soundOn;
   const attempt = el.play();
   if (!attempt || !attempt.catch) return;
@@ -256,7 +256,25 @@ function release() {
   emit();
 }
 
+// Punto 102, parte 5: mientras el visor de Momentos está abierto (encima
+// del Muro), el Muro no reproduce nada: se pausa el video activo y nada
+// arranca solo. Al cerrarlo, todo sigue como estaba.
+let suspended = false;
+
+export function setFeedVideoSuspended(value) {
+  suspended = !!value;
+  clearTimeout(candidateTimer);
+  candidateTimer = null;
+  candidateId = null;
+  if (suspended) {
+    if (el && !el.paused) el.pause();
+  } else {
+    decide();
+  }
+}
+
 function decide() {
+  if (suspended) return;
   const target = mostVisible();
   const activeRatio = activeId ? ratios.get(activeId) || 0 : 1;
   if (activeRatio === 0) {
