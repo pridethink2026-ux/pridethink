@@ -98,6 +98,12 @@ function ApprovedVideo({ postId, video }) {
     borderRadius: "12px",
     overflow: "hidden",
     background: "var(--bg)",
+    // Capa propia (fallo del iPhone: el post de abajo quedaba en blanco,
+    // con solo una rayita de su foto). Así el marco recorta sus esquinas
+    // él mismo y los botones (zIndex 1 y 2) quedan contenidos aquí y no en
+    // la página entera, y Safari no tiene que dibujar aparte lo que sigue.
+    isolation: "isolate",
+    transform: "translateZ(0)",
   };
   const fillStyle = { position: "absolute", inset: 0, width: "100%", height: "100%" };
   const posterStyle = { ...fillStyle, objectFit: "cover", objectPosition: "center", display: "block" };

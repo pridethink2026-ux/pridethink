@@ -43,6 +43,8 @@ let blocked = false;
 let candidateTimer = null;
 let candidateId = null;
 let observer = null;
+// Dónde iba cada video que se soltó al salir de la pantalla (release()).
+const resumeAt = new Map(); // id -> segundos
 
 const IDLE_MUTED = { activeId: null, soundOn: false };
 const IDLE_SOUND = { activeId: null, soundOn: true };
@@ -204,6 +206,18 @@ function activate(id) {
     blocked = false;
     el.style.opacity = "0";
     slot.mount.appendChild(el);
+    // Si se soltó al salir de la pantalla, sigue desde donde iba.
+    const start = resumeAt.get(id) || 0;
+    resumeAt.delete(id);
+    if (start > 0) {
+      el.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (activeId === id) el.currentTime = start;
+        },
+        { once: true }
+      );
+    }
     el.src = slot.url;
   }
   tryPlay();
@@ -226,10 +240,29 @@ function mostVisible() {
   return best;
 }
 
+// El activo salió del todo de la pantalla: se saca el <video> del marco y
+// se suelta el archivo (queda la miniatura). Libera memoria y deja la
+// página sin video cuando no se ve; en el iPhone, tenerlo pegado (aunque
+// en pausa) dejaba en blanco el post de abajo. Se recuerda dónde iba y al
+// volver sigue desde ahí (activate). Es el mismo elemento, así que el
+// permiso de sonar de Safari se mantiene.
+function release() {
+  if (!el || !activeId || isFullscreen()) return;
+  resumeAt.set(activeId, el.currentTime || 0);
+  stopElement();
+  activeId = null;
+  userPaused = false;
+  blocked = false;
+  emit();
+}
+
 function decide() {
   const target = mostVisible();
-  // El activo salió de la pantalla: pausa (queda en su lugar, en pausa).
-  if (activeId && (ratios.get(activeId) || 0) < VISIBLE_RATIO && el && !el.paused) {
+  const activeRatio = activeId ? ratios.get(activeId) || 0 : 1;
+  if (activeRatio === 0) {
+    release();
+  } else if (activeRatio < VISIBLE_RATIO && el && !el.paused) {
+    // Casi fuera de la pantalla: pausa (queda en su lugar, en pausa).
     el.pause();
   }
   if (!target) {
@@ -347,6 +380,7 @@ export function registerSlot(id, { observeEl, mount, url, duration }) {
     if (observer) observer.unobserve(observeEl);
     slots.delete(id);
     ratios.delete(id);
+    resumeAt.delete(id);
     if (candidateId === id) {
       clearTimeout(candidateTimer);
       candidateTimer = null;
