@@ -47,6 +47,13 @@
     solo REGISTRA lo que borraría; se cambia a false después de revisar los
     registros.
 
+  Punto 102, parte 7 — limpieza de Storage de los momentos:
+  - cleanupDeletedMomentFiles: al borrar un momento o al vencer (la política
+    TTL borra el documento), borra su video y miniatura (momentVideos/) o su
+    foto (momentImages/).
+  - cleanupOrphanPostFiles revisa también momentVideos/: carpetas sin
+    momento y con más de 1 día sin cambios (mismo modo prueba).
+
   Subir: npx firebase deploy --only functions (o npm run deploy:functions
   desde la raíz del proyecto).
 */
@@ -411,8 +418,8 @@ exports.approveMomentVideo = onDocumentCreated("moments/{momentId}", async (even
 const POST_IMAGES_ROOT = "postImages/";
 
 // Carpetas de fotos de posts, con la misma forma que
-// videoStorage.listPostVideoFolders(): [{ key, authorId, postId, newest,
-// count, bytes, remove() }].
+// videoStorage.listPostVideoFolders(): [{ key, authorId, id, newest,
+// count, bytes, remove() }] (id: el del post).
 async function listPostImageFolders() {
   const [files] = await getStorage().bucket().getFiles({ prefix: POST_IMAGES_ROOT });
   const now = Date.now();
@@ -428,7 +435,7 @@ async function listPostImageFolders() {
       folder = {
         key,
         authorId: parts[1],
-        postId: parts[2],
+        id: parts[2],
         newest: 0,
         count: 0,
         bytes: 0,
@@ -465,12 +472,47 @@ exports.cleanupDeletedPostFiles = onDocumentDeleted("posts/{postId}", async (eve
   logger.info("limpieza: archivos del post borrados", { postId, video: !!post.video });
 });
 
-// Una vez al día: carpetas sin post. ORPHAN_CLEANUP_DRY_RUN = true solo
+// ---------------------------------------------------------------------------
+// Punto 102, parte 7 — limpieza de Storage de los momentos
+// ---------------------------------------------------------------------------
+
+// Al borrar un momento (desde la app o la consola) Y al vencer: la política
+// TTL de "moments" (campo expireAt) borra el documento, y ese borrado
+// también dispara esta función. Borra la carpeta del video
+// (momentVideos/{autor}/{momentId}/) o la foto (momentImages/{autor}/{id}.jpg).
+// La app ya borraba los archivos al borrar a mano (moments.js); esto cubre
+// el vencimiento y una app que se cerró justo después de borrar. La regla
+// de ciclo de vida del bucket (2 días) sigue de respaldo.
+exports.cleanupDeletedMomentFiles = onDocumentDeleted("moments/{momentId}", async (event) => {
+  const moment = event.data && event.data.data();
+  const authorId = moment && moment.authorId;
+  if (!authorId) return;
+  const momentId = event.params.momentId;
+  try {
+    if (moment.video) {
+      await videoStorage.deleteMomentVideoFolder(authorId, momentId);
+    } else {
+      await getStorage()
+        .bucket()
+        .file(`momentImages/${authorId}/${momentId}.jpg`)
+        .delete({ ignoreNotFound: true });
+    }
+    logger.info("limpieza: archivos del momento borrados", { momentId, video: !!moment.video });
+  } catch (err) {
+    logger.warn("limpieza: no se pudo borrar", { what: "momento", momentId, err: String(err) });
+  }
+});
+
+// Una vez al día: carpetas sin post (y, desde el punto 102, parte 7,
+// carpetas de video sin momento). ORPHAN_CLEANUP_DRY_RUN = true solo
 // registra ("limpieza (prueba): se borraría") sin borrar nada. Después de
 // revisar en Functions → Registros que solo aparezcan carpetas que de verdad
 // sobran, se cambia a false y se vuelve a subir la función.
 const ORPHAN_CLEANUP_DRY_RUN = true;
 const ORPHAN_MIN_AGE_MS = 2 * 24 * 60 * 60 * 1000; // 2 días sin cambios
+// Un momento vive 24 h y su video se sube minutos antes de crearlo: una
+// carpeta de más de 1 día sin momento ya no va a tener uno.
+const MOMENT_ORPHAN_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 const ORPHAN_MAX_FOLDERS = 200; // tope por pasada
 
 exports.cleanupOrphanPostFiles = onSchedule(
@@ -479,19 +521,26 @@ exports.cleanupOrphanPostFiles = onSchedule(
     const db = getFirestore();
     const now = Date.now();
     // Videos (videoStorage.js) y fotos, con la misma forma:
-    // { key, authorId, postId, newest (ms), count, bytes, remove() }.
-    const folders = [...(await videoStorage.listPostVideoFolders()), ...(await listPostImageFolders())];
+    // { key, authorId, id, newest (ms), count, bytes, remove() }, más de qué
+    // colección es cada carpeta y desde qué edad se revisa.
+    const asPost = (f) => ({ ...f, collection: "posts", minAge: ORPHAN_MIN_AGE_MS });
+    const asMoment = (f) => ({ ...f, collection: "moments", minAge: MOMENT_ORPHAN_MIN_AGE_MS });
+    const folders = [
+      ...(await videoStorage.listPostVideoFolders()).map(asPost),
+      ...(await listPostImageFolders()).map(asPost),
+      ...(await videoStorage.listMomentVideoFolders()).map(asMoment),
+    ];
 
     let checked = 0;
     let orphans = 0;
     let bytes = 0;
     for (const folder of folders) {
       if (checked >= ORPHAN_MAX_FOLDERS) break;
-      if (now - folder.newest < ORPHAN_MIN_AGE_MS) continue; // puede ser un borrador en curso
+      if (now - folder.newest < folder.minAge) continue; // puede ser un borrador o una subida en curso
       checked += 1;
-      const postSnap = await db.doc(`posts/${folder.postId}`).get();
-      // Si el post existe y es de ese autor, la carpeta es suya: no se toca.
-      if (postSnap.exists && postSnap.get("authorId") === folder.authorId) continue;
+      const docSnap = await db.doc(`${folder.collection}/${folder.id}`).get();
+      // Si el post (o momento) existe y es de ese autor, la carpeta es suya: no se toca.
+      if (docSnap.exists && docSnap.get("authorId") === folder.authorId) continue;
       orphans += 1;
       bytes += folder.bytes;
       if (ORPHAN_CLEANUP_DRY_RUN) {
@@ -500,7 +549,7 @@ exports.cleanupOrphanPostFiles = onSchedule(
         await folder.remove().catch((err) =>
           logger.warn("limpieza: no se pudo borrar", { folder: folder.key, err: String(err) })
         );
-        logger.info("limpieza: carpeta sin post borrada", {
+        logger.info("limpieza: carpeta sin post (o momento) borrada", {
           folder: folder.key,
           files: folder.count,
           bytes: folder.bytes,

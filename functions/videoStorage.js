@@ -30,8 +30,9 @@ function videoPaths(authorId, postId) {
   return { video: `${base}/video.mp4`, poster: `${base}/poster.jpg` };
 }
 
-// Video de un momento (punto 102). Los momentos vencidos los borra una
-// regla de ciclo de vida del bucket (prefijo momentVideos/, 2 días).
+// Video de un momento (punto 102). Al borrarse o vencer el momento, lo
+// borra cleanupDeletedMomentFiles (parte 7); además, la regla de ciclo de
+// vida del bucket (prefijo momentVideos/, 2 días) borra todo lo que quede.
 function momentVideoPaths(authorId, momentId) {
   const base = `${MOMENT_VIDEO_ROOT}${authorId}/${momentId}`;
   return { video: `${base}/video.mp4`, poster: `${base}/poster.jpg` };
@@ -78,14 +79,32 @@ async function deletePostVideoFolder(authorId, postId) {
     .deleteFiles({ prefix: `${VIDEO_ROOT}${authorId}/${postId}/`, force: true });
 }
 
-// Todas las carpetas de video, para la limpieza diaria (cleanupOrphanPostFiles):
-// [{ key, authorId, postId, newest (ms), count, bytes, remove() }].
-async function listPostVideoFolders() {
-  const [files] = await getStorage().bucket().getFiles({ prefix: VIDEO_ROOT });
+// Borra TODO lo que haya en la carpeta del video de un momento (punto 102,
+// parte 7: al borrarlo o al vencer).
+async function deleteMomentVideoFolder(authorId, momentId) {
+  await getStorage()
+    .bucket()
+    .deleteFiles({ prefix: `${MOMENT_VIDEO_ROOT}${authorId}/${momentId}/`, force: true });
+}
+
+// Carpetas de video de los posts, para la limpieza diaria
+// (cleanupOrphanPostFiles): [{ key, authorId, id, newest (ms), count,
+// bytes, remove() }] (id: el del post).
+function listPostVideoFolders() {
+  return listVideoFolders(VIDEO_ROOT);
+}
+
+// Lo mismo para los momentos (punto 102, parte 7; id: el del momento).
+function listMomentVideoFolders() {
+  return listVideoFolders(MOMENT_VIDEO_ROOT);
+}
+
+async function listVideoFolders(root) {
+  const [files] = await getStorage().bucket().getFiles({ prefix: root });
   const now = Date.now();
   const folders = new Map();
   for (const file of files) {
-    const parts = file.name.split("/"); // [raíz, autor, postId, nombre]
+    const parts = file.name.split("/"); // [raíz, autor, id, nombre]
     if (parts.length < 4 || !parts[1] || !parts[2]) continue;
     const key = `${parts[0]}/${parts[1]}/${parts[2]}/`;
     const updated = Date.parse(file.metadata.updated || file.metadata.timeCreated) || now;
@@ -95,7 +114,7 @@ async function listPostVideoFolders() {
       folder = {
         key,
         authorId: parts[1],
-        postId: parts[2],
+        id: parts[2],
         newest: 0,
         count: 0,
         bytes: 0,
@@ -119,5 +138,7 @@ module.exports = {
   getVideoPlaybackUrls,
   deleteVideoFiles,
   deletePostVideoFolder,
+  deleteMomentVideoFolder,
   listPostVideoFolders,
+  listMomentVideoFolders,
 };
