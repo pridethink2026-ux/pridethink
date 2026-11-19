@@ -13,7 +13,7 @@ import { lazyWithReload } from "./lazyLoad";
 import { useMoments } from "./MomentsContext";
 import { MAX_ACTIVE_MOMENTS, MomentLimitError, MomentTimeoutError, publishMoment } from "./moments";
 import { MAX_MOMENT_VIDEO_SECONDS } from "./videoCompress";
-import { useVideoJob, startVideoJob, clearVideoJob, VIDEO_DEST_MOMENT } from "./videoJob";
+import { useVideoJob, startVideoJob, clearVideoJob, publishVideoWhenReady, VIDEO_DEST_MOMENT } from "./videoJob";
 
 const MomentMusicStep = lazyWithReload(() => import(/* webpackChunkName: "moment-music" */ "./MomentMusicStep"));
 
@@ -44,8 +44,13 @@ const MomentMusicStep = lazyWithReload(() => import(/* webpackChunkName: "moment
   se prepara y se publica SOLO (videoJob.js, destino VIDEO_DEST_MOMENT,
   publishWhenReady), aunque la persona se vaya a otra sección. El avance
   se ve debajo de la tira (MomentVideoStatus.jsx). Sin música (decisión
-  del punto 102); el texto encima del video llega en la parte 6. Mientras
-  hay un video en curso no se puede elegir otro (sí publicar fotos).
+  del punto 102). Mientras hay un video en curso no se puede elegir otro
+  (sí publicar fotos).
+  Texto encima del video (parte 6): después del recorte, el video se
+  empieza a preparar y a la vez se abre MomentTextEditor sobre un cuadro
+  del video (burnIn false). "Publicar" lo deja marcado para publicarse
+  solo (publishVideoWhenReady) con el texto como dato (`texts`), que
+  dibuja MomentViewer encima del video. "Cancelar" descarta el video.
 */
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -158,8 +163,21 @@ export default function MomentsStrip({ currentUid, myProfile }) {
   const [viewer, setViewer] = useState(null); // { authorUids, startIndex }
   const [addHover, setAddHover] = useState(false);
   const [trimVideo, setTrimVideo] = useState(null); // video elegido, en el editor de recorte
+  // Parte 6: { frame, momentId } mientras se escribe el texto encima del video.
+  const [videoText, setVideoText] = useState(null);
   const videoJob = useVideoJob(VIDEO_DEST_MOMENT);
   const videoBusy = videoJob.status !== "idle";
+
+  // Si la tira se desmonta con el paso de texto abierto, nadie va a tocar
+  // "Publicar": el video que se estaba preparando se descarta.
+  const videoTextOpenRef = useRef(false);
+  videoTextOpenRef.current = !!videoText;
+  useEffect(
+    () => () => {
+      if (videoTextOpenRef.current) clearVideoJob(VIDEO_DEST_MOMENT);
+    },
+    []
+  );
 
   // Otra cuenta en esta pestaña: el video de la anterior se descarta.
   useEffect(() => {
@@ -258,7 +276,10 @@ export default function MomentsStrip({ currentUid, myProfile }) {
 
   // Recorte listo: se prepara y se publica solo (videoJob.js). El id del
   // momento se elige aquí, como el del post del Muro.
-  const handleTrimConfirm = ({ start, end }) => {
+  // Parte 6: el video se empieza a preparar YA, mientras se escribe el
+  // texto encima (sobre un cuadro del video); al tocar "Publicar" queda
+  // marcado para publicarse solo apenas esté listo.
+  const handleTrimConfirm = ({ start, end, frame }) => {
     const file = trimVideo;
     setTrimVideo(null);
     if (!file) return;
@@ -268,12 +289,24 @@ export default function MomentsStrip({ currentUid, myProfile }) {
     }
     setMessage(null);
     momentVideoUid = currentUid;
-    startVideoJob(
-      VIDEO_DEST_MOMENT,
-      file,
-      { start, end, maxSeconds: MAX_MOMENT_VIDEO_SECONDS },
-      { publishWhenReady: { uid: currentUid, momentId: doc(collection(db, "moments")).id, caption: "" } }
-    );
+    const momentId = doc(collection(db, "moments")).id;
+    startVideoJob(VIDEO_DEST_MOMENT, file, { start, end, maxSeconds: MAX_MOMENT_VIDEO_SECONDS });
+    // Sin cuadro de fondo (no se pudo sacar): se publica sin texto.
+    if (frame) setVideoText({ frame, momentId });
+    else publishVideoWhenReady(VIDEO_DEST_MOMENT, { uid: currentUid, momentId, caption: "", texts: [] });
+  };
+
+  const handleVideoTextDone = (_blob, caption, texts) => {
+    const step = videoText;
+    setVideoText(null);
+    if (!step) return;
+    publishVideoWhenReady(VIDEO_DEST_MOMENT, { uid: currentUid, momentId: step.momentId, caption, texts });
+  };
+
+  // Cancelar el texto descarta también el video que se estaba preparando.
+  const handleVideoTextCancel = () => {
+    setVideoText(null);
+    clearVideoJob(VIDEO_DEST_MOMENT);
   };
 
   const openViewer = (uid) => setViewer({ authorUids: queue, startIndex: queue.indexOf(uid) });
@@ -352,8 +385,23 @@ export default function MomentsStrip({ currentUid, myProfile }) {
         <VideoTrimmer
           file={trimVideo}
           maxSeconds={MAX_MOMENT_VIDEO_SECONDS}
+          withFrame
           onConfirm={handleTrimConfirm}
           onCancel={handleTrimCancel}
+        />
+      )}
+
+      {videoText && (
+        // Parte 6: el texto encima del video, sobre un cuadro del video. No
+        // se quema (burnIn false): se guarda como dato y lo dibuja el visor.
+        <MomentTextEditor
+          blob={videoText.frame}
+          isPrivate={!!myProfile?.isPrivate}
+          burnIn={false}
+          confirmLabel={t("momentText.publish")}
+          onConfirm={handleVideoTextDone}
+          onCancel={handleVideoTextCancel}
+          onError={() => handleVideoTextDone(null, "", [])}
         />
       )}
 

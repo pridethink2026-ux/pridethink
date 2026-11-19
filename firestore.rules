@@ -1287,13 +1287,44 @@ service cloud.firestore {
     // propia carpeta (momentVideos/{autor}/{momentId}/), sin links
     // (imageURL vacío; la Cloud Function approveMomentVideo escribe
     // video.url, video.posterUrl e imageURL = la miniatura al aprobarlo),
-    // sin storagePath y sin música (decisión del punto 102). Duración hasta
+    // sin storagePath y sin música (decisión del punto 102), con "texts"
+    // opcional (parte 6, textosSobreVideoValidos). Duración hasta
     // 77 s (+ margen), medidas hasta 1280, peso hasta 40 MB, igual que el
     // video de un post.
+    // Un texto encima del video (punto 102, parte 6): { text, color, size,
+    // x, y }, mismas medidas que MomentTextEditor.jsx (size: alto de la
+    // letra como fracción del ancho, 0.04 a 0.16; x/y: el centro, 0 a 1).
+    function textoSobreVideoValido(t) {
+      return t is map
+        && t.keys().hasOnly(['text', 'color', 'size', 'x', 'y'])
+        && t.keys().hasAll(['text', 'color', 'size', 'x', 'y'])
+        && t.text is string && t.text.size() > 0 && t.text.size() <= 100
+        && t.color is string && t.color.matches('^#[0-9a-fA-F]{6}$')
+        && t.size is number && t.size >= 0.04 && t.size <= 0.16
+        && t.x is number && t.x >= 0 && t.x <= 1
+        && t.y is number && t.y >= 0 && t.y <= 1;
+    }
+
+    // "texts" es opcional: hasta 5 textos (las reglas no tienen bucles,
+    // así que se revisa cada posición).
+    function textosSobreVideoValidos(d) {
+      return !('texts' in d) || (
+        d.texts is list
+        && d.texts.size() >= 1
+        && d.texts.size() <= 5
+        && textoSobreVideoValido(d.texts[0])
+        && (d.texts.size() < 2 || textoSobreVideoValido(d.texts[1]))
+        && (d.texts.size() < 3 || textoSobreVideoValido(d.texts[2]))
+        && (d.texts.size() < 4 || textoSobreVideoValido(d.texts[3]))
+        && (d.texts.size() < 5 || textoSobreVideoValido(d.texts[4]))
+      );
+    }
+
     function momentoConVideoValido(momentId) {
       let d = request.resource.data;
       let base = 'momentVideos/' + request.auth.uid + '/' + momentId + '/';
-      return d.keys().hasOnly(['authorId', 'imageURL', 'caption', 'createdAt', 'expireAt', 'video'])
+      return d.keys().hasOnly(['authorId', 'imageURL', 'caption', 'createdAt', 'expireAt', 'video', 'texts'])
+        && textosSobreVideoValidos(d)
         && d.imageURL == ''
         && d.video is map
         && d.video.keys().hasOnly(['status', 'path', 'posterPath', 'duration', 'width', 'height', 'size'])

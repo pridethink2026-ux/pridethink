@@ -19,9 +19,11 @@ import { deleteVideoFiles, momentVideoPaths } from "./videoStorage";
     opcional) es { trackId, startSec }: qué pista de musicLibrary.json y
     desde qué segundo suena; lo elige MomentMusicStep.jsx.
     Momento con VIDEO (punto 102): { authorId, imageURL ("" hasta que se
-    aprueba, después la miniatura), caption, createdAt, expireAt, video:
-    { status, path, posterPath, duration, width, height, size, url?,
-    posterUrl? } }, sin storagePath ni music. Ver createVideoMoment.
+    aprueba, después la miniatura), caption, createdAt, expireAt, texts?,
+    video: { status, path, posterPath, duration, width, height, size,
+    url?, posterUrl? } }, sin storagePath ni music. "texts" (parte 6,
+    opcional): el texto encima del video, que no se quema en el archivo;
+    lo dibuja MomentViewer. Ver createVideoMoment.
   - momentIndex/{authorUid} → { ids, times: { [id]: { createdAt,
     expireAt } } en milisegundos, expireAt }. Es lo que escucha
     MomentsContext.jsx para saber quién tiene momentos activos sin hacer
@@ -241,7 +243,10 @@ export async function publishMoment(uid, blob, myIndex, caption = "", music = nu
 // subida puede tardar un minuto y mientras tanto se pudo publicar otro
 // momento; reescribir un índice viejo lo borraría de la lista.
 // res: el video comprimido (videoCompress.js); paths: momentVideoPaths.
-export async function createVideoMoment(uid, momentId, caption, res, paths) {
+// texts (parte 6): el texto encima del video como dato, [{ text, color,
+// size, x, y }] (MomentTextEditor.jsx); el visor lo dibuja. Vacío: no se
+// guarda el campo.
+export async function createVideoMoment(uid, momentId, caption, texts, res, paths) {
   // Sin tiempo límite a propósito (a diferencia de publishMoment): si el
   // guardado terminara después de avisar el error, "Descartar" borraría
   // los archivos de un momento que sí se creó. Igual que el post con video.
@@ -263,6 +268,7 @@ export async function createVideoMoment(uid, momentId, caption, res, paths) {
     caption: (caption || "").slice(0, MAX_CAPTION_LENGTH),
     createdAt: serverTimestamp(),
     expireAt: Timestamp.fromMillis(expireAt),
+    ...(texts && texts.length > 0 ? { texts } : {}),
     video: {
       status: "pending",
       path: paths.video,

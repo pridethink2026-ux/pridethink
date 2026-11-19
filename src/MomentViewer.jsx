@@ -26,6 +26,7 @@ import { notify, timeAgo } from "./utils";
 import { triggerStarRain } from "./StarRain";
 import { videoPlaybackUrls } from "./videoStorage";
 import { setFeedVideoSuspended } from "./feedVideo";
+import { momentTextStyle } from "./MomentTextEditor";
 
 /*
   MomentViewer
@@ -228,6 +229,7 @@ const styles = {
     flexShrink: 0,
   }),
   stage: {
+    position: "relative", // para el texto encima del video (parte 6)
     flex: 1,
     minHeight: 0,
     display: "flex",
@@ -248,6 +250,18 @@ const styles = {
   },
   status: { color: "rgba(255,255,255,0.7)", fontSize: "14px" },
   hiddenVideo: { display: "none" },
+  // Texto encima del video (punto 102, parte 6): un recuadro del tamaño
+  // del video, centrado como él; los toques pasan al escenario.
+  textLayer: (box) => ({
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    width: `${box.w}px`,
+    height: `${box.h}px`,
+    transform: "translate(-50%, -50%)",
+    overflow: "hidden",
+    pointerEvents: "none",
+  }),
   reportBtn: {
     width: "40px",
     height: "40px",
@@ -435,6 +449,27 @@ export default function MomentViewer({
   // elemento (punto 101, parte 1): reusándolo, una vez que suena, los
   // siguientes momentos con video también suenan solos.
   const videoRef = useRef(null);
+  // Tamaño del escenario (parte 6): para saber dónde queda el video en
+  // pantalla y dibujar su texto encima en el mismo lugar.
+  const [stageSize, setStageSize] = useState(null);
+  const stageObserverRef = useRef(null);
+  const stageRef = useCallback((node) => {
+    if (stageObserverRef.current) {
+      stageObserverRef.current();
+      stageObserverRef.current = null;
+    }
+    if (!node) return;
+    const measure = () => setStageSize({ w: node.clientWidth, h: node.clientHeight });
+    measure();
+    if (typeof ResizeObserver === "function") {
+      const ro = new ResizeObserver(measure);
+      ro.observe(node);
+      stageObserverRef.current = () => ro.disconnect();
+    } else {
+      window.addEventListener("resize", measure);
+      stageObserverRef.current = () => window.removeEventListener("resize", measure);
+    }
+  }, []);
   // Solo diagnóstico (?debug=1).
   const debugRef = useRef({ rescuedAtMount: 0, rescuedLater: 0, gaveUp: 0, events: [] });
   const timerRunningRef = useRef(false);
@@ -457,6 +492,18 @@ export default function MomentViewer({
   const videoNotReady = !!current?.video && current.video.status !== "approved";
   const videoUrls = current?.video && !videoNotReady ? videoPlaybackUrls(current.video) : null;
   const isVideoMoment = !!videoUrls;
+  // Texto encima del video (parte 6): el recuadro donde se ve el video. El
+  // <video> se achica para entrar (maxWidth/maxHeight 100 %) pero no se
+  // agranda, igual que la foto; las medidas son las del video publicado.
+  let videoBox = null;
+  if (isVideoMoment && stageSize && Array.isArray(current.texts) && current.texts.length > 0) {
+    const vw = current.video.width;
+    const vh = current.video.height;
+    if (vw > 0 && vh > 0) {
+      const scale = Math.min(1, stageSize.w / vw, stageSize.h / vh);
+      videoBox = { w: vw * scale, h: vh * scale };
+    }
+  }
   const me = allUsers.find((u) => u.uid === currentUid);
   // Con la confirmación de borrar, el reporte, la lista de quién vio, el
   // aviso abiertos, o mientras escribes una respuesta, todo se detiene.
@@ -1128,6 +1175,7 @@ export default function MomentViewer({
         )}
 
         <div
+          ref={stageRef}
           style={styles.stage}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
@@ -1146,9 +1194,22 @@ export default function MomentViewer({
             playsInline
             preload="auto"
             disablePictureInPicture
-            aria-label={current ? t("moments.videoAlt", { name: author?.displayName || "" }) : undefined}
+            aria-label={
+              current ? current.caption || t("moments.videoAlt", { name: author?.displayName || "" }) : undefined
+            }
             style={isVideoMoment ? styles.image : styles.hiddenVideo}
           />
+          {videoBox && (
+            // Parte 6: el texto del momento con video, encima, igual que en
+            // el editor (momentTextStyle). Lo lee el aria-label del video.
+            <div style={styles.textLayer(videoBox)} aria-hidden="true">
+              {current.texts.map((item, i) => (
+                <div key={i} style={momentTextStyle(item, videoBox.w)}>
+                  {item.text}
+                </div>
+              ))}
+            </div>
+          )}
           {current && isVideoMoment ? null : current && videoNotReady ? (
             // Punto 102: un momento con video pendiente o rechazado (solo lo
             // lee su autor): aviso en lugar de la foto.

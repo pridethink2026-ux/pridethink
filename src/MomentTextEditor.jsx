@@ -28,17 +28,26 @@ import { MOMENT_TEXT_COLORS } from "./themes";
   - `blob` (obligatoria): la foto que devolvió ImageEditor.
   - `isPrivate` (booleano): muestra el aviso de perfil privado; si no es
     privado, avisa que podrás ver quién vio el momento (commit 5).
-  - `onConfirm(blob, caption)`, `onCancel()`, `onError()` (obligatorias).
+  - `onConfirm(blob, caption, texts)`, `onCancel()`, `onError()`
+    (obligatorias). `texts` son los textos como dato:
+    [{ text, color, size, x, y }] (mismas medidas que arriba).
+  - `burnIn` (punto 102, parte 6; por defecto true): con false NO se quema
+    nada y `blob` es solo el fondo para escribir (un cuadro del video):
+    onConfirm(null, caption, texts). Lo usa el momento con video, cuyo
+    texto se guarda como dato y lo dibuja MomentViewer encima del video.
+  - `confirmLabel` (opcional): el texto del botón de confirmar (por
+    defecto "Siguiente").
 
   Colores del texto: MOMENT_TEXT_COLORS de themes.js (fijos, ver allá por
   qué). Fondo negro y bordes blancos fijos, mismo criterio que
   ImageEditor.jsx; los botones usan las variables del tema.
 */
 
-const MAX_TEXTS = 5;
-const MAX_TEXT_LENGTH = 100;
-const MIN_SIZE = 0.04;
-const MAX_SIZE = 0.16;
+// Mismos topes que firestore.rules (textosSobreVideoValidos, punto 102).
+export const MAX_TEXTS = 5;
+export const MAX_TEXT_LENGTH = 100;
+export const MIN_SIZE = 0.04;
+export const MAX_SIZE = 0.16;
 const DEFAULT_SIZE = 0.08;
 const JPEG_QUALITY = 0.85;
 const FONT_WAIT_MS = 3000;
@@ -56,6 +65,30 @@ const TIGHT_SHADOW = 0.06;
 function colorEntry(value) {
   return MOMENT_TEXT_COLORS.find((c) => c.value === value) || MOMENT_TEXT_COLORS[0];
 }
+
+// Cómo se ve un texto encima de la foto o del video, con la foto mostrada
+// a `displayWidth` px de ancho. La usa también MomentViewer.jsx para
+// dibujar el texto encima de un momento con video (punto 102, parte 6),
+// así se ve igual que en el editor.
+export function momentTextStyle(item, displayWidth) {
+  const fontPx = item.size * displayWidth;
+  const outline = colorEntry(item.color).outline;
+  return {
+    position: "absolute",
+    left: `${item.x * 100}%`,
+    top: `${item.y * 100}%`,
+    transform: "translate(-50%, -50%)",
+    fontFamily: TEXT_FONT_FAMILY,
+    fontWeight: TEXT_WEIGHT,
+    fontSize: `${fontPx}px`,
+    lineHeight: 1.15,
+    color: item.color,
+    textShadow: `0 0 ${fontPx * WIDE_SHADOW}px ${outline}, 0 0 ${fontPx * TIGHT_SHADOW}px ${outline}`,
+    whiteSpace: "pre",
+  };
+}
+
+const round = (v, digits) => Math.round(v * 10 ** digits) / 10 ** digits;
 
 const styles = {
   overlay: {
@@ -85,27 +118,13 @@ const styles = {
     flexShrink: 0,
   }),
   image: { width: "100%", height: "100%", display: "block", pointerEvents: "none" },
-  textItem: (item, displayWidth, selected) => {
-    const fontPx = item.size * displayWidth;
-    const outline = colorEntry(item.color).outline;
-    return {
-      position: "absolute",
-      left: `${item.x * 100}%`,
-      top: `${item.y * 100}%`,
-      transform: "translate(-50%, -50%)",
-      fontFamily: TEXT_FONT_FAMILY,
-      fontWeight: TEXT_WEIGHT,
-      fontSize: `${fontPx}px`,
-      lineHeight: 1.15,
-      color: item.color,
-      textShadow: `0 0 ${fontPx * WIDE_SHADOW}px ${outline}, 0 0 ${fontPx * TIGHT_SHADOW}px ${outline}`,
-      whiteSpace: "pre",
-      cursor: "move",
-      touchAction: "none",
-      outline: selected ? "1px dashed rgba(255,255,255,0.9)" : "none",
-      outlineOffset: "4px",
-    };
-  },
+  textItem: (item, displayWidth, selected) => ({
+    ...momentTextStyle(item, displayWidth),
+    cursor: "move",
+    touchAction: "none",
+    outline: selected ? "1px dashed rgba(255,255,255,0.9)" : "none",
+    outlineOffset: "4px",
+  }),
   panel: {
     width: "100%",
     maxWidth: "520px",
@@ -176,7 +195,15 @@ function drawTexts(ctx, items, width) {
   ctx.shadowBlur = 0;
 }
 
-export default function MomentTextEditor({ blob, isPrivate = false, onConfirm, onCancel, onError }) {
+export default function MomentTextEditor({
+  blob,
+  isPrivate = false,
+  burnIn = true,
+  confirmLabel = null,
+  onConfirm,
+  onCancel,
+  onError,
+}) {
   const { t } = useLanguage();
   const vp = useViewport();
   const [image, setImage] = useState(null); // <img> ya cargada
@@ -298,8 +325,21 @@ export default function MomentTextEditor({ blob, isPrivate = false, onConfirm, o
   const handleConfirm = async () => {
     const finalItems = items.filter((i) => i.text.trim());
     const caption = finalItems.map((i) => i.text.trim()).join(" · ");
+    // Los textos como dato (punto 102, parte 6): para el video, que no se
+    // puede quemar; los dibuja el visor.
+    const texts = finalItems.map((i) => ({
+      text: i.text.trim().slice(0, MAX_TEXT_LENGTH),
+      color: i.color,
+      size: clamp(round(i.size, 3), MIN_SIZE, MAX_SIZE),
+      x: clamp(round(i.x, 4), 0, 1),
+      y: clamp(round(i.y, 4), 0, 1),
+    }));
+    if (!burnIn) {
+      onConfirm(null, caption, texts);
+      return;
+    }
     if (finalItems.length === 0) {
-      onConfirm(blob, "");
+      onConfirm(blob, "", []);
       return;
     }
     setBusy(true);
@@ -321,7 +361,7 @@ export default function MomentTextEditor({ blob, isPrivate = false, onConfirm, o
       canvas.toBlob(
         (out) => {
           setBusy(false);
-          if (out) onConfirm(out, caption);
+          if (out) onConfirm(out, caption, texts);
           else onError();
         },
         "image/jpeg",
@@ -460,7 +500,7 @@ export default function MomentTextEditor({ blob, isPrivate = false, onConfirm, o
             {...hoverProps("publish")}
           >
             {/* Punto 79: después viene el paso de música (MomentMusicStep), que es el que publica. */}
-            {busy ? t("common.loading") : t("momentText.next")}
+            {busy ? t("common.loading") : confirmLabel || t("momentText.next")}
           </button>
         </div>
       </div>

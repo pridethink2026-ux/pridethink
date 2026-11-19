@@ -137,14 +137,16 @@ const PUBLISHERS = {
     },
   },
   /*
-    Momentos (punto 102, parte 4). payload: { uid, momentId, caption }.
-    Crea moments/{momentId} en "pending" junto con el índice del autor
-    (moments.js, createVideoMoment). Sin avisos después.
+    Momentos (punto 102, parte 4). payload: { uid, momentId, caption,
+    texts } (texts: el texto encima del video, parte 6; ver
+    MomentTextEditor.jsx). Crea moments/{momentId} en "pending" junto con
+    el índice del autor (moments.js, createVideoMoment). Sin avisos después.
   */
   [VIDEO_DEST_MOMENT]: {
     id: (payload) => payload.momentId,
     paths: (payload) => momentVideoPaths(payload.uid, payload.momentId),
-    create: (payload, res, paths) => createVideoMoment(payload.uid, payload.momentId, payload.caption, res, paths),
+    create: (payload, res, paths) =>
+      createVideoMoment(payload.uid, payload.momentId, payload.caption, payload.texts, res, paths),
     // Con 30 momentos activos no se puede: lo dice el aviso del error.
     errorReason: (err) => (err instanceof MomentLimitError ? "limit" : null),
   },
@@ -419,6 +421,18 @@ function createJob(dest) {
       }
       if (file && !job) runCompression();
     },
+    // Publicar solo, decidido DESPUÉS de empezar (punto 102, parte 6: el
+    // texto del momento se escribe mientras el video se prepara). Si ya
+    // está listo, publica ahora; si sigue preparándose, al terminar; si la
+    // compresión falló, al terminar el "Reintentar".
+    publishWhenReady: (payload) => {
+      if (!PUBLISHERS[dest]) return;
+      autoPublish = payload;
+      if (state.status === "ready" && result) {
+        publishPayload = payload;
+        runPublish();
+      }
+    },
     publish: (payload) => {
       if (state.status !== "ready" || !result) return;
       if (!PUBLISHERS[dest]) {
@@ -465,6 +479,11 @@ export function startVideoJob(dest, pickedFile, options = {}, extra = null) {
 
 export function retryVideoJob(dest) {
   jobFor(dest).retry();
+}
+
+// Publicar apenas esté listo (o ya, si lo está). payload: ver PUBLISHERS.
+export function publishVideoWhenReady(dest, payload) {
+  jobFor(dest).publishWhenReady(payload);
 }
 
 // Solo con el video listo (status "ready"). payload: ver PUBLISHERS.

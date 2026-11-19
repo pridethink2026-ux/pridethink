@@ -227,9 +227,12 @@ const styles = {
 
 /*
   file: el video elegido. maxSeconds: 90 el Muro, 77 Momentos.
-  onConfirm({ start, end }) / onCancel().
+  onConfirm({ start, end, frame }) / onCancel().
+  withFrame (punto 102, parte 6): además devuelve `frame`, un JPEG (Blob)
+  de un cuadro del principio del tramo, de fondo para escribir el texto
+  del momento (MomentTextEditor). null si no se pudo sacar.
 */
-export default function VideoTrimmer({ file, maxSeconds, onConfirm, onCancel }) {
+export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onConfirm, onCancel }) {
   const { t } = useLanguage();
   const [info, setInfo] = useState(null); // { duration }
   const [error, setError] = useState(null); // código de openVideoForTrim
@@ -241,6 +244,7 @@ export default function VideoTrimmer({ file, maxSeconds, onConfirm, onCancel }) 
   const [paused, setPaused] = useState(true);
   const [muted, setMuted] = useState(true);
   const [focusedHandle, setFocusedHandle] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   const videoRef = useRef(null);
   const barRef = useRef(null);
@@ -331,6 +335,28 @@ export default function VideoTrimmer({ file, maxSeconds, onConfirm, onCancel }) 
     },
     []
   );
+  // "Listo". Con withFrame, primero saca un cuadro del tramo (medio segundo
+  // después del inicio: el primero suele ser negro) como JPEG.
+  const confirm = async () => {
+    if (confirming) return;
+    const { start, end } = rangeRef.current;
+    let frame = null;
+    const opened = openedRef.current;
+    if (withFrame && opened) {
+      setConfirming(true);
+      try {
+        const url = await opened.frameAt(start + Math.min(0.5, (end - start) / 2));
+        if (url) {
+          frame = await fetch(url).then((r) => r.blob());
+          URL.revokeObjectURL(url);
+        }
+      } catch {
+        frame = null;
+      }
+    }
+    onConfirm({ start, end, frame });
+  };
+
   useEffect(() => {
     if (previewFailed && info) showFrame(rangeRef.current.start);
   }, [previewFailed, info, showFrame]);
@@ -630,10 +656,11 @@ export default function VideoTrimmer({ file, maxSeconds, onConfirm, onCancel }) 
             </button>
             <button
               type="button"
-              style={buttonStyle({ primary: true })}
-              onClick={() => onConfirm({ start: range.start, end: range.end })}
+              style={buttonStyle({ primary: true, disabled: confirming })}
+              disabled={confirming}
+              onClick={confirm}
             >
-              {t("video.trimDone")}
+              {confirming ? t("common.loading") : t("video.trimDone")}
             </button>
           </div>
         </>
