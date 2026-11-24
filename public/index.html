@@ -26,6 +26,10 @@
          Solo los pesos que usa la app (Sora 800 no se usaba). -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Videos y miniaturas del Muro (punto 103): abre la conexión antes de
+         que el primer video la pida. Sin crossorigin porque <video> e <img>
+         piden sin CORS. -->
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com" />
     <link
       rel="preload"
       as="style"

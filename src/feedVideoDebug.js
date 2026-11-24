@@ -15,7 +15,10 @@ import { DEBUG } from "./debug";
                desde el segundo N)
     meta       el navegador ya sabe duración y tamaño (loadedmetadata)
     datos      ya tiene el primer cuadro (loadeddata)
+    listo      cree que ya puede arrancar (canplay)
     play       empezó a moverse (playing)
+               En datos, listo y play, "(1.2s)" = segundos de video ya
+               bajados por delante de donde va.
     espera     se quedó sin datos a mitad de camino (waiting)
     bloqueado  el navegador no dejó arrancar solo
 

@@ -17,9 +17,13 @@ import { videoDebug, videoDebugHeader } from "./feedVideoDebug";
   registerSlot(). El post que esté al menos 50 % visible durante 300 ms
   se queda con el reproductor: arranca solo (en silencio, salvo que la
   persona ya haya activado el sonido) y se pausa al salir de la
-  pantalla. Para que no haya pausa al arrancar, el archivo se empieza a
-  descargar apenas el post llega al 50 % (si el reproductor está libre o
-  en pausa); la espera de 300 ms solo retrasa el play, no la descarga. Tocar el video lo pausa o lo sigue; la bocina activa o silencia
+  pantalla. Para que no haya pausa al arrancar, el reproductor pasa al
+  post apenas este es el más visible (y al menos 50 %) y el archivo
+  empieza a bajar ya; la espera de 300 ms solo retrasa el play, no la
+  descarga. Si el video anterior sigue sonando, el nuevo tiene que verse
+  al menos 10 puntos más (SWITCH_MARGIN) para quitarle el reproductor:
+  así no salta de uno a otro en el borde. Tocar el video lo pausa o lo
+  sigue; la bocina activa o silencia
   TODOS los videos mientras la pestaña esté abierta (al recargar vuelve a
   silencio: ningún navegador deja sonar sin un toque nuevo).
 
@@ -37,6 +41,12 @@ const VISIBLE_RATIO = 0.5;
 // Lo que tiene que quedarse a la vista antes de darle play (para no
 // arrancar videos que se pasan de largo al bajar rápido).
 const ACTIVATE_DELAY_MS = 300;
+// Cuánto más visible (fracción) tiene que estar un video para quitarle el
+// reproductor a otro que sigue sonando.
+const SWITCH_MARGIN = 0.1;
+// Cada 5 %: con el margen hay que enterarse de cambios chicos de
+// visibilidad, no solo al cruzar el 25 %, 50 %, 80 %.
+const THRESHOLDS = Array.from({ length: 21 }, (_, i) => i / 20);
 
 const slots = new Map(); // id -> { mount, url, duration }
 const ratios = new Map(); // id -> fracción visible
@@ -154,12 +164,20 @@ function ensureElement() {
     el.addEventListener(type, emit)
   );
   // Medición (solo con ?debug=1, feedVideoDebug.js).
+  // En datos, listo y play se suma entre paréntesis cuántos segundos de
+  // video tiene ya bajados por delante (lo que Safari junta antes de
+  // arrancar).
   [
-    ["loadedmetadata", "meta"],
-    ["loadeddata", "datos"],
-    ["playing", "play"],
-    ["waiting", "espera"],
-  ].forEach(([type, label]) => el.addEventListener(type, () => videoDebug(activeId, label)));
+    ["loadedmetadata", "meta", false],
+    ["loadeddata", "datos", true],
+    ["canplay", "listo", true],
+    ["playing", "play", true],
+    ["waiting", "espera", false],
+  ].forEach(([type, label, withBuffer]) =>
+    el.addEventListener(type, () =>
+      videoDebug(activeId, withBuffer ? `${label}(${bufferedAhead().toFixed(1)}s)` : label)
+    )
+  );
   // Si se cambia el sonido desde los controles de pantalla completa, la
   // bocina lo refleja (y vale para los siguientes videos).
   el.addEventListener("volumechange", () => {
@@ -175,6 +193,17 @@ function ensureElement() {
     if (activeId && !userPaused) tryPlay();
   });
   return el;
+}
+
+// Segundos ya descargados desde donde va el video (para la medición).
+function bufferedAhead() {
+  if (!el) return 0;
+  const now = el.currentTime || 0;
+  const ranges = el.buffered;
+  for (let i = 0; i < ranges.length; i += 1) {
+    if (ranges.start(i) <= now + 0.1 && ranges.end(i) >= now) return ranges.end(i) - now;
+  }
+  return 0;
 }
 
 function tryPlay() {
@@ -317,15 +346,20 @@ function decide() {
   }
   if (!autoplayEnabled()) return;
   if (candidateId === target) return;
+  // El anterior sigue sonando y el nuevo apenas se ve más: todavía no.
+  // (Si el anterior baja del 50 %, arriba ya se pausó y aquí pasa.)
+  if (activeId && el && !el.paused && (ratios.get(target) || 0) < activeRatio + SWITCH_MARGIN) {
+    clearTimeout(candidateTimer);
+    candidateTimer = null;
+    candidateId = null;
+    return;
+  }
   clearTimeout(candidateTimer);
   candidateId = target;
   videoDebug(target, "candidato");
-  // Precarga: si el reproductor está libre o en pausa (el video anterior
-  // ya bajó del 50 %), se pasa YA a este marco y empieza a descargar; así
-  // la espera de abajo corre al mismo tiempo que la descarga. Si el
-  // anterior sigue sonando (dos videos a la vista), espera como antes para
-  // no cortarlo por un movimiento corto.
-  if (!activeId || !el || el.paused) activate(target, false);
+  // Precarga: el reproductor pasa YA a este marco y empieza a descargar;
+  // la espera de abajo corre al mismo tiempo que la descarga.
+  activate(target, false);
   candidateTimer = setTimeout(() => {
     candidateTimer = null;
     candidateId = null;
@@ -349,10 +383,12 @@ function ensureObserver() {
       });
       decide();
     },
-    { threshold: [0, 0.25, VISIBLE_RATIO, 0.8, 1] }
+    { threshold: THRESHOLDS }
   );
   videoDebugHeader(
-    `video Muro · arranca ${Math.round(VISIBLE_RATIO * 100)} % · espera ${ACTIVATE_DELAY_MS} ms · ms desde candidato`
+    `video Muro · arranca ${Math.round(VISIBLE_RATIO * 100)} % · espera ${ACTIVATE_DELAY_MS} ms · margen ${Math.round(
+      SWITCH_MARGIN * 100
+    )} · ms desde candidato · (Ns) = bajado por delante`
   );
 }
 
