@@ -629,7 +629,7 @@ const styles = {
     minWidth: 0,
   },
   chatHeader: {
-    padding: "16px 20px",
+    padding: "12px 10px 12px 16px",
     borderBottom: "1px solid var(--border)",
     fontSize: "15px",
     fontWeight: 600,
@@ -666,17 +666,48 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
-  blockBtn: {
-    background: "none",
-    border: "1px solid var(--border)",
-    borderRadius: "999px",
-    padding: "5px 12px",
-    fontSize: "12px",
-    fontWeight: 600,
-    color: "var(--text-muted)",
+  // Punto 104, parte 3: "⋯" del encabezado (en lugar del botón Bloquear) y
+  // su menú.
+  optionsWrapper: { position: "relative", flexShrink: 0 },
+  optionsBtn: (active) => ({
+    width: "36px",
+    height: "36px",
+    borderRadius: "50%",
+    border: "none",
+    padding: 0,
+    background: active ? "var(--surface-alt)" : "transparent",
+    color: "var(--text)",
     cursor: "pointer",
-    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  }),
+  optionsMenu: {
+    position: "absolute",
+    top: "calc(100% + 6px)",
+    right: 0,
+    zIndex: 20,
+    minWidth: "180px",
+    padding: "6px",
+    borderRadius: "14px",
+    border: "1px solid var(--border)",
+    background: "var(--surface)",
+    boxShadow: "0 12px 30px rgba(var(--shadow-rgb), 0.28)",
   },
+  optionsItem: (hover) => ({
+    display: "block",
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: "10px",
+    border: "none",
+    background: hover ? "var(--surface-alt)" : "transparent",
+    color: "var(--text)",
+    fontFamily: "inherit",
+    fontSize: "14px",
+    fontWeight: 500,
+    textAlign: "left",
+    cursor: "pointer",
+  }),
   // Punto 104: sin gap; el espacio entre mensajes lo pone cada fila
   // (bubbleRow): poco dentro de un grupo, más entre grupos.
   messagesArea: {
@@ -1615,6 +1646,88 @@ function bubbleCorners(mine, groupFirst, groupLast, big = BUBBLE_RADIUS) {
     [`borderTop${side}Radius`]: `${groupFirst ? big : BUBBLE_RADIUS_JOINED}px`,
     [`borderBottom${side}Radius`]: `${groupLast ? big : BUBBLE_RADIUS_JOINED}px`,
   };
+}
+
+function MoreIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <circle cx="4" cy="10" r="1.8" fill="currentColor" />
+      <circle cx="10" cy="10" r="1.8" fill="currentColor" />
+      <circle cx="16" cy="10" r="1.8" fill="currentColor" />
+    </svg>
+  );
+}
+
+// Punto 104, parte 3: "⋯" en el encabezado de la conversación, con "Ver
+// perfil" y "Bloquear"/"Desbloquear". Se cierra al elegir, al tocar
+// afuera o con Escape.
+function ChatOptionsMenu({ isBlocked, onToggleBlock, onViewProfile }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(null);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const outside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", outside);
+    document.addEventListener("touchstart", outside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", outside);
+      document.removeEventListener("touchstart", outside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const items = [
+    { key: "profile", label: t("chat.viewProfile"), run: onViewProfile },
+    { key: "block", label: isBlocked ? t("chat.unblock") : t("chat.block"), run: onToggleBlock },
+  ];
+
+  return (
+    <div ref={ref} style={styles.optionsWrapper}>
+      <button
+        type="button"
+        style={styles.optionsBtn(open || hovered === "button")}
+        onClick={() => setOpen((v) => !v)}
+        onMouseEnter={() => setHovered("button")}
+        onMouseLeave={() => setHovered(null)}
+        aria-label={t("chat.moreOptions")}
+        title={t("chat.moreOptions")}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MoreIcon />
+      </button>
+      {open && (
+        <div role="menu" style={styles.optionsMenu}>
+          {items.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="menuitem"
+              style={styles.optionsItem(hovered === item.key)}
+              onMouseEnter={() => setHovered(item.key)}
+              onMouseLeave={() => setHovered(null)}
+              onClick={() => {
+                setOpen(false);
+                setHovered(null);
+                item.run();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Vista previa del último mensaje de una conversación (fila de la lista),
@@ -2786,9 +2899,12 @@ export default function Chat({
                       )}
                     </div>
                   </div>
-                  <button style={styles.blockBtn} onClick={handleToggleBlock}>
-                    {isBlocked ? t("chat.unblock") : t("chat.block")}
-                  </button>
+                  <ChatOptionsMenu
+                    key={activeContact.uid}
+                    isBlocked={isBlocked}
+                    onToggleBlock={handleToggleBlock}
+                    onViewProfile={() => onOpenProfile(activeContact.uid)}
+                  />
                 </div>
                 <div
                   ref={messagesAreaRef}
