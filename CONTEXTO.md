@@ -972,8 +972,6 @@ categorías fijas. Prototipo funcional en fase de prueba con un socio.
 
 - **Videos del Muro: E y F del punto 103, solo si vuelve a hacer falta** — E) precargar el siguiente video antes de que llegue a la pantalla (o dos reproductores que se turnan); F) soltar el archivo solo cuando el video esté a más de una pantalla (volver a un video ya visto lo baja otra vez desde cero; riesgo: el post en blanco del iPhone). Para decidir, medir primero con `?debug=1`.
 
-- **Mañana (2026-11-18), en este orden**: parte 6 del punto 102 (texto encima del video en Momentos), parte 7 del punto 102 (limpieza de los videos de Momentos), y revisar los registros de la limpieza diaria (el pendiente de abajo, "Limpieza diaria de Storage: quitar el modo prueba").
-
 - **Videos en el Muro: probar con otra cuenta** (quedó del punto 101) — con una segunda cuenta: que un post con video no aparezca mientras está "pendiente" y sí cuando se aprueba; que un perfil privado no muestre sus videos a quien no lo sigue; y que con un bloqueo (en cualquier dirección) no se vean, igual que con las fotos.
 
 - **Limpieza diaria de Storage: quitar el modo prueba** (quedó del punto 101; revisar el 2026-11-18) — en la consola de Firebase, Functions → Registros, buscar los mensajes de `cleanupOrphanPostFiles` ("limpieza (prueba): se borraría" y "limpieza: resumen"). Si solo aparecen carpetas que de verdad sobran (sin post, o con un post de otro autor, y sin cambios hace más de 2 días), cambiar `ORPHAN_CLEANUP_DRY_RUN` a `false` en `functions/index.js` y volver a subir con `npm run deploy:functions`. Si aparece la carpeta de algún post que sí existe, NO quitar el modo prueba: revisar antes. (El cambio de `functions/videoStorage.js` del punto 102 ya se desplegó el 2026-11-17 con la parte 4.)
