@@ -1979,12 +1979,57 @@ export default function Chat({
     return unsub;
   }, [currentUid, activeContact, activeSummaryLoaded, activeHiddenMs]);
 
-  // Auto-scroll al último mensaje. Solo mueve la lista: scrollIntoView
-  // desplazaría también la página (punto 91).
-  useEffect(() => {
+  // Punto 104: al abrir una conversación se aparece YA en el último mensaje
+  // (sin animación, antes de pintar); el desplazamiento suave queda solo
+  // para un mensaje NUEVO (llega o lo envías), y solo si estabas abajo o es
+  // tuyo. Una reacción o un cambio en un mensaje viejo no mueve nada. Solo
+  // mueve la lista: scrollIntoView desplazaría también la página (punto 91).
+  // - Lo primero que llega de esa conversación, y todo lo que llegue el
+  //   primer segundo después de abrirla (openedAt: la caché y después el
+  //   servidor), va directo al final, sin animación.
+  // - followingRef: mientras corre el desplazamiento suave, la lista
+  //   todavía no está "al final"; esto evita que el scroll la dé por
+  //   despegada (si la persona toca la lista, se corta).
+  const scrollStateRef = useRef({ chatKey: null, openedAt: 0, lastKey: null });
+  const followingRef = useRef(false);
+  const visibleSendingCount = activeChatId
+    ? sendingVoiceNotes.filter((n) => n.chatId === activeChatId && !messages.some((m) => m.id === n.id)).length
+    : 0;
+  const lastMessage = messages.length ? messages[messages.length - 1] : null;
+  const lastKey = `${lastMessage ? lastMessage.id : ""}|${visibleSendingCount}`;
+  useLayoutEffect(() => {
     const area = messagesAreaRef.current;
-    if (area) area.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
-  }, [messages, sendingVoiceNotes]);
+    const state = scrollStateRef.current;
+    if (state.chatKey !== activeChatId) {
+      state.chatKey = activeChatId;
+      state.openedAt = Date.now();
+      state.lastKey = null;
+    }
+    if (!area || !lastMessage) return;
+    if (state.lastKey === lastKey) return;
+    const firstContent = state.lastKey === null;
+    state.lastKey = lastKey;
+    if (firstContent || Date.now() - state.openedAt < 1000) {
+      area.scrollTop = area.scrollHeight;
+      stuckToEndRef.current = true;
+      return;
+    }
+    const mine = lastMessage.senderId === currentUid || visibleSendingCount > 0;
+    if (!stuckToEndRef.current && !mine) return;
+    stuckToEndRef.current = true;
+    followingRef.current = true;
+    area.scrollTo({ top: area.scrollHeight, behavior: "smooth" });
+  }, [activeChatId, lastKey, lastMessage, currentUid, visibleSendingCount]);
+
+  // Una foto, un sticker o un post compartido que termina de cargar hace
+  // crecer la lista: si estabas al final, sigues al final.
+  const handleMessagesMediaLoad = () => {
+    const area = messagesAreaRef.current;
+    if (area && stuckToEndRef.current) area.scrollTop = area.scrollHeight;
+  };
+  const stopFollowing = () => {
+    followingRef.current = false;
+  };
 
   // Si estabas al final, sigues viendo el último mensaje cuando la lista se
   // achica (sale el teclado o crece el cuadro de escribir).
@@ -2001,7 +2046,10 @@ export default function Chat({
 
   const handleMessagesScroll = (e) => {
     const area = e.currentTarget;
-    stuckToEndRef.current = area.scrollHeight - area.scrollTop - area.clientHeight < 40;
+    const atEnd = area.scrollHeight - area.scrollTop - area.clientHeight < 40;
+    if (atEnd) followingRef.current = false;
+    // Durante el desplazamiento suave sigue "al final" (ver followingRef).
+    stuckToEndRef.current = atEnd || followingRef.current;
   };
 
   // Cierra el panel de stickers al tocar/clickear afuera, mismo patrón que
@@ -2613,7 +2661,14 @@ export default function Chat({
                     {isBlocked ? t("chat.unblock") : t("chat.block")}
                   </button>
                 </div>
-                <div ref={messagesAreaRef} style={styles.messagesArea} onScroll={handleMessagesScroll}>
+                <div
+                  ref={messagesAreaRef}
+                  style={styles.messagesArea}
+                  onScroll={handleMessagesScroll}
+                  onLoadCapture={handleMessagesMediaLoad}
+                  onTouchStart={stopFollowing}
+                  onWheel={stopFollowing}
+                >
                   {messages.map((m) => (
                     <MessageBubble
                       key={m.id}
