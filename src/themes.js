@@ -664,6 +664,11 @@ const PINKY_VARS = {
   "--badge-new-text": "#0f5a2b",
   "--badge-used-bg": "rgba(138, 61, 0, 0.14)",
   "--badge-used-text": "#7a3500",
+  // Punto 104: botón "Eliminar" que aparece al deslizar una conversación
+  // del Chat a la izquierda. El mismo rojo en todos los temas (se lee
+  // sobre fondos claros y oscuros); el texto blanco tiene contraste 4.6:1.
+  "--danger": "#d93a40",
+  "--on-danger": "#ffffff",
 };
 
 export const THEMES = {

@@ -403,6 +403,20 @@ const styles = {
     overscrollBehavior: "none",
   },
   shellPage: { height: "100%" },
+  // Punto 104, parte 4: lista de conversaciones en celular, a pantalla
+  // completa: sin caja, sin margen y con el fondo de la página; la lista
+  // se desplaza con la página.
+  wrapperList: { padding: 0 },
+  shellList: {
+    maxWidth: "none",
+    height: "auto",
+    minHeight: "60vh",
+    background: "transparent",
+    borderRadius: 0,
+    border: "none",
+    boxShadow: "none",
+    overflow: "visible",
+  },
   // Punto 96: el padding de abajo deja la fila de escribir arriba de la
   // línea de inicio del iPhone; useChatViewport lo pone en 0 con el teclado
   // abierto. Va en la caja (no en la fila) para que el fondo llegue al borde.
@@ -434,11 +448,13 @@ const styles = {
     flexDirection: "column",
     flexShrink: 0,
   }),
+  // Punto 104, parte 4: título de la lista (con el degradado de la app),
+  // sin línea debajo.
   contactsHeader: {
-    padding: "18px 16px 12px",
-    fontSize: "13px",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
+    margin: 0,
+    flex: 1,
+    minWidth: 0,
+    fontSize: "20px",
     fontWeight: 700,
     fontFamily: "var(--font-display)",
     background: "var(--gradient-text)",
@@ -447,21 +463,55 @@ const styles = {
     backgroundClip: "text",
     WebkitTextFillColor: "transparent",
     color: "transparent",
-    borderBottom: "1px solid var(--border)",
   },
+  // Punto 104: fila de arriba de la lista: título y, a la derecha, el
+  // lápiz de "Nueva conversación" (o la flecha para volver).
+  listTopBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "14px 10px 8px 16px",
+  },
+  listIconBtn: (hover) => ({
+    width: "38px",
+    height: "38px",
+    flexShrink: 0,
+    borderRadius: "50%",
+    border: "none",
+    padding: 0,
+    background: hover ? "var(--surface-alt)" : "transparent",
+    color: "var(--text)",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "inherit",
+    fontSize: "18px",
+  }),
+  // Punto 104: buscador más delgado y suave: sin borde, con lupa.
   searchBox: {
-    padding: "10px 12px",
-    borderBottom: "1px solid var(--border)",
+    position: "relative",
+    padding: "2px 16px 10px",
+  },
+  searchIcon: {
+    position: "absolute",
+    left: "28px",
+    top: "calc(50% - 4px)",
+    transform: "translateY(-50%)",
+    color: "var(--text-muted)",
+    display: "flex",
+    pointerEvents: "none",
   },
   searchInput: {
     width: "100%",
     boxSizing: "border-box",
     background: "var(--surface-alt)",
-    border: "1px solid var(--border)",
-    boxShadow: "var(--field-shine)",
+    border: "none",
     borderRadius: "999px",
-    padding: "7px 12px",
-    fontSize: "12px",
+    padding: "8px 14px 8px 36px",
+    fontSize: "14px",
+    lineHeight: "20px",
+    fontFamily: "inherit",
     color: "var(--text)",
     outline: "none",
   },
@@ -469,41 +519,73 @@ const styles = {
     flex: 1,
     overflowY: "auto",
   },
-  // Cada fila es un <button> (se abre con el teclado): sin borde propio
-  // salvo el de la izquierda, con la fuente y el color de la app.
+  // Cada fila es un <button> (se abre con el teclado), sin borde, con la
+  // fuente y el color de la app. La abierta (solo en PC) va resaltada.
   contactItem: (active) => ({
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    gap: "12px",
     width: "100%",
-    padding: "12px 16px",
+    padding: "10px 16px",
     cursor: "pointer",
     border: "none",
-    borderLeft: active ? "3px solid var(--accent2)" : "3px solid transparent",
     background: active ? "var(--surface-alt)" : "transparent",
     color: "var(--text)",
     fontFamily: "inherit",
     textAlign: "left",
     boxSizing: "border-box",
   }),
-  // Punto 90: la fila de una conversación es este contenedor con dos
-  // botones hermanos (un <button> no puede ir dentro de otro).
-  contactRow: (active) => ({
-    display: "flex",
-    alignItems: "stretch",
-    background: active ? "var(--surface-alt)" : "transparent",
+  // Punto 104: fila de una conversación que se desliza a la izquierda
+  // (ConversationRow). Sin selección de texto ni el menú del iPhone al
+  // mantener presionado; touch-action pan-y: el desplazamiento vertical
+  // lo sigue haciendo el navegador.
+  swipeRow: {
+    position: "relative",
+    overflow: "hidden",
+    touchAction: "pan-y",
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  },
+  swipeContent: (offset, dragging) => ({
+    position: "relative",
+    transform: `translateX(${offset}px)`,
+    transition: dragging ? "none" : "transform 0.2s ease",
   }),
-  contactRowOpen: { flex: 1, width: "auto", minWidth: 0, background: "transparent" },
-  contactDeleteBtn: {
-    flexShrink: 0,
-    width: "44px",
+  swipeDeleteBtn: (width) => ({
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: `${width}px`,
     border: "none",
-    background: "transparent",
+    padding: 0,
+    background: "var(--danger)",
+    color: "var(--on-danger)",
+    fontFamily: "inherit",
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+  }),
+  // En PC, 🗑 al pasar el mouse por la fila (no hay deslizar).
+  hoverDeleteBtn: (hover) => ({
+    position: "absolute",
+    right: "12px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    width: "32px",
+    height: "32px",
+    borderRadius: "50%",
+    border: "1px solid var(--border)",
+    background: hover ? "var(--surface-alt)" : "var(--surface)",
     color: "var(--text-muted)",
     cursor: "pointer",
-    fontSize: "15px",
+    fontSize: "14px",
+    padding: 0,
     fontFamily: "inherit",
-  },
+  }),
   contactText: { flex: 1, minWidth: 0 },
   contactTopLine: { display: "flex", alignItems: "baseline", gap: "8px" },
   contactName: (unread) => ({
@@ -516,7 +598,12 @@ const styles = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   }),
-  contactTime: { fontSize: "11px", color: "var(--text-muted)", flexShrink: 0 },
+  contactTime: (unread) => ({
+    fontSize: "11px",
+    color: unread ? "var(--accent2)" : "var(--text-muted)",
+    fontWeight: unread ? 700 : 400,
+    flexShrink: 0,
+  }),
   contactBottomLine: { display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" },
   contactPreview: (unread) => ({
     flex: 1,
@@ -530,8 +617,8 @@ const styles = {
     whiteSpace: "nowrap",
   }),
   unreadDot: {
-    width: "9px",
-    height: "9px",
+    width: "10px",
+    height: "10px",
     borderRadius: "50%",
     background: "var(--accent2)",
     flexShrink: 0,
@@ -552,20 +639,6 @@ const styles = {
     fontSize: "13px",
     fontWeight: 600,
     cursor: "pointer",
-  },
-  listHeaderRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    borderBottom: "1px solid var(--border)",
-  },
-  listBackBtn: {
-    background: "none",
-    border: "none",
-    color: "var(--text)",
-    fontSize: "18px",
-    cursor: "pointer",
-    padding: "14px 0 10px 12px",
   },
   listNote: { padding: "16px", fontSize: "13px", color: "var(--text-muted)", margin: 0 },
   // Punto 97: aviso para activar las notificaciones push.
@@ -1730,6 +1803,231 @@ function ChatOptionsMenu({ isBlocked, onToggleBlock, onViewProfile }) {
   );
 }
 
+function NewChatIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none"
+      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
+      <path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Punto 104, parte 4: fila de conversación que se borra deslizando o
+// manteniendo presionado
+// ---------------------------------------------------------------------
+// - Deslizar a la izquierda: aparece "Eliminar" (rojo, --danger) detrás de
+//   la fila; tocarlo pide la confirmación de siempre (onDelete). Solo
+//   cuenta si el dedo va claramente de lado (el desplazamiento vertical
+//   lo sigue haciendo el navegador: touch-action pan-y). Una sola fila
+//   abierta a la vez (openRowId); tocar en otro lado la cierra.
+// - Mantener presionado ~0,5 s (dedo o mouse), o clic derecho: la
+//   confirmación directo, sin abrir el chat.
+// - En PC (sin pantalla táctil): además, 🗑 al pasar el mouse.
+const SWIPE_ACTION_WIDTH = 88;
+const SWIPE_START_PX = 10;
+const LONG_PRESS_MS = 500;
+
+function ConversationRow({ rowId, openRowId, setOpenRowId, touch, active, disabled, onOpen, onDelete, children }) {
+  const { t } = useLanguage();
+  const [offset, setOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [hover, setHover] = useState(null); // null | "row" | "trash"
+  const rowRef = useRef(null);
+  const gestureRef = useRef(null); // { x, y, startOffset, mode: null | "swipe" | "scroll" }
+  const pressTimerRef = useRef(null);
+  const suppressClickRef = useRef(false);
+  const isOpen = openRowId === rowId;
+
+  // Otra fila se abrió (o se pidió cerrar): esta vuelve a su lugar.
+  useEffect(() => {
+    if (!isOpen && !dragging) setOffset(0);
+  }, [isOpen, dragging]);
+
+  // Abierta: tocar fuera de la fila la cierra.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const outside = (e) => {
+      if (rowRef.current && !rowRef.current.contains(e.target)) setOpenRowId(null);
+    };
+    document.addEventListener("touchstart", outside);
+    document.addEventListener("mousedown", outside);
+    return () => {
+      document.removeEventListener("touchstart", outside);
+      document.removeEventListener("mousedown", outside);
+    };
+  }, [isOpen, setOpenRowId]);
+
+  useEffect(() => () => clearTimeout(pressTimerRef.current), []);
+
+  const cancelPress = () => {
+    clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = null;
+  };
+
+  // onDelete muestra la confirmación (window.confirm, que frena todo hasta
+  // que se responde). El clic que el navegador manda al soltar el dedo no
+  // tiene que abrir el chat; pasado un momento, los clics vuelven a valer.
+  const askDelete = () => {
+    if (disabled) return;
+    suppressClickRef.current = true;
+    setOpenRowId(null);
+    setOffset(0);
+    onDelete();
+    setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 600);
+  };
+
+  const startPress = () => {
+    cancelPress();
+    if (disabled) return;
+    pressTimerRef.current = setTimeout(() => {
+      pressTimerRef.current = null;
+      gestureRef.current = null;
+      setDragging(false);
+      askDelete();
+    }, LONG_PRESS_MS);
+  };
+
+  const handleTouchStart = (e) => {
+    const p = e.touches[0];
+    suppressClickRef.current = false;
+    gestureRef.current = { x: p.clientX, y: p.clientY, startOffset: offset, mode: null };
+    startPress();
+  };
+
+  const handleTouchMove = (e) => {
+    const g = gestureRef.current;
+    if (!g) return;
+    const p = e.touches[0];
+    const dx = p.clientX - g.x;
+    const dy = p.clientY - g.y;
+    if (!g.mode) {
+      if (Math.abs(dx) < SWIPE_START_PX && Math.abs(dy) < SWIPE_START_PX) return;
+      cancelPress();
+      g.mode = Math.abs(dx) > Math.abs(dy) * 1.2 && !disabled ? "swipe" : "scroll";
+      if (g.mode === "swipe") setDragging(true);
+    }
+    if (g.mode !== "swipe") return;
+    // Hasta un poco más que el botón, con resistencia; nunca a la derecha.
+    const raw = Math.min(0, g.startOffset + dx);
+    const limit = -SWIPE_ACTION_WIDTH;
+    setOffset(raw < limit ? limit + (raw - limit) * 0.3 : raw);
+  };
+
+  const handleTouchEnd = () => {
+    cancelPress();
+    const g = gestureRef.current;
+    gestureRef.current = null;
+    if (!g || g.mode !== "swipe") return;
+    suppressClickRef.current = true;
+    setDragging(false);
+    if (offset < -SWIPE_ACTION_WIDTH / 2) {
+      setOffset(-SWIPE_ACTION_WIDTH);
+      setOpenRowId(rowId);
+    } else {
+      setOffset(0);
+      if (isOpen) setOpenRowId(null);
+    }
+  };
+
+  const handleClick = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    // Abierta: tocarla la cierra en lugar de abrir el chat.
+    if (isOpen || offset !== 0) {
+      setOpenRowId(null);
+      setOffset(0);
+      return;
+    }
+    onOpen();
+  };
+
+  const actionWidth = Math.max(0, -offset);
+
+  return (
+    <div
+      ref={rowRef}
+      style={styles.swipeRow}
+      onMouseEnter={() => setHover("row")}
+      onMouseLeave={() => {
+        setHover(null);
+        cancelPress();
+      }}
+    >
+      {actionWidth > 0 && (
+        <button
+          type="button"
+          style={styles.swipeDeleteBtn(actionWidth)}
+          onClick={askDelete}
+          aria-label={t("chat.deleteConversation")}
+        >
+          {t("chat.delete")}
+        </button>
+      )}
+      <div style={styles.swipeContent(offset, dragging)}>
+        <button
+          type="button"
+          style={styles.contactItem(active)}
+          onClick={handleClick}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          // El mouse (PC) también puede mantener presionado; el táctil
+          // usa los eventos de arriba (sin esto, el toque contaría dos
+          // veces: el navegador también simula el mouse).
+          onMouseDown={(e) => {
+            if (touch) return;
+            suppressClickRef.current = false;
+            if (e.button === 0) startPress();
+          }}
+          onMouseUp={cancelPress}
+          // Clic derecho en PC y, en Android, el mantener presionado del
+          // sistema: la misma confirmación (una sola vez por toque).
+          onContextMenu={(e) => {
+            e.preventDefault();
+            if (pressTimerRef.current || !suppressClickRef.current) {
+              cancelPress();
+              askDelete();
+            }
+          }}
+        >
+          {children}
+        </button>
+        {!touch && (hover === "row" || hover === "trash") && (
+          <button
+            type="button"
+            style={styles.hoverDeleteBtn(hover === "trash")}
+            disabled={disabled}
+            onMouseEnter={() => setHover("trash")}
+            onMouseLeave={() => setHover("row")}
+            onClick={askDelete}
+            aria-label={t("chat.deleteConversation")}
+            title={t("chat.deleteConversation")}
+          >
+            🗑
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Vista previa del último mensaje de una conversación (fila de la lista),
 // con "Tú:" si lo enviaste vos. Los tipos sin texto llevan una etiqueta;
 // la respuesta a un momento, la misma frase que su burbuja.
@@ -2039,6 +2337,10 @@ export default function Chat({
 
   // "recent": tus conversaciones; "new": buscador de "Nueva conversación".
   const [listMode, setListMode] = useState("recent");
+  // Punto 104: la fila deslizada (con "Eliminar" a la vista), una a la vez,
+  // y el hover de los íconos de arriba de la lista (lápiz / flecha).
+  const [openRowId, setOpenRowId] = useState(null);
+  const [listIconHover, setListIconHover] = useState(null);
 
   // Punto 97: aviso para activar las notificaciones (nunca se piden solas
   // al abrir la app). En iPhone sin instalar, explica cómo instalarla.
@@ -2661,17 +2963,23 @@ export default function Chat({
   const showContactsList = !isMobile || !activeContact;
   const showChatPane = !isMobile || !!activeContact;
 
+  // Punto 104: en celular, la lista va a pantalla completa (sin caja).
+  const mobileList = isMobile && !activeContact;
   const wrapperStyle =
     viewportMode === "full"
       ? { ...styles.wrapper, ...styles.wrapperFull }
       : viewportMode === "page"
       ? { ...styles.wrapper, ...styles.wrapperPage }
+      : mobileList
+      ? { ...styles.wrapper, ...styles.wrapperList }
       : styles.wrapper;
   const shellStyle =
     viewportMode === "full"
       ? { ...styles.shell, ...styles.shellFull }
       : viewportMode === "page"
       ? { ...styles.shell, ...styles.shellPage }
+      : mobileList
+      ? { ...styles.shell, ...styles.shellList }
       : styles.shell;
   const composerSizes = composerMetrics(touch);
   // Centra los iconos de 34px con la última línea del cuadro.
@@ -2691,17 +2999,25 @@ export default function Chat({
           <div style={styles.contactsCol(isMobile)}>
             {listMode === "recent" ? (
               <>
-                <p style={styles.contactsHeader}>{t("chat.conversationsHeader")}</p>
-                <button
-                  type="button"
-                  style={styles.listActionBtn}
-                  onClick={() => {
-                    setListMode("new");
-                    setSearch("");
-                  }}
-                >
-                  ✏️ {t("chat.newConversation")}
-                </button>
+                <div style={styles.listTopBar}>
+                  <h2 style={styles.contactsHeader}>{t("chat.conversationsHeader")}</h2>
+                  <button
+                    type="button"
+                    style={styles.listIconBtn(listIconHover === "new")}
+                    onMouseEnter={() => setListIconHover("new")}
+                    onMouseLeave={() => setListIconHover(null)}
+                    onClick={() => {
+                      setListIconHover(null);
+                      setOpenRowId(null);
+                      setListMode("new");
+                      setSearch("");
+                    }}
+                    aria-label={t("chat.newConversation")}
+                    title={t("chat.newConversation")}
+                  >
+                    <NewChatIcon />
+                  </button>
+                </div>
                 {pushBanner && (
                   <div style={styles.pushBanner}>
                     <p style={styles.pushBannerText}>
@@ -2736,11 +3052,14 @@ export default function Chat({
                 )}
               </>
             ) : (
-              <div style={styles.listHeaderRow}>
+              <div style={{ ...styles.listTopBar, paddingLeft: "6px" }}>
                 <button
                   type="button"
-                  style={styles.listBackBtn}
+                  style={styles.listIconBtn(listIconHover === "back")}
+                  onMouseEnter={() => setListIconHover("back")}
+                  onMouseLeave={() => setListIconHover(null)}
                   onClick={() => {
+                    setListIconHover(null);
                     setListMode("recent");
                     setSearch("");
                   }}
@@ -2749,12 +3068,13 @@ export default function Chat({
                 >
                   ←
                 </button>
-                <p style={{ ...styles.contactsHeader, borderBottom: "none", paddingLeft: "4px" }}>
-                  {t("chat.newConversation")}
-                </p>
+                <h2 style={styles.contactsHeader}>{t("chat.newConversation")}</h2>
               </div>
             )}
             <div style={styles.searchBox}>
+              <span style={styles.searchIcon}>
+                <SearchIcon />
+              </span>
               <input
                 style={touch ? { ...styles.searchInput, fontSize: "16px" } : styles.searchInput}
                 type="text"
@@ -2779,12 +3099,17 @@ export default function Chat({
                     const unread = isChatUnread(chat, currentUid);
                     const isActive = activeContact?.uid === c.uid;
                     return (
-                      <div key={chat.id} style={styles.contactRow(isActive)}>
-                        <button
-                          type="button"
-                          style={{ ...styles.contactItem(isActive), ...styles.contactRowOpen }}
-                          onClick={() => openConversation(c)}
-                        >
+                      <ConversationRow
+                        key={chat.id}
+                        rowId={chat.id}
+                        openRowId={openRowId}
+                        setOpenRowId={setOpenRowId}
+                        touch={touch}
+                        active={isActive && !isMobile}
+                        disabled={recordingState !== "idle"}
+                        onOpen={() => openConversation(c)}
+                        onDelete={() => handleDeleteConversation(chat, c)}
+                      >
                           <Avatar
                             uid={c.uid}
                             name={c.displayName || c.identity}
@@ -2796,7 +3121,7 @@ export default function Chat({
                           <span style={styles.contactText}>
                             <span style={styles.contactTopLine}>
                               <span style={styles.contactName(unread)}>{c.displayName || t("chat.defaultName")}</span>
-                              <span style={styles.contactTime}>{timeAgo(chat.lastMessageAt, t)}</span>
+                              <span style={styles.contactTime(unread)}>{timeAgo(chat.lastMessageAt, t)}</span>
                             </span>
                             <span style={styles.contactBottomLine}>
                               <span style={styles.contactPreview(unread)}>{chatPreview(chat, currentUid, t)}</span>
@@ -2810,18 +3135,7 @@ export default function Chat({
                               )}
                             </span>
                           </span>
-                        </button>
-                        <button
-                          type="button"
-                          style={styles.contactDeleteBtn}
-                          disabled={recordingState !== "idle"}
-                          onClick={() => handleDeleteConversation(chat, c)}
-                          aria-label={t("chat.deleteConversation")}
-                          title={t("chat.deleteConversation")}
-                        >
-                          🗑
-                        </button>
-                      </div>
+                      </ConversationRow>
                     );
                   })}
                   {recent.hasMore && (
