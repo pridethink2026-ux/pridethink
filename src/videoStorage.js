@@ -35,6 +35,14 @@ export function momentVideoPaths(uid, momentId) {
   return { video: `${base}/video.mp4`, poster: `${base}/poster.jpg` };
 }
 
+// Caché del navegador para el video y la miniatura: un año. Cada archivo
+// tiene su propia ruta (por post/momento) y nunca se reescribe, así que no
+// hay versión vieja que pueda quedar. "private": solo el navegador de quien
+// lo ve, no cachés intermedias (así un video borrado no queda guardado
+// fuera del teléfono). Vale para lo que se suba desde ahora; lo ya subido
+// sigue sin caché.
+const VIDEO_CACHE_CONTROL = "private, max-age=31536000, immutable";
+
 async function loadStorage() {
   const [sdk, { storage }] = await Promise.all([import("firebase/storage"), import("./firebaseStorage")]);
   return { sdk, storage };
@@ -67,7 +75,10 @@ export function uploadVideoFiles({ paths, blob, posterBlob, onProgress, startPau
     };
     const one = (key, path, data, contentType) =>
       new Promise((resolve, reject) => {
-        const task = sdk.uploadBytesResumable(sdk.ref(storage, path), data, { contentType });
+        const task = sdk.uploadBytesResumable(sdk.ref(storage, path), data, {
+          contentType,
+          cacheControl: VIDEO_CACHE_CONTROL,
+        });
         tasks.add(task);
         if (paused) task.pause();
         task.on(

@@ -165,7 +165,9 @@ function ApprovedVideo({ postId, video, urls }) {
 
   return (
     <div ref={frameRef} style={frameStyle}>
-      {urls.posterUrl && <img src={urls.posterUrl} alt="" loading="lazy" style={posterStyle} />}
+      {/* Sin loading="lazy": Safari pide esas imágenes casi al entrar en
+          pantalla y el marco se veía vacío un momento. Es un JPG chico. */}
+      {urls.posterUrl && <img src={urls.posterUrl} alt="" decoding="async" style={posterStyle} />}
       {/* Aquí feedVideo.js pone el <video> compartido; React no lo toca. */}
       <div ref={mountRef} style={fillStyle} />
       <button

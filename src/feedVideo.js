@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { videoDebug, videoDebugHeader } from "./feedVideoDebug";
 
 /*
   feedVideo.js — punto 101 (videos en el Muro), parte 4.
@@ -13,10 +14,12 @@ import { useSyncExternalStore } from "react";
   está viendo (los demás muestran su miniatura).
 
   Cada video aprobado (PostVideo.jsx) registra su "hueco" con
-  registerSlot(). El post que esté al menos 60 % visible durante medio
-  segundo se queda con el reproductor: arranca solo (en silencio, salvo
-  que la persona ya haya activado el sonido) y se pausa al salir de la
-  pantalla. Tocar el video lo pausa o lo sigue; la bocina activa o silencia
+  registerSlot(). El post que esté al menos 50 % visible durante 300 ms
+  se queda con el reproductor: arranca solo (en silencio, salvo que la
+  persona ya haya activado el sonido) y se pausa al salir de la
+  pantalla. Para que no haya pausa al arrancar, el archivo se empieza a
+  descargar apenas el post llega al 50 % (si el reproductor está libre o
+  en pausa); la espera de 300 ms solo retrasa el play, no la descarga. Tocar el video lo pausa o lo sigue; la bocina activa o silencia
   TODOS los videos mientras la pestaña esté abierta (al recargar vuelve a
   silencio: ningún navegador deja sonar sin un toque nuevo).
 
@@ -30,8 +33,10 @@ import { useSyncExternalStore } from "react";
   si no, solo { activeId: null, soundOn }.
 */
 
-const VISIBLE_RATIO = 0.6;
-const ACTIVATE_DELAY_MS = 500;
+const VISIBLE_RATIO = 0.5;
+// Lo que tiene que quedarse a la vista antes de darle play (para no
+// arrancar videos que se pasan de largo al bajar rápido).
+const ACTIVATE_DELAY_MS = 300;
 
 const slots = new Map(); // id -> { mount, url, duration }
 const ratios = new Map(); // id -> fracción visible
@@ -148,6 +153,13 @@ function ensureElement() {
   ["timeupdate", "pause", "play", "loadedmetadata", "durationchange"].forEach((type) =>
     el.addEventListener(type, emit)
   );
+  // Medición (solo con ?debug=1, feedVideoDebug.js).
+  [
+    ["loadedmetadata", "meta"],
+    ["loadeddata", "datos"],
+    ["playing", "play"],
+    ["waiting", "espera"],
+  ].forEach(([type, label]) => el.addEventListener(type, () => videoDebug(activeId, label)));
   // Si se cambia el sonido desde los controles de pantalla completa, la
   // bocina lo refleja (y vale para los siguientes videos).
   el.addEventListener("volumechange", () => {
@@ -177,10 +189,12 @@ function tryPlay() {
       el.muted = true;
       el.play().catch(() => {
         blocked = true;
+        videoDebug(activeId, "bloqueado");
         emit();
       });
     } else {
       blocked = true; // por ejemplo, Ahorro de batería
+      videoDebug(activeId, "bloqueado");
     }
     emit();
   });
@@ -195,7 +209,9 @@ function stopElement() {
   if (el.parentNode) el.parentNode.removeChild(el);
 }
 
-function activate(id) {
+// play = false: solo pone el archivo en este marco y lo empieza a
+// descargar (precarga, ver decide()); el play llega al terminar la espera.
+function activate(id, play = true) {
   const slot = slots.get(id);
   if (!slot) return;
   ensureElement();
@@ -219,8 +235,9 @@ function activate(id) {
       );
     }
     el.src = slot.url;
+    videoDebug(id, `carga${play ? "" : " (precarga)"}${start > 0 ? ` (vuelve ${Math.round(start)}s)` : ""}`);
   }
-  tryPlay();
+  if (play) tryPlay();
   emit();
 }
 
@@ -290,6 +307,8 @@ function decide() {
     return;
   }
   if (target === activeId) {
+    // Ya precargado y todavía dentro de su espera: el play lo da el timer.
+    if (candidateId === target) return;
     clearTimeout(candidateTimer);
     candidateTimer = null;
     candidateId = null;
@@ -300,10 +319,23 @@ function decide() {
   if (candidateId === target) return;
   clearTimeout(candidateTimer);
   candidateId = target;
+  videoDebug(target, "candidato");
+  // Precarga: si el reproductor está libre o en pausa (el video anterior
+  // ya bajó del 50 %), se pasa YA a este marco y empieza a descargar; así
+  // la espera de abajo corre al mismo tiempo que la descarga. Si el
+  // anterior sigue sonando (dos videos a la vista), espera como antes para
+  // no cortarlo por un movimiento corto.
+  if (!activeId || !el || el.paused) activate(target, false);
   candidateTimer = setTimeout(() => {
     candidateTimer = null;
     candidateId = null;
-    if (mostVisible() === target) activate(target);
+    if (mostVisible() !== target) return;
+    if (activeId === target) {
+      if (!userPaused && !blocked) tryPlay();
+      emit();
+    } else {
+      activate(target);
+    }
   }, ACTIVATE_DELAY_MS);
 }
 
@@ -318,6 +350,9 @@ function ensureObserver() {
       decide();
     },
     { threshold: [0, 0.25, VISIBLE_RATIO, 0.8, 1] }
+  );
+  videoDebugHeader(
+    `video Muro · arranca ${Math.round(VISIBLE_RATIO * 100)} % · espera ${ACTIVATE_DELAY_MS} ms · ms desde candidato`
   );
 }
 
