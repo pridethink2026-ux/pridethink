@@ -677,22 +677,50 @@ const styles = {
     cursor: "pointer",
     flexShrink: 0,
   },
+  // Punto 104: sin gap; el espacio entre mensajes lo pone cada fila
+  // (bubbleRow): poco dentro de un grupo, más entre grupos.
   messagesArea: {
     flex: 1,
     overflowY: "auto",
-    padding: "16px 20px",
+    padding: "12px 16px 16px",
     display: "flex",
     flexDirection: "column",
-    gap: "10px",
     overscrollBehavior: "contain",
   },
-  bubbleRow: (mine) => ({
+  // Punto 104: columna (burbuja y, debajo, la hora), pegada a su lado.
+  bubbleRow: (mine, marginTop = 12) => ({
     display: "flex",
-    justifyContent: mine ? "flex-end" : "flex-start",
+    flexDirection: "column",
+    alignItems: mine ? "flex-end" : "flex-start",
+    marginTop: `${marginTop}px`,
   }),
   bubbleWrapper: {
     position: "relative",
-    maxWidth: "75%",
+    maxWidth: "78%",
+  },
+  // Con reacción, espacio para la pastilla que cuelga abajo.
+  bubbleWrapperReacted: { marginBottom: "10px" },
+  // Punto 104: la hora, chica y tenue, debajo del último mensaje del grupo.
+  messageTime: {
+    fontSize: "11px",
+    lineHeight: 1.2,
+    color: "var(--text-muted)",
+    margin: "3px 6px 0",
+    fontVariantNumeric: "tabular-nums",
+  },
+  // Punto 104: "Hoy", "Ayer" o la fecha, centrado entre los mensajes.
+  daySeparator: {
+    display: "flex",
+    justifyContent: "center",
+    margin: "18px 0 4px",
+  },
+  daySeparatorLabel: {
+    fontSize: "11px",
+    fontWeight: 600,
+    color: "var(--text-muted)",
+    background: "var(--surface-alt)",
+    borderRadius: "999px",
+    padding: "3px 10px",
   },
   reactionBadge: (mine) => ({
     position: "absolute",
@@ -708,8 +736,8 @@ const styles = {
     zIndex: 5,
   }),
   bubble: (mine) => ({
-    padding: "10px 14px",
-    borderRadius: "16px",
+    padding: "9px 14px",
+    borderRadius: "20px",
     fontSize: "14px",
     lineHeight: 1.4,
     wordBreak: "break-word",
@@ -896,7 +924,7 @@ const styles = {
   imageBubbleImg: {
     maxWidth: "240px",
     width: "100%",
-    borderRadius: "14px",
+    borderRadius: "18px",
     display: "block",
     cursor: "pointer",
   },
@@ -1365,12 +1393,12 @@ function MomentReplyPreview({ message, mine }) {
 // Punto 98b: nota de voz propia que se está enviando. Misma burbuja que
 // AudioMessage (misma forma de onda, porque usa el id del mensaje real),
 // con un círculo girando en lugar de ▶ y "Enviando…".
-function SendingVoiceNote({ id, duration }) {
+function SendingVoiceNote({ id, duration, groupFirst = true }) {
   const { t } = useLanguage();
   return (
-    <div style={styles.bubbleRow(true)}>
+    <div style={styles.bubbleRow(true, groupFirst ? 12 : 2)}>
       <div style={styles.bubbleWrapper}>
-        <div style={{ ...styles.bubble(true), opacity: 0.8 }}>
+        <div style={{ ...styles.bubble(true), ...bubbleCorners(true, groupFirst, true), opacity: 0.8 }}>
           <div style={styles.audioMessage} aria-live="polite">
             <span style={{ ...styles.audioPlayBtn(true), cursor: "default" }}>
               <span
@@ -1389,8 +1417,26 @@ function SendingVoiceNote({ id, duration }) {
   );
 }
 
-function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenProduct, senderName }) {
+// Punto 104: groupFirst/groupLast (lugar en el grupo, ver sameGroup),
+// marginTop (espacio con el de arriba), timeLabel (la hora, solo en el
+// último del grupo) y touch (letra un poco más grande en el celular).
+function MessageBubble({
+  message,
+  mine,
+  currentUid,
+  chatId,
+  onOpenPost,
+  onOpenProduct,
+  senderName,
+  groupFirst = true,
+  groupLast = true,
+  marginTop = 12,
+  timeLabel = null,
+  touch = false,
+}) {
   const { open, setOpen, containerRef, triggerProps } = useReactionPicker();
+  const corners = bubbleCorners(mine, groupFirst, groupLast);
+  const bubbleStyle = { ...styles.bubble(mine), ...corners, ...(touch ? { fontSize: "15px" } : null) };
   const myReaction = (message.reactions || {})[currentUid] || null;
   const reactionEmojis = getDistinctReactionEmojis(message.reactions);
   // Punto 61: se chequea "message.imageUrl" (no "message.type === 'image'")
@@ -1410,18 +1456,24 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
   };
 
   return (
-    <div style={styles.bubbleRow(mine)}>
-      <div ref={containerRef} style={styles.bubbleWrapper} {...triggerProps}>
+    <div style={styles.bubbleRow(mine, marginTop)}>
+      <div
+        ref={containerRef}
+        style={
+          reactionEmojis.length > 0 ? { ...styles.bubbleWrapper, ...styles.bubbleWrapperReacted } : styles.bubbleWrapper
+        }
+        {...triggerProps}
+      >
         {message.imageUrl ? (
           <div style={styles.imageBubble}>
             <img
               src={message.imageUrl}
               alt=""
-              style={styles.imageBubbleImg}
+              style={{ ...styles.imageBubbleImg, ...bubbleCorners(mine, groupFirst, groupLast, 18) }}
               onClick={() => setImageViewerOpen(true)}
             />
             {message.text && (
-              <div style={styles.bubble(mine)}>
+              <div style={bubbleStyle}>
                 <span style={styles.bubbleText}><AnimatedEmojiText text={message.text} /></span>
               </div>
             )}
@@ -1438,7 +1490,7 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
             onOpenProduct={onOpenProduct}
           />
         ) : (
-          <div style={styles.bubble(mine)}>
+          <div style={bubbleStyle}>
             {message.type === "audio" ? (
               <AudioMessage
                 id={message.id}
@@ -1479,6 +1531,7 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
           />
         )}
       </div>
+      {timeLabel && <span style={styles.messageTime}>{timeLabel}</span>}
       {imageViewerOpen && (
         <ImageViewer
           images={[message.imageUrl]}
@@ -1488,6 +1541,80 @@ function MessageBubble({ message, mine, currentUid, chatId, onOpenPost, onOpenPr
       )}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------
+// Punto 104: grupos de mensajes, hora y separadores de día
+// ---------------------------------------------------------------------
+// Mensajes seguidos de la misma persona, el mismo día y con menos de 5
+// minutos entre uno y otro forman un grupo: van más juntos, con la
+// esquina de su lado más chica, y solo el último lleva la hora.
+const GROUP_GAP_MS = 5 * 60 * 1000;
+const BUBBLE_RADIUS = 20;
+const BUBBLE_RADIUS_JOINED = 6;
+
+// Un mensaje recién enviado todavía no tiene la hora del servidor: se usa
+// la estimada (serverTimestamps: "estimate") o, si falta, ahora.
+function messageMs(message) {
+  const at = message && message.createdAt;
+  return at && typeof at.toMillis === "function" ? at.toMillis() : Date.now();
+}
+
+function startOfDay(ms) {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function sameGroup(a, b) {
+  if (!a || !b || a.senderId !== b.senderId) return false;
+  const aMs = messageMs(a);
+  const bMs = messageMs(b);
+  return startOfDay(aMs) === startOfDay(bMs) && bMs - aMs < GROUP_GAP_MS;
+}
+
+function dateLocale(language) {
+  return language === "en" ? "en-US" : "es";
+}
+
+function formatMessageTime(ms, language) {
+  try {
+    return new Intl.DateTimeFormat(dateLocale(language), { hour: "numeric", minute: "2-digit" }).format(ms);
+  } catch (e) {
+    return "";
+  }
+}
+
+// "Hoy", "Ayer", el día de la semana (esta semana) o la fecha (con el año
+// solo si no es este año).
+function formatDayLabel(ms, language, t) {
+  const days = Math.round((startOfDay(Date.now()) - startOfDay(ms)) / 86400000);
+  if (days === 0) return t("chat.today");
+  if (days === 1) return t("chat.yesterday");
+  const sameYear = new Date(ms).getFullYear() === new Date().getFullYear();
+  const options =
+    days > 1 && days < 7
+      ? { weekday: "long" }
+      : sameYear
+      ? { day: "numeric", month: "long" }
+      : { day: "numeric", month: "long", year: "numeric" };
+  try {
+    const label = new Intl.DateTimeFormat(dateLocale(language), options).format(ms);
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  } catch (e) {
+    return "";
+  }
+}
+
+// Esquinas de una burbuja según su lugar en el grupo: del lado de quien
+// escribe, chica arriba si no es la primera y chica abajo si no es la
+// última.
+function bubbleCorners(mine, groupFirst, groupLast, big = BUBBLE_RADIUS) {
+  const side = mine ? "Right" : "Left";
+  return {
+    borderRadius: `${big}px`,
+    [`borderTop${side}Radius`]: `${groupFirst ? big : BUBBLE_RADIUS_JOINED}px`,
+    [`borderBottom${side}Radius`]: `${groupLast ? big : BUBBLE_RADIUS_JOINED}px`,
+  };
 }
 
 // Vista previa del último mensaje de una conversación (fila de la lista),
@@ -1703,7 +1830,7 @@ export default function Chat({
   openRequest = null,
   onOpenRequestDone = () => {},
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isMobile = useIsMobile();
   const [touch] = useState(isTouchScreen);
   const [currentUid, setCurrentUid] = useState(null);
@@ -1974,7 +2101,9 @@ export default function Chat({
       ...(activeHiddenMs ? [startAfter(Timestamp.fromMillis(activeHiddenMs))] : [])
     );
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      // "estimate": un mensaje recién enviado ya trae una hora (la local)
+      // mientras el servidor pone la suya (punto 104: hora y día).
+      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })));
     });
     return unsub;
   }, [currentUid, activeContact, activeSummaryLoaded, activeHiddenMs]);
@@ -2669,28 +2798,54 @@ export default function Chat({
                   onTouchStart={stopFollowing}
                   onWheel={stopFollowing}
                 >
-                  {messages.map((m) => (
-                    <MessageBubble
-                      key={m.id}
-                      message={m}
-                      mine={m.senderId === currentUid}
-                      currentUid={currentUid}
-                      chatId={getChatId(currentUid, activeContact.uid)}
-                      onOpenPost={onOpenPost}
-                      onOpenProduct={onOpenProduct}
-                      senderName={
-                        m.senderId === currentUid ? myProfile?.displayName : activeContact.displayName
-                      }
-                    />
-                  ))}
+                  {messages.map((m, i) => {
+                    // Punto 104: separador al cambiar de día; grupos de
+                    // mensajes seguidos (sameGroup); hora en el último.
+                    const prev = messages[i - 1];
+                    const next = messages[i + 1];
+                    const ms = messageMs(m);
+                    const newDay = !prev || startOfDay(messageMs(prev)) !== startOfDay(ms);
+                    const groupFirst = newDay || !sameGroup(prev, m);
+                    const groupLast = !sameGroup(m, next);
+                    return (
+                      <React.Fragment key={m.id}>
+                        {newDay && (
+                          <div style={styles.daySeparator}>
+                            <span style={styles.daySeparatorLabel}>{formatDayLabel(ms, language, t)}</span>
+                          </div>
+                        )}
+                        <MessageBubble
+                          message={m}
+                          mine={m.senderId === currentUid}
+                          currentUid={currentUid}
+                          chatId={getChatId(currentUid, activeContact.uid)}
+                          onOpenPost={onOpenPost}
+                          onOpenProduct={onOpenProduct}
+                          senderName={
+                            m.senderId === currentUid ? myProfile?.displayName : activeContact.displayName
+                          }
+                          groupFirst={groupFirst}
+                          groupLast={groupLast}
+                          marginTop={newDay ? 6 : groupFirst ? 12 : 2}
+                          timeLabel={groupLast ? formatMessageTime(ms, language) : null}
+                          touch={touch}
+                        />
+                      </React.Fragment>
+                    );
+                  })}
                   {sendingVoiceNotes
                     .filter(
                       (n) =>
                         n.chatId === getChatId(currentUid, activeContact.uid) &&
                         !messages.some((m) => m.id === n.id)
                     )
-                    .map((n) => (
-                      <SendingVoiceNote key={n.id} id={n.id} duration={n.duration} />
+                    .map((n, i) => (
+                      <SendingVoiceNote
+                        key={n.id}
+                        id={n.id}
+                        duration={n.duration}
+                        groupFirst={i > 0 ? false : !lastMessage || lastMessage.senderId !== currentUid}
+                      />
                     ))}
                 </div>
                 {sendError && activeWriteState === "ok" && (
