@@ -314,6 +314,8 @@ export const translations = {
     "editor.use": "Usar foto",
     // Filtros y ajustes (photoFilters.js, ImageEditor.jsx; punto 105)
     "filters.tabCrop": "Recortar",
+    "filters.tabTrim": "Recortar",
+    "filters.videoTitle": "Editar video",
     "filters.tabFilters": "Filtros",
     "filters.tabAdjust": "Ajustes",
     "filters.original": "Original",
@@ -1151,6 +1153,8 @@ export const translations = {
     "editor.use": "Use photo",
     // Filters and adjustments (photoFilters.js, ImageEditor.jsx; point 105)
     "filters.tabCrop": "Crop",
+    "filters.tabTrim": "Trim",
+    "filters.videoTitle": "Edit video",
     "filters.tabFilters": "Filters",
     "filters.tabAdjust": "Adjust",
     "filters.original": "Original",

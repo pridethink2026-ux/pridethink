@@ -279,7 +279,8 @@ export default function MomentsStrip({ currentUid, myProfile }) {
   // Parte 6: el video se empieza a preparar YA, mientras se escribe el
   // texto encima (sobre un cuadro del video); al tocar "Publicar" queda
   // marcado para publicarse solo apenas esté listo.
-  const handleTrimConfirm = ({ start, end, frame }) => {
+  // `look` (punto 105): el filtro elegido, o null; `frame` ya viene con él.
+  const handleTrimConfirm = ({ start, end, frame, look }) => {
     const file = trimVideo;
     setTrimVideo(null);
     if (!file) return;
@@ -290,7 +291,7 @@ export default function MomentsStrip({ currentUid, myProfile }) {
     setMessage(null);
     momentVideoUid = currentUid;
     const momentId = doc(collection(db, "moments")).id;
-    startVideoJob(VIDEO_DEST_MOMENT, file, { start, end, maxSeconds: MAX_MOMENT_VIDEO_SECONDS });
+    startVideoJob(VIDEO_DEST_MOMENT, file, { start, end, maxSeconds: MAX_MOMENT_VIDEO_SECONDS, look });
     // Sin cuadro de fondo (no se pudo sacar): se publica sin texto.
     if (frame) setVideoText({ frame, momentId });
     else publishVideoWhenReady(VIDEO_DEST_MOMENT, { uid: currentUid, momentId, caption: "", texts: [] });
@@ -386,6 +387,7 @@ export default function MomentsStrip({ currentUid, myProfile }) {
           file={trimVideo}
           maxSeconds={MAX_MOMENT_VIDEO_SECONDS}
           withFrame
+          withFilters
           onConfirm={handleTrimConfirm}
           onCancel={handleTrimCancel}
         />

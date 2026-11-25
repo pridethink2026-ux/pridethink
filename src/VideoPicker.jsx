@@ -96,10 +96,11 @@ export default function VideoPicker({
     if (file) setTrimFile(file);
   };
 
-  const handleTrimConfirm = ({ start, end }) => {
+  // `look`: el filtro elegido en el editor (punto 105), o null.
+  const handleTrimConfirm = ({ start, end, look }) => {
     const file = trimFile;
     setTrimFile(null);
-    if (file) startVideoJob(destination, file, { start, end, maxSeconds });
+    if (file) startVideoJob(destination, file, { start, end, maxSeconds, look });
   };
   const handleTrimCancel = useCallback(() => setTrimFile(null), []);
 
@@ -302,6 +303,7 @@ export default function VideoPicker({
         <VideoTrimmer
           file={trimFile}
           maxSeconds={maxSeconds}
+          withFilters
           onConfirm={handleTrimConfirm}
           onCancel={handleTrimCancel}
         />

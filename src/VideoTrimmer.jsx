@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLanguage } from "./LanguageContext";
 import { buttonStyle } from "./ImageEditor";
 import { MIN_TRIM_SECONDS, openVideoForTrim } from "./videoCompress";
+import { DEFAULT_LOOK, applyLook, isLookSupported, isNeutralLook, normalizeLook, renderLook } from "./photoFilters";
+import LookControls, { LookTabs, buildFilterThumbs, thumbSource } from "./LookControls";
 
 /*
   VideoTrimmer — punto 102, parte 2 (editor de recorte, como Instagram).
@@ -26,9 +28,50 @@ import { MIN_TRIM_SECONDS, openVideoForTrim } from "./videoCompress";
   cuadro del inicio (o del borde que se está moviendo), sacado con
   Mediabunny; la compresión funciona igual.
 
+  FILTROS (punto 105, parte 4): con `withFilters` (Muro y Momentos) y si el
+  teléfono tiene WebGL, el título pasa a "Editar video" y hay pestañas
+  Recortar · Filtros · Ajustes (LookControls.jsx, las mismas de las fotos).
+  El filtro se ve EN VIVO en las tres pestañas: mientras haya un filtro,
+  encima del <video> (que sigue reproduciéndose debajo) va un canvas del
+  mismo tamaño; en cada cuadro de pantalla en que el video cambió de
+  cuadro, el <video> se copia achicado (720 px de lado como máximo) a un
+  canvas 2D, se filtra con WebGL y se pinta ahí. Sin filtro, el canvas no
+  existe y todo es como antes. Si la vista previa no funciona, el cuadro
+  fijo también se ve filtrado. Las miniaturas de la tira salen de un
+  cuadro del principio del tramo. "Listo" devuelve también `look` (null
+  si no hay filtro) y el cuadro de `withFrame` ya filtrado (es el fondo
+  del texto del momento). El filtro lo aplica videoCompress.js (parte 3).
+
   Colores fijos sobre el velo negro (blanco y negro translúcido), igual que
   ImageEditor.jsx: van encima de imágenes cualquiera.
 */
+
+const PREVIEW_LONG_SIDE = 720; // vista previa filtrada, en px reales
+
+// Carga un Blob o una URL como <img> (para filtrar el cuadro fijo y el
+// fondo del texto). null si no se pudo.
+function loadImage(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+// El cuadro de `withFrame` con el filtro (JPEG). Si algo falla, el original.
+async function filterFrameBlob(blob, look) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = await loadImage(url);
+    const canvas = img && applyLook(img, look);
+    if (!canvas) return blob;
+    const out = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    return out || blob;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 const THUMB_COUNT = 8;
 const KEY_STEP = 0.5;
@@ -84,6 +127,17 @@ const styles = {
     maxHeight: "100%",
     borderRadius: "12px",
     background: "#000",
+  },
+  filterOverlay: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    // Sin medida hasta el primer dibujo (drawFiltered pone la del video).
+    width: 0,
+    height: 0,
+    borderRadius: "12px",
+    background: "#000",
+    pointerEvents: "none",
   },
   tap: {
     position: "absolute",
@@ -231,9 +285,33 @@ const styles = {
   withFrame (punto 102, parte 6): además devuelve `frame`, un JPEG (Blob)
   de un cuadro del principio del tramo, de fondo para escribir el texto
   del momento (MomentTextEditor). null si no se pudo sacar.
+  withFilters (punto 105): pestañas de filtros y ajustes; onConfirm recibe
+  también `look` (null sin filtro).
 */
-export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onConfirm, onCancel }) {
+export default function VideoTrimmer({
+  file,
+  maxSeconds,
+  withFrame = false,
+  withFilters = false,
+  onConfirm,
+  onCancel,
+}) {
   const { t } = useLanguage();
+  // Punto 105: filtros solo si se pidieron Y el teléfono puede dibujarlos.
+  const filtersOn = useMemo(() => withFilters && isLookSupported(), [withFilters]);
+  const [tab, setTab] = useState("trim"); // "trim" | "filters" | "adjust"
+  const [look, setLook] = useState(DEFAULT_LOOK);
+  const [filterThumbs, setFilterThumbs] = useState(null);
+  const filtered = filtersOn && !isNeutralLook(look);
+  const lookRef = useRef(look);
+  const filteredRef = useRef(filtered);
+  lookRef.current = look;
+  filteredRef.current = filtered;
+  const previewBoxRef = useRef(null);
+  const overlayRef = useRef(null); // canvas filtrado encima del <video>
+  const smallRef = useRef(null); // canvas 2D con el cuadro achicado
+  const lastDrawRef = useRef({ time: -1, look: null, w: 0, h: 0 });
+  const stillRef = useRef(null); // cuadro fijo filtrado (sin vista previa)
   const [info, setInfo] = useState(null); // { duration }
   const [error, setError] = useState(null); // código de openVideoForTrim
   const [range, setRange] = useState({ start: 0, end: 0 });
@@ -340,6 +418,8 @@ export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onCo
   const confirm = async () => {
     if (confirming) return;
     const { start, end } = rangeRef.current;
+    // Punto 105: el filtro elegido, o null si no cambia nada.
+    const chosenLook = filtered ? normalizeLook(look) : null;
     let frame = null;
     const opened = openedRef.current;
     if (withFrame && opened) {
@@ -350,16 +430,112 @@ export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onCo
           frame = await fetch(url).then((r) => r.blob());
           URL.revokeObjectURL(url);
         }
+        // El fondo del texto del momento, con el mismo filtro que el video.
+        if (frame && chosenLook) frame = await filterFrameBlob(frame, chosenLook);
       } catch {
         frame = null;
       }
     }
-    onConfirm({ start, end, frame });
+    onConfirm({ start, end, frame, look: chosenLook });
   };
 
   useEffect(() => {
     if (previewFailed && info) showFrame(rangeRef.current.start);
   }, [previewFailed, info, showFrame]);
+
+  // Punto 105: el filtro en vivo encima del <video> (ver el docstring).
+  // Solo dibuja si cambió el cuadro, el filtro o el tamaño.
+  const drawFiltered = useCallback((video) => {
+    const overlay = overlayRef.current;
+    const box = previewBoxRef.current;
+    if (!overlay || !box || video.readyState < 2) return;
+    const vr = video.getBoundingClientRect();
+    const br = box.getBoundingClientRect();
+    if (vr.width < 2 || vr.height < 2) return;
+    // Encima del video, exactamente donde se ve.
+    const pos = [vr.left - br.left, vr.top - br.top, vr.width, vr.height].map((n) => `${Math.round(n)}px`);
+    const st = overlay.style;
+    if (st.left !== pos[0]) st.left = pos[0];
+    if (st.top !== pos[1]) st.top = pos[1];
+    if (st.width !== pos[2]) st.width = pos[2];
+    if (st.height !== pos[3]) st.height = pos[3];
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const k = Math.min(dpr, PREVIEW_LONG_SIDE / Math.max(vr.width, vr.height));
+    const w = Math.max(2, Math.round(vr.width * k));
+    const h = Math.max(2, Math.round(vr.height * k));
+    const last = lastDrawRef.current;
+    const currentLook = lookRef.current;
+    if (last.time === video.currentTime && last.look === currentLook && last.w === w && last.h === h) return;
+    if (!smallRef.current) smallRef.current = document.createElement("canvas");
+    const small = smallRef.current;
+    if (small.width !== w) small.width = w;
+    if (small.height !== h) small.height = h;
+    const sctx = small.getContext("2d");
+    const octx = overlay.getContext("2d");
+    if (!sctx || !octx) return;
+    sctx.drawImage(video, 0, 0, w, h);
+    const glCanvas = renderLook(small, currentLook);
+    if (overlay.width !== w) overlay.width = w;
+    if (overlay.height !== h) overlay.height = h;
+    octx.drawImage(glCanvas || small, 0, 0);
+    lastDrawRef.current = { time: video.currentTime, look: currentLook, w, h };
+  }, []);
+
+  // El canvas filtrado se vuelve a crear al poner un filtro: forzar dibujo.
+  useEffect(() => {
+    if (filtered) lastDrawRef.current = { time: -1, look: null, w: 0, h: 0 };
+  }, [filtered]);
+
+  // Sin vista previa (previewFailed): el cuadro fijo, filtrado.
+  useEffect(() => {
+    if (!previewFailed || !frameUrl || !filtered) return undefined;
+    let alive = true;
+    loadImage(frameUrl).then((img) => {
+      const target = stillRef.current;
+      if (!alive || !img || !target) return;
+      const k = Math.min(1, PREVIEW_LONG_SIDE / Math.max(img.width, img.height));
+      const w = Math.max(2, Math.round(img.width * k));
+      const h = Math.max(2, Math.round(img.height * k));
+      const glCanvas = renderLook(img, look, w, h);
+      target.width = w;
+      target.height = h;
+      const ctx = target.getContext("2d");
+      if (ctx) ctx.drawImage(glCanvas || img, 0, 0, w, h);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [previewFailed, frameUrl, filtered, look]);
+
+  // Miniaturas de la tira de filtros: un cuadro del principio del tramo.
+  // Se rehacen si el inicio cambió desde la última vez.
+  const thumbsStartRef = useRef(null);
+  useEffect(() => {
+    if (!filtersOn || tab !== "filters" || !info) return undefined;
+    const opened = openedRef.current;
+    const { start, end } = rangeRef.current;
+    if (!opened || thumbsStartRef.current === start) return undefined;
+    thumbsStartRef.current = start;
+    let alive = true;
+    let done = false;
+    opened
+      .frameAt(start + Math.min(0.5, (end - start) / 2))
+      .then(async (url) => {
+        if (!url) return;
+        const img = await loadImage(url);
+        URL.revokeObjectURL(url);
+        if (!alive || !img) return;
+        const base = thumbSource(img, img.width, img.height);
+        if (base) setFilterThumbs(buildFilterThumbs(base));
+        done = true;
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+      // Sin terminar (se cambió de pestaña): pedirlas otra vez al volver.
+      if (!done) thumbsStartRef.current = null;
+    };
+  }, [filtersOn, tab, info]);
 
   // Repetir solo el tramo y mover la línea de reproducción (sin re-render).
   useEffect(() => {
@@ -378,12 +554,13 @@ export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onCo
           playheadRef.current.style.left = `${(clamp(video.currentTime, 0, duration) / duration) * 100}%`;
           playheadRef.current.style.opacity = dragRef.current ? "0" : "1";
         }
+        if (filteredRef.current) drawFiltered(video);
       }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [info, duration, previewFailed]);
+  }, [info, duration, previewFailed, drawFiltered]);
 
   const play = () => {
     const video = videoRef.current;
@@ -528,8 +705,24 @@ export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onCo
   const pct = (seconds) => (duration > 0 ? (seconds / duration) * 100 : 0);
 
   const content = (
-    <div style={styles.overlay} role="dialog" aria-modal="true" aria-label={t("video.trimTitle")}>
-      <h2 style={styles.title}>{t("video.trimTitle")}</h2>
+    <div
+      style={styles.overlay}
+      role="dialog"
+      aria-modal="true"
+      aria-label={filtersOn ? t("filters.videoTitle") : t("video.trimTitle")}
+    >
+      <h2 style={styles.title}>{filtersOn ? t("filters.videoTitle") : t("video.trimTitle")}</h2>
+      {filtersOn && info && !error && (
+        <LookTabs
+          tabs={[
+            { id: "trim", label: t("filters.tabTrim") },
+            { id: "filters", label: t("filters.tabFilters") },
+            { id: "adjust", label: t("filters.tabAdjust") },
+          ]}
+          active={tab}
+          onChange={(next) => !confirming && setTab(next)}
+        />
+      )}
 
       {error ? (
         <>
@@ -546,9 +739,14 @@ export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onCo
         </p>
       ) : (
         <>
-          <div style={styles.previewBox}>
+          <div ref={previewBoxRef} style={styles.previewBox}>
             {previewFailed ? (
-              frameUrl && <img src={frameUrl} alt="" style={styles.media} />
+              frameUrl &&
+              (filtered ? (
+                <canvas ref={stillRef} style={styles.media} />
+              ) : (
+                <img src={frameUrl} alt="" style={styles.media} />
+              ))
             ) : (
               <>
                 <video
@@ -564,6 +762,9 @@ export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onCo
                   onPause={() => setPaused(true)}
                   onError={() => setPreviewFailed(true)}
                 />
+                {/* Punto 105: el video filtrado, encima del original
+                    (drawFiltered lo ubica y lo dibuja). */}
+                {filtered && <canvas ref={overlayRef} style={styles.filterOverlay} aria-hidden="true" />}
                 <button
                   type="button"
                   style={styles.tap}
@@ -588,67 +789,71 @@ export default function VideoTrimmer({ file, maxSeconds, withFrame = false, onCo
             )}
           </div>
 
-          <div style={styles.controls}>
-            {/* Mover y soltar se escuchan solo aquí: los eventos de la
-                agarradera o la ventana (con setPointerCapture) suben hasta la
-                barra. */}
-            <div
-              ref={barRef}
-              style={styles.bar}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-            >
-              <div style={styles.strip} aria-hidden="true">
-                {thumbs.map((url, i) =>
-                  url ? (
-                    <img key={i} src={url} alt="" style={styles.thumb} draggable={false} />
-                  ) : (
-                    <div key={i} style={styles.thumbEmpty} />
-                  )
-                )}
-              </div>
-              <div style={{ ...styles.dim, left: 0, width: `${pct(range.start)}%` }} />
-              <div style={{ ...styles.dim, left: `${pct(range.end)}%`, right: 0 }} />
+          {filtersOn && tab !== "trim" ? (
+            <LookControls mode={tab} look={look} onChange={setLook} thumbs={filterThumbs} />
+          ) : (
+            <div style={styles.controls}>
+              {/* Mover y soltar se escuchan solo aquí: los eventos de la
+                  agarradera o la ventana (con setPointerCapture) suben hasta la
+                  barra. */}
               <div
-                style={{ ...styles.windowBox, left: `${pct(range.start)}%`, width: `${pct(length)}%` }}
-                onPointerDown={onPointerDown("move")}
+                ref={barRef}
+                style={styles.bar}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
               >
-                {["start", "end"].map((side) => (
-                  <div
-                    key={side}
-                    role="slider"
-                    tabIndex={0}
-                    aria-label={side === "start" ? t("video.trimStartLabel") : t("video.trimEndLabel")}
-                    aria-valuemin={0}
-                    aria-valuemax={Math.round(duration)}
-                    aria-valuenow={Math.round(side === "start" ? range.start : range.end)}
-                    aria-valuetext={formatTime(side === "start" ? range.start : range.end)}
-                    style={styles.handle(side)}
-                    onPointerDown={onPointerDown(side)}
-                    onKeyDown={onHandleKey(side)}
-                    onFocus={() => setFocusedHandle(side)}
-                    onBlur={() => setFocusedHandle(null)}
-                  >
-                    <div style={styles.handleBar(side, focusedHandle === side)}>
-                      <span style={styles.grip} />
+                <div style={styles.strip} aria-hidden="true">
+                  {thumbs.map((url, i) =>
+                    url ? (
+                      <img key={i} src={url} alt="" style={styles.thumb} draggable={false} />
+                    ) : (
+                      <div key={i} style={styles.thumbEmpty} />
+                    )
+                  )}
+                </div>
+                <div style={{ ...styles.dim, left: 0, width: `${pct(range.start)}%` }} />
+                <div style={{ ...styles.dim, left: `${pct(range.end)}%`, right: 0 }} />
+                <div
+                  style={{ ...styles.windowBox, left: `${pct(range.start)}%`, width: `${pct(length)}%` }}
+                  onPointerDown={onPointerDown("move")}
+                >
+                  {["start", "end"].map((side) => (
+                    <div
+                      key={side}
+                      role="slider"
+                      tabIndex={0}
+                      aria-label={side === "start" ? t("video.trimStartLabel") : t("video.trimEndLabel")}
+                      aria-valuemin={0}
+                      aria-valuemax={Math.round(duration)}
+                      aria-valuenow={Math.round(side === "start" ? range.start : range.end)}
+                      aria-valuetext={formatTime(side === "start" ? range.start : range.end)}
+                      style={styles.handle(side)}
+                      onPointerDown={onPointerDown(side)}
+                      onKeyDown={onHandleKey(side)}
+                      onFocus={() => setFocusedHandle(side)}
+                      onBlur={() => setFocusedHandle(null)}
+                    >
+                      <div style={styles.handleBar(side, focusedHandle === side)}>
+                        <span style={styles.grip} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                {!previewFailed && <div ref={playheadRef} style={styles.playhead} />}
               </div>
-              {!previewFailed && <div ref={playheadRef} style={styles.playhead} />}
+  
+              <p style={styles.info}>
+                {t("video.trimInfo", { start: formatTime(range.start), length: formatTime(length) })}
+              </p>
+              <p style={styles.hint}>
+                {duration > maxSeconds + 0.5
+                  ? t("video.trimTooLongHint", { duration: formatTime(duration), max: formatTime(maxSeconds) })
+                  : t("video.trimHint", { max: formatTime(maxSeconds) })}
+              </p>
+              {previewFailed && <p style={styles.hint}>{t("video.trimNoPreview")}</p>}
             </div>
-
-            <p style={styles.info}>
-              {t("video.trimInfo", { start: formatTime(range.start), length: formatTime(length) })}
-            </p>
-            <p style={styles.hint}>
-              {duration > maxSeconds + 0.5
-                ? t("video.trimTooLongHint", { duration: formatTime(duration), max: formatTime(maxSeconds) })
-                : t("video.trimHint", { max: formatTime(maxSeconds) })}
-            </p>
-            {previewFailed && <p style={styles.hint}>{t("video.trimNoPreview")}</p>}
-          </div>
+          )}
 
           <div style={styles.row}>
             <button type="button" style={buttonStyle({})} onClick={onCancel}>
