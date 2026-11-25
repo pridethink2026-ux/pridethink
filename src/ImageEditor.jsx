@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "./LanguageContext";
+import { DEFAULT_LOOK, isLookSupported, isNeutralLook, renderLook } from "./photoFilters";
+import LookControls, { LookTabs, buildFilterThumbs, thumbSource } from "./LookControls";
 
 /*
   ImageEditor
@@ -24,6 +26,14 @@ import { useLanguage } from "./LanguageContext";
   - `circleGuide` (booleano, default false): dibuja un círculo dentro del
     recorte para mostrar lo que se ve en Avatar.jsx (foto de perfil).
   - `maxSize` (número, default 1024): lado máximo del resultado.
+  - `withFilters` (booleano, default false, punto 105): agrega las pestañas
+    Recortar · Filtros · Ajustes (LookControls.jsx, photoFilters.js). Solo
+    en el Muro y Momentos; la foto de perfil, el chat y la Tienda no. Si el
+    teléfono no tiene WebGL, el editor queda como antes (sin pestañas).
+    En Filtros y Ajustes se ve SOLO el recorte elegido, con el filtro en
+    vivo (sobre una copia del tamaño de la pantalla); en Recortar, la foto
+    sin filtro. Al usar la foto, el filtro se aplica al resultado final ya
+    recortado y reducido. Si en ese momento WebGL falla, sale sin filtro.
   - `onConfirm(blob)`, `onCancel()` (obligatorias).
   - `onError(code)` (obligatoria): la imagen no se pudo abrir o exportar
     ("decode" | "empty" | "nocontext" | "noblob" — los mismos códigos que
@@ -184,6 +194,17 @@ const styles = {
     justifyContent: "center",
   },
   loading: { color: "#fff", fontFamily: "var(--font-body)", fontSize: "14px" },
+  // Con filtros (punto 105): misma altura que el panel de LookControls,
+  // para que los botones de abajo no salten al cambiar de pestaña.
+  cropPanel: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    justifyContent: "center",
+    alignContent: "center",
+    height: "112px",
+    flexShrink: 0,
+  },
 };
 
 // Exportada: la reusa MomentTextEditor.jsx (punto 66), para que los dos
@@ -225,12 +246,18 @@ export default function ImageEditor({
   squareOnly = false,
   circleGuide = false,
   maxSize = 1024,
+  withFilters = false,
   onConfirm,
   onCancel,
   onError,
 }) {
   const { t } = useLanguage();
   const vp = useViewport();
+  // Punto 105: filtros solo si se pidieron Y el teléfono puede dibujarlos.
+  const filtersOn = useMemo(() => withFilters && isLookSupported(), [withFilters]);
+  const [tab, setTab] = useState("crop"); // "crop" | "filters" | "adjust"
+  const [look, setLook] = useState(DEFAULT_LOOK);
+  const previewRef = useRef(null);
   const [working, setWorking] = useState(null); // canvas de la copia de trabajo
   const [quarterTurns, setQuarterTurns] = useState(0);
   const [square, setSquare] = useState(squareOnly);
@@ -295,13 +322,15 @@ export default function ImageEditor({
 
   // Escala de pantalla: la foto girada entra en el espacio disponible
   // (dejando lugar arriba para el título y abajo para los botones).
+  // Con filtros, además las pestañas y el panel de controles (punto 105).
   const availW = Math.min(vp.w - 32, 720);
-  const availH = Math.max(180, vp.h - 230);
+  const availH = Math.max(180, vp.h - (filtersOn ? 380 : 230));
   const scale = rotated ? Math.min(availW / rotated.width, availH / rotated.height, 1) : 1;
   const dispW = rotated ? Math.round(rotated.width * scale) : 0;
   const dispH = rotated ? Math.round(rotated.height * scale) : 0;
 
-  // Pinta la foto girada en el canvas visible.
+  // Pinta la foto girada en el canvas visible (también al volver a la
+  // pestaña Recortar, que vuelve a crear el canvas).
   useEffect(() => {
     const target = displayRef.current;
     if (!target || !rotated) return;
@@ -309,7 +338,46 @@ export default function ImageEditor({
     target.height = rotated.height;
     const ctx = target.getContext("2d");
     if (ctx) ctx.drawImage(rotated, 0, 0);
-  }, [rotated]);
+  }, [rotated, tab]);
+
+  // Filtros y Ajustes (punto 105): se ve solo el recorte, en una copia del
+  // tamaño de la pantalla (barato de redibujar con cada movimiento).
+  const showLook = filtersOn && tab !== "crop";
+  const pScale = rotated && crop ? Math.min(availW / crop.w, availH / crop.h, 1) : 1;
+  const previewW = crop ? Math.max(1, Math.round(crop.w * pScale)) : 0;
+  const previewH = crop ? Math.max(1, Math.round(crop.h * pScale)) : 0;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const croppedPreview = useMemo(() => {
+    if (!showLook || !rotated || !crop) return null;
+    const res = Math.min(1, (Math.max(previewW, previewH) * dpr) / Math.max(crop.w, crop.h));
+    const out = whiteCanvas(Math.max(1, Math.round(crop.w * res)), Math.max(1, Math.round(crop.h * res)));
+    if (!out) return null;
+    out.ctx.drawImage(rotated, crop.x, crop.y, crop.w, crop.h, 0, 0, out.canvas.width, out.canvas.height);
+    return out.canvas;
+  }, [showLook, rotated, crop, previewW, previewH, dpr]);
+
+  // Miniaturas de la tira: el centro del recorte con cada filtro.
+  const thumbs = useMemo(() => {
+    if (!croppedPreview) return null;
+    const base = thumbSource(croppedPreview, croppedPreview.width, croppedPreview.height);
+    return base ? buildFilterThumbs(base) : null;
+  }, [croppedPreview]);
+
+  // Vista previa en vivo: a lo sumo un dibujo por cuadro de pantalla.
+  useEffect(() => {
+    if (!showLook || !croppedPreview) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const target = previewRef.current;
+      if (!target) return;
+      if (target.width !== croppedPreview.width) target.width = croppedPreview.width;
+      if (target.height !== croppedPreview.height) target.height = croppedPreview.height;
+      const ctx = target.getContext("2d");
+      if (!ctx) return;
+      const filtered = renderLook(croppedPreview, look);
+      ctx.drawImage(filtered || croppedPreview, 0, 0);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [showLook, croppedPreview, look, tab]);
 
   const startDrag = (e, kind) => {
     if (!crop || busy) return;
@@ -379,6 +447,14 @@ export default function ImageEditor({
       return;
     }
     out.ctx.drawImage(rotated, sx, sy, sw, sh, 0, 0, out.canvas.width, out.canvas.height);
+    // Punto 105: el filtro va sobre el resultado final. Si WebGL falla
+    // justo ahora, la foto sale sin filtro (nunca se pierde la foto).
+    if (filtersOn && !isNeutralLook(look)) {
+      const filtered = renderLook(out.canvas, look);
+      if (filtered) out.ctx.drawImage(filtered, 0, 0);
+      // eslint-disable-next-line no-console
+      else console.warn("ImageEditor: no se pudo aplicar el filtro");
+    }
     out.canvas.toBlob(
       (blob) => {
         setBusy(false);
@@ -408,8 +484,22 @@ export default function ImageEditor({
     <div style={styles.overlay} role="dialog" aria-modal="true" aria-label={t("editor.title")}>
       <p style={styles.title}>{t("editor.title")}</p>
 
+      {filtersOn && rotated && (
+        <LookTabs
+          tabs={[
+            { id: "crop", label: t("filters.tabCrop") },
+            { id: "filters", label: t("filters.tabFilters") },
+            { id: "adjust", label: t("filters.tabAdjust") },
+          ]}
+          active={tab}
+          onChange={(next) => !busy && setTab(next)}
+        />
+      )}
+
       {!rotated ? (
         <p style={styles.loading}>{t("editor.loading")}</p>
+      ) : showLook ? (
+        <canvas ref={previewRef} style={styles.canvas(previewW, previewH)} />
       ) : (
         <div
           style={styles.stage(dispW, dispH)}
@@ -448,54 +538,58 @@ export default function ImageEditor({
         </div>
       )}
 
-      <div style={styles.row}>
-        <button
-          type="button"
-          style={buttonStyle({ hovered: hovered === "left", disabled: busy || !rotated })}
-          disabled={busy || !rotated}
-          onClick={() => setQuarterTurns((q) => (q + 3) % 4)}
-          title={t("editor.rotateLeft")}
-          aria-label={t("editor.rotateLeft")}
-          {...hoverProps("left")}
-        >
-          ⟲
-        </button>
-        <button
-          type="button"
-          style={buttonStyle({ hovered: hovered === "right", disabled: busy || !rotated })}
-          disabled={busy || !rotated}
-          onClick={() => setQuarterTurns((q) => (q + 1) % 4)}
-          title={t("editor.rotateRight")}
-          aria-label={t("editor.rotateRight")}
-          {...hoverProps("right")}
-        >
-          ⟳
-        </button>
-        {!squareOnly && (
-          <>
-            <button
-              type="button"
-              style={buttonStyle({ hovered: hovered === "free", active: !square, disabled: busy })}
-              disabled={busy}
-              aria-pressed={!square}
-              onClick={() => setSquare(false)}
-              {...hoverProps("free")}
-            >
-              {t("editor.cropFree")}
-            </button>
-            <button
-              type="button"
-              style={buttonStyle({ hovered: hovered === "square", active: square, disabled: busy })}
-              disabled={busy}
-              aria-pressed={square}
-              onClick={() => setSquare(true)}
-              {...hoverProps("square")}
-            >
-              {t("editor.cropSquare")}
-            </button>
-          </>
-        )}
-      </div>
+      {showLook ? (
+        <LookControls mode={tab} look={look} onChange={setLook} thumbs={thumbs} />
+      ) : (
+        <div style={filtersOn ? styles.cropPanel : styles.row}>
+          <button
+            type="button"
+            style={buttonStyle({ hovered: hovered === "left", disabled: busy || !rotated })}
+            disabled={busy || !rotated}
+            onClick={() => setQuarterTurns((q) => (q + 3) % 4)}
+            title={t("editor.rotateLeft")}
+            aria-label={t("editor.rotateLeft")}
+            {...hoverProps("left")}
+          >
+            ⟲
+          </button>
+          <button
+            type="button"
+            style={buttonStyle({ hovered: hovered === "right", disabled: busy || !rotated })}
+            disabled={busy || !rotated}
+            onClick={() => setQuarterTurns((q) => (q + 1) % 4)}
+            title={t("editor.rotateRight")}
+            aria-label={t("editor.rotateRight")}
+            {...hoverProps("right")}
+          >
+            ⟳
+          </button>
+          {!squareOnly && (
+            <>
+              <button
+                type="button"
+                style={buttonStyle({ hovered: hovered === "free", active: !square, disabled: busy })}
+                disabled={busy}
+                aria-pressed={!square}
+                onClick={() => setSquare(false)}
+                {...hoverProps("free")}
+              >
+                {t("editor.cropFree")}
+              </button>
+              <button
+                type="button"
+                style={buttonStyle({ hovered: hovered === "square", active: square, disabled: busy })}
+                disabled={busy}
+                aria-pressed={square}
+                onClick={() => setSquare(true)}
+                {...hoverProps("square")}
+              >
+                {t("editor.cropSquare")}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <div style={styles.row}>
         <button

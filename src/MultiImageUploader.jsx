@@ -76,6 +76,9 @@ export default function MultiImageUploader({
   onChange,
   maxImages = 5,
   maxSize = 1024,
+  // Punto 105: filtros y ajustes en el editor. Solo el Muro (Feed.jsx);
+  // la Tienda no los pidió.
+  withFilters = false,
 }) {
   const { t } = useLanguage();
   const inputRef = useRef(null);
@@ -307,6 +310,7 @@ export default function MultiImageUploader({
           key={queue[0].id}
           file={queue[0].file}
           maxSize={maxSize}
+          withFilters={withFilters}
           onConfirm={handleEdited}
           onCancel={nextInQueue}
           onError={handleEditorError}

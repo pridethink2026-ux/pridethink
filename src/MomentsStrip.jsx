@@ -409,6 +409,7 @@ export default function MomentsStrip({ currentUid, myProfile }) {
         <ImageEditor
           file={editingFile}
           maxSize={MOMENT_MAX_SIZE}
+          withFilters
           onConfirm={handleEdited}
           onCancel={() => setEditingFile(null)}
           onError={() => {

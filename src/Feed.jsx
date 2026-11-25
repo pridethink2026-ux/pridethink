@@ -1392,6 +1392,7 @@ export default function Feed({
                   onChange={setComposerImages}
                   maxImages={4}
                   maxSize={1024}
+                  withFilters
                 />
               )}
               {composerImages.length === 0 ? (
