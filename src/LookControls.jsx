@@ -27,6 +27,15 @@ import { ADJUSTMENT_IDS, FILTER_IDS, applyLook } from "./photoFilters";
   buttonStyle (variables del tema).
 */
 
+// ¿Hay un mouse de verdad? (en iPhone y Android, no).
+const CAN_HOVER = (() => {
+  try {
+    return window.matchMedia("(hover: hover)").matches;
+  } catch {
+    return false;
+  }
+})();
+
 // Botones de la pestaña Ajustes: los 4 de color y "Belleza" (punto 106).
 const ADJUST_TOOLS = [...ADJUSTMENT_IDS, "beauty"];
 
@@ -200,10 +209,15 @@ export default function LookControls({ mode, look, onChange, thumbs }) {
   const [adjustment, setAdjustment] = useState(ADJUSTMENT_IDS[0]);
   const [hovered, setHovered] = useState(null);
 
-  const hoverProps = (key) => ({
-    onMouseEnter: () => setHovered(key),
-    onMouseLeave: () => setHovered(null),
-  });
+  // Punto 106: en pantallas táctiles el "pasar el mouse" se queda pegado
+  // en el último botón tocado y se ve igual que el activo; ahí no se usa.
+  const hoverProps = (key) =>
+    CAN_HOVER
+      ? {
+          onMouseEnter: () => setHovered(key),
+          onMouseLeave: () => setHovered(null),
+        }
+      : {};
 
   if (mode === "filters") {
     if (intensityOpen && look.filter !== "original") {
@@ -279,7 +293,9 @@ export default function LookControls({ mode, look, onChange, thumbs }) {
             // márgenes "auto" de la primera y la última la centran cuando
             // sí entra.
             style={{
-              ...buttonStyle({ hovered: hovered === id, active: adjustment === id }),
+              // El ajuste que se está editando va relleno con el color de
+              // acento, distinto del resaltado de pasar el mouse.
+              ...buttonStyle({ hovered: hovered === id, primary: adjustment === id }),
               padding: "6px 8px",
               fontSize: "12px",
               flex: "0 0 auto",
