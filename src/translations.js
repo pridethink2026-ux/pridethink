@@ -334,6 +334,7 @@ export const translations = {
     "filters.contrast": "Contraste",
     "filters.saturation": "Saturación",
     "filters.warmth": "Calidez",
+    "filters.beauty": "Belleza",
     "filters.reset": "Restablecer",
     "profile.about": "Acerca de",
     "profile.fullNameField": "Nombre completo",
@@ -1173,6 +1174,7 @@ export const translations = {
     "filters.contrast": "Contrast",
     "filters.saturation": "Saturation",
     "filters.warmth": "Warmth",
+    "filters.beauty": "Beauty",
     "filters.reset": "Reset",
 
     // Public profile (UserProfile.jsx)

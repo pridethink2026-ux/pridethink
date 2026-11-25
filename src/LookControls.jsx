@@ -17,7 +17,8 @@ import { ADJUSTMENT_IDS, FILTER_IDS, applyLook } from "./photoFilters";
       Elegir otro filtro vuelve la intensidad a 100 %.
     · "adjust": brillo, contraste, saturación y calidez; se elige uno y
       se mueve su barrita (-100..100). Cerca de 0 se pega al 0, para poder
-      volver al centro con el dedo.
+      volver al centro con el dedo. Además "Belleza" (punto 106), de 0
+      (apagada) a 100. Si los 5 botones no entran, la fila se desliza.
   - buildFilterThumbs(canvas): las miniaturas (dataURL por filtro) a
     partir de un canvas chico de la foto o del cuadro del video.
 
@@ -25,6 +26,9 @@ import { ADJUSTMENT_IDS, FILTER_IDS, applyLook } from "./photoFilters";
   VideoTrimmer: van encima de una imagen cualquiera. Los botones usan
   buttonStyle (variables del tema).
 */
+
+// Botones de la pestaña Ajustes: los 4 de color y "Belleza" (punto 106).
+const ADJUST_TOOLS = [...ADJUSTMENT_IDS, "beauty"];
 
 const THUMB_PX = 64;
 const SNAP_TO_ZERO = 4;
@@ -137,6 +141,14 @@ const styles = {
     textAlign: "right",
   },
   chips: { display: "flex", gap: "6px", justifyContent: "center", flexWrap: "wrap" },
+  chipScroll: {
+    display: "flex",
+    gap: "5px",
+    overflowX: "auto",
+    padding: "2px 4px",
+    WebkitOverflowScrolling: "touch",
+    scrollbarWidth: "none",
+  },
 };
 
 export function LookTabs({ tabs, active, onChange }) {
@@ -253,34 +265,42 @@ export default function LookControls({ mode, look, onChange, thumbs }) {
   }
 
   // mode === "adjust"
-  const anyChanged = ADJUSTMENT_IDS.some((id) => look[id] !== 0);
+  const anyChanged = ADJUST_TOOLS.some((id) => (look[id] || 0) !== 0);
+  const isBeauty = adjustment === "beauty";
   return (
     <div style={styles.panel}>
-      <div style={styles.chips}>
-        {ADJUSTMENT_IDS.map((id) => (
+      <div style={styles.chipScroll}>
+        {ADJUST_TOOLS.map((id, i) => (
           <button
             key={id}
             type="button"
-            // Más chicos que los botones de siempre: los 4 entran en una
-            // fila en un teléfono angosto.
+            // Más chicos que los botones de siempre, para que entren en una
+            // fila; si no entran (teléfono angosto), la fila se desliza. Los
+            // márgenes "auto" de la primera y la última la centran cuando
+            // sí entra.
             style={{
               ...buttonStyle({ hovered: hovered === id, active: adjustment === id }),
-              padding: "6px 10px",
+              padding: "6px 8px",
               fontSize: "12px",
+              flex: "0 0 auto",
+              whiteSpace: "nowrap",
+              marginLeft: i === 0 ? "auto" : 0,
+              marginRight: i === ADJUST_TOOLS.length - 1 ? "auto" : 0,
             }}
             aria-pressed={adjustment === id}
             onClick={() => setAdjustment(id)}
             {...hoverProps(id)}
           >
             {t(`filters.${id}`)}
-            {look[id] !== 0 ? " •" : ""}
+            {(look[id] || 0) !== 0 ? " •" : ""}
           </button>
         ))}
       </div>
       <Slider
         label={t(`filters.${adjustment}`)}
-        value={look[adjustment]}
-        min={-100}
+        value={look[adjustment] || 0}
+        // Belleza va de 0 (apagada) a 100; los demás, de -100 a 100.
+        min={isBeauty ? 0 : -100}
         max={100}
         onChange={(v) => onChange({ ...look, [adjustment]: v })}
       />
@@ -291,7 +311,7 @@ export default function LookControls({ mode, look, onChange, thumbs }) {
             style={{ ...buttonStyle({ hovered: hovered === "reset" }), padding: "5px 12px", fontSize: "12px" }}
             onClick={() => {
               const next = { ...look };
-              ADJUSTMENT_IDS.forEach((id) => {
+              ADJUST_TOOLS.forEach((id) => {
                 next[id] = 0;
               });
               onChange(next);
