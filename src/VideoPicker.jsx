@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLanguage } from "./LanguageContext";
-import { MAX_VIDEO_SECONDS } from "./videoCompress";
+import { MAX_VIDEO_SECONDS, videoStatsText } from "./videoCompress";
+import { DEBUG } from "./debug";
 import VideoTrimmer from "./VideoTrimmer";
 import { useVideoJob, startVideoJob, retryVideoJob, clearVideoJob, VIDEO_DEST_FEED } from "./videoJob";
 
@@ -268,6 +269,8 @@ export default function VideoPicker({
               ✕ {t("video.remove")}
             </button>
           </div>
+          {/* Punto 105: medir cuánto suma el filtro, solo con ?debug=1. */}
+          {DEBUG && videoStatsText(result) && <span style={mutedTextStyle}>{videoStatsText(result)}</span>}
         </div>
       )}
 

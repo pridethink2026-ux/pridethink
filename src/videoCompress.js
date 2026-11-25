@@ -31,21 +31,38 @@
   el TRAMO, no sobre el video entero: un video largo se puede publicar si
   se elige una parte que entre. Sin tramo, se usa el video entero.
 
+  FILTRO (punto 105, parte 3): con la opción `look` (photoFilters.js) cada
+  cuadro pasa por el filtro en la MISMA compresión (`video.process` de
+  Mediabunny, que llega con el cuadro ya reducido a 720p y derecho): se
+  dibuja en un canvas 2D (sample.draw, funciona en todos los navegadores),
+  se filtra con WebGL y se devuelve el canvas WebGL compartido, que
+  Mediabunny copia en el acto (new VideoFrame). Sin look, o con un look
+  neutro, no hay `process` y la compresión queda idéntica a la de antes.
+  Si el teléfono no tiene WebGL, el video sale sin filtro (no falla). Si
+  WebGL falla a la mitad, ese cuadro sale sin filtro (se cuenta en
+  stats.filterFailures). La miniatura sale del video ya comprimido, así
+  que lleva el filtro.
+
   Uso:
     const job = compressVideo(file, (progress) => ..., {  // progress 0..1
       start, end,            // opcional: el tramo elegido
       maxSeconds,            // opcional: MAX_VIDEO_SECONDS por defecto
+      look,                  // opcional: el filtro (punto 105)
     });
     const result = await job.promise;
     job.pause(); job.resume();  // al salir y volver a la app (videoJob.js)
     job.cancel();  // por ejemplo si la persona quita el video a la mitad
 
-  result: { blob, posterBlob, duration, width, height } (duration: la del
-  tramo publicado)
+  result: { blob, posterBlob, duration, width, height, stats } (duration:
+  la del tramo publicado; stats = { seconds, filtered, filterFailures }:
+  cuánto tardó la compresión SIN contar las pausas, para medir con
+  ?debug=1 cuánto suma el filtro)
   Errores (error.code): "notVideo" | "tooLong" | "unsupported" |
   "audioFailed" | "failed" | "canceled". En "tooLong", error.duration trae
   los segundos del tramo pedido y error.max el máximo.
 */
+
+import { isLookSupported, isNeutralLook, normalizeLook, renderLook } from "./photoFilters";
 
 export const MAX_VIDEO_SECONDS = 90; // Muro (punto 101)
 export const MAX_MOMENT_VIDEO_SECONDS = 77; // Momentos (punto 102)
@@ -212,6 +229,41 @@ async function pickAudioTrack(input) {
   return { track: primary, copy: false };
 }
 
+// Para ?debug=1 (VideoPicker y MomentVideoStatus): cuánto tardó la
+// compresión y si llevaba filtro. Solo diagnóstico, sin traducir.
+export function videoStatsText(result) {
+  const s = result && result.stats;
+  if (!s) return null;
+  let text = `debug: compresión ${s.seconds} s de ${Math.round(result.duration)} s de video`;
+  text += s.filtered ? " · con filtro" : " · sin filtro";
+  if (s.filterFailures) text += ` · ${s.filterFailures} cuadros sin filtro`;
+  return text;
+}
+
+// El filtro de cada cuadro (punto 105, ver el docstring). `counter`
+// junta los cuadros que no se pudieron filtrar.
+function makeLookProcess(look, counter) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  return (sample) => {
+    if (!ctx) {
+      counter.failures += 1;
+      return sample;
+    }
+    const w = sample.displayWidth;
+    const h = sample.displayHeight;
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    sample.draw(ctx, 0, 0, w, h);
+    const filtered = renderLook(canvas, look);
+    if (!filtered) {
+      counter.failures += 1;
+      return sample;
+    }
+    return filtered;
+  };
+}
+
 // El tramo pedido, ajustado al video real: { start, end, length, trimmed }.
 // "trimmed" es false si es el video entero (entonces no se pasa `trim`).
 // Exportada para el editor de recorte (parte 2), que usa el mismo cálculo.
@@ -286,6 +338,15 @@ export function compressVideo(file, onProgress, options = {}) {
 
       const audio = await pickAudioTrack(input);
 
+      // Filtro (punto 105): solo si cambia algo y el teléfono puede.
+      const wantsLook = options.look && !isNeutralLook(options.look);
+      const look = wantsLook && isLookSupported() ? normalizeLook(options.look) : null;
+      if (wantsLook && !look) {
+        // eslint-disable-next-line no-console
+        console.warn("compressVideo: sin WebGL, el video sale sin filtro");
+      }
+      const filterCounter = { failures: 0 };
+
       const output = new mb.Output({
         format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }),
         target: new mb.BufferTarget(),
@@ -316,6 +377,14 @@ export function compressVideo(file, onProgress, options = {}) {
                 // La rotación del iPhone se aplica a los cuadros, no se deja
                 // como dato aparte: así se ve derecho en cualquier reproductor.
                 allowTransformationMetadata: false,
+                // El filtro, cuadro por cuadro, a la misma medida.
+                ...(look
+                  ? {
+                      process: makeLookProcess(look, filterCounter),
+                      processedWidth: size.width,
+                      processedHeight: size.height,
+                    }
+                  : {}),
               },
         // Solo la pista elegida. Si se puede copiar, SIN codec ni quality
         // (cualquiera de los dos obliga a recodificar, ver arriba).
@@ -338,10 +407,16 @@ export function compressVideo(file, onProgress, options = {}) {
       }
       // Corre hasta terminar; si se pausa, espera a resume() y sigue desde
       // donde iba.
+      let activeMs = 0; // sin contar las pausas (stats)
       for (;;) {
         pauseController = new AbortController();
         if (paused) pauseController.abort();
-        await conversion.execute({ pauseSignal: pauseController.signal });
+        const startedAt = performance.now();
+        try {
+          await conversion.execute({ pauseSignal: pauseController.signal });
+        } finally {
+          activeMs += performance.now() - startedAt;
+        }
         if (conversion.state === "done") break;
         if (canceled) throw videoError("canceled");
         await waitForResume();
@@ -359,6 +434,11 @@ export function compressVideo(file, onProgress, options = {}) {
         duration: trim.length,
         width: size.width,
         height: size.height,
+        stats: {
+          seconds: Math.round(activeMs / 100) / 10,
+          filtered: !!look,
+          filterFailures: filterCounter.failures,
+        },
       };
     } finally {
       input.dispose();

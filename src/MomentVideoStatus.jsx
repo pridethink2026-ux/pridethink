@@ -1,6 +1,7 @@
 import React from "react";
 import { useLanguage } from "./LanguageContext";
-import { MAX_MOMENT_VIDEO_SECONDS } from "./videoCompress";
+import { MAX_MOMENT_VIDEO_SECONDS, videoStatsText } from "./videoCompress";
+import { DEBUG } from "./debug";
 import { videoErrorText } from "./VideoPicker";
 import { useVideoJob, clearVideoJob, retryVideoJob, VIDEO_DEST_MOMENT } from "./videoJob";
 import { MAX_ACTIVE_MOMENTS } from "./moments";
@@ -122,6 +123,10 @@ export default function MomentVideoStatus() {
           <div style={styles.fill(percent, job.status === "paused")} />
         </div>
         <span style={styles.muted}>{hint}</span>
+        {/* Punto 105: medir cuánto suma el filtro, solo con ?debug=1. */}
+        {DEBUG && uploading && videoStatsText(job.result) && (
+          <span style={{ ...styles.muted, display: "block", marginTop: "4px" }}>{videoStatsText(job.result)}</span>
+        )}
       </div>
     );
   }
